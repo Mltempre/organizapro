@@ -227,12 +227,12 @@ export default function ConfiguracoesPage() {
 
         {/* Card — Links e Horários */}
         <div style={card}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Links e Horarios</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Google Meu Negócio e Horários</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
             {[
-              { k: 'logo_url',              l: 'URL da Logo',              p: 'https://...'           },
-              { k: 'link_google',           l: 'Google Avaliacoes',        p: 'https://g.page/r/...'  },
-              { k: 'horario_funcionamento', l: 'Horario de Funcionamento', p: 'Seg a Sex: 08h-18h'    },
+              { k: 'logo_url',              l: 'URL da Logo',                             p: 'https://...'                              },
+              { k: 'link_google',           l: 'Link do Perfil da Empresa no Google',     p: 'Cole aqui o link do seu perfil no Google' },
+              { k: 'horario_funcionamento', l: 'Horario de Funcionamento',                p: 'Seg a Sex: 08h-18h'                       },
             ].map(f => (
               <div key={f.k}>
                 <label style={lbl}>{f.l}</label>
