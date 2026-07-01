@@ -148,7 +148,7 @@ export default function AdminShell({
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>OrganizaPro</div>
-              <div style={{ fontSize: 11, color: "#4a9bb0" }}>Painel de Organização</div>
+              <div style={{ fontSize: 10, color: "#4a9bb0", lineHeight: 1.35 }}>O sistema mais simples para organizar o seu negócio.</div>
             </div>
           </div>
 
