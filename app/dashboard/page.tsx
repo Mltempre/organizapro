@@ -4,43 +4,63 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AgItem = any;
+type AgItem = {
+  id: string;
+  hora: string;
+  paciente_nome: string;
+  tipo_consulta?: string;
+  status: string;
+  data: string;
+};
 
-type DashStats = {
-  clientes:         number;
-  clientesMes:      number;
+type DashData = {
   compromissosHoje: number;
-  proximosSete:     number;
   pendentes:        number;
-  confirmadas:      number;
+  atrasados:        number;
+  agendaHoje:       AgItem[];
+  proximos:         AgItem[];
+  atrasadosList:    AgItem[];
 };
 
 function saudacao(): string {
   const h = parseInt(
     new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit" })
   );
-  return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+  if (h >= 6 && h < 12) return "Bom dia";
+  if (h >= 12 && h < 18) return "Boa tarde";
+  return "Boa noite";
 }
 
-function prioridadeLocal(s: DashStats): string {
-  if (s.pendentes > 0)
-    return `Você tem ${s.pendentes} compromisso${s.pendentes > 1 ? "s" : ""} pendente${s.pendentes > 1 ? "s" : ""} aguardando confirmação`;
-  if (s.proximosSete > 0)
-    return `${s.proximosSete} compromisso${s.proximosSete > 1 ? "s" : ""} programado${s.proximosSete > 1 ? "s" : ""} para os próximos 7 dias — tudo organizado`;
-  if (s.clientes === 0)
-    return "Comece cadastrando seus primeiros clientes para organizar sua agenda";
-  return "Agenda em dia. Bom momento para cadastrar novos compromissos";
+function formatarDataBR(d: string): string {
+  const [y, m, dd] = d.split("-");
+  return `${dd}/${m}/${y}`;
 }
+
+function labelDia(d: string, hoje: string, amanha: string): string {
+  if (d === hoje)   return "Hoje";
+  if (d === amanha) return "Amanhã";
+  const [y, m, dd] = d.split("-");
+  const dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(dd));
+  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  return `${dias[dt.getDay()]}, ${dd}/${m}`;
+}
+
+const stStatus: Record<string, { bg: string; color: string; label: string }> = {
+  confirmado: { bg: "#00FF8722", color: "#00FF87", label: "Confirmado" },
+  agendado:   { bg: "#00C6FF22", color: "#00C6FF", label: "Agendado"   },
+  concluido:  { bg: "#1F4E5F22", color: "#4a9bb0", label: "Concluído"  },
+  faltou:     { bg: "#FF444422", color: "#f87171", label: "Faltou"     },
+  cancelado:  { bg: "#64748b22", color: "#94a3b8", label: "Cancelado"  },
+  reagendar:  { bg: "#ea580c22", color: "#fb923c", label: "Reagendar"  },
+};
 
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashStats>({
-    clientes: 0, clientesMes: 0, compromissosHoje: 0,
-    proximosSete: 0, pendentes: 0, confirmadas: 0,
+  const [dash, setDash] = useState<DashData>({
+    compromissosHoje: 0, pendentes: 0, atrasados: 0,
+    agendaHoje: [], proximos: [], atrasadosList: [],
   });
-  const [agendaHoje, setAgendaHoje] = useState<AgItem[]>([]);
 
   const carregarDados = useCallback(async () => {
     try {
@@ -55,40 +75,45 @@ export default function Dashboard() {
 
       const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       const [ano, mes, dia] = hoje.split("-").map(Number);
-      const inicioMes    = `${ano}-${String(mes).padStart(2, "0")}-01`;
-      const fimProxSete  = new Date(Date.UTC(ano, mes - 1, dia + 7)).toISOString().split("T")[0];
+      const amanha  = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
+      const fimSete = new Date(Date.UTC(ano, mes - 1, dia + 6)).toISOString().split("T")[0];
 
       const [
-        { count: totalClientes },
-        { count: clientesMes },
         { data: agHoje },
-        { count: proxSete },
-        { count: pendentesTotal },
+        { data: prox },
+        { data: atrasados },
       ] = await Promise.all([
-        supabase.from("pacientes").select("*", { count: "exact", head: true }).eq("clinica_id", cid),
-        supabase.from("pacientes").select("*", { count: "exact", head: true }).eq("clinica_id", cid).gte("created_at", inicioMes),
-        supabase.from("agendamentos").select("*").eq("clinica_id", cid).eq("data", hoje).order("hora"),
-        supabase.from("agendamentos").select("*", { count: "exact", head: true })
-          .eq("clinica_id", cid).gt("data", hoje).lte("data", fimProxSete)
-          .not("status", "in", '("cancelado","concluido","faltou")'),
-        supabase.from("agendamentos").select("*", { count: "exact", head: true })
-          .eq("clinica_id", cid).gte("data", hoje).eq("status", "agendado"),
+        supabase.from("agendamentos")
+          .select("id, hora, paciente_nome, tipo_consulta, status, data")
+          .eq("clinica_id", cid).eq("data", hoje)
+          .order("hora"),
+        supabase.from("agendamentos")
+          .select("id, hora, paciente_nome, tipo_consulta, status, data")
+          .eq("clinica_id", cid)
+          .gte("data", amanha).lte("data", fimSete)
+          .not("status", "in", '("cancelado","faltou")')
+          .order("data").order("hora"),
+        supabase.from("agendamentos")
+          .select("id, hora, paciente_nome, tipo_consulta, status, data")
+          .eq("clinica_id", cid)
+          .lt("data", hoje).eq("status", "agendado")
+          .order("data", { ascending: false }).order("hora")
+          .limit(20),
       ]);
 
-      const lista       = agHoje || [];
-      const confirmadas = lista.filter((a: AgItem) => ["confirmado","concluido"].includes(a.status)).length;
-      const pendentes   = lista.filter((a: AgItem) => a.status === "agendado").length;
-      const ativos      = lista.filter((a: AgItem) => !["cancelado","faltou"].includes(a.status));
+      const lista         = (agHoje       || []) as AgItem[];
+      const ativos        = lista.filter(a => !["cancelado", "faltou"].includes(a.status));
+      const pendentesHoje = lista.filter(a => a.status === "agendado");
+      const atrasadosList = (atrasados    || []) as AgItem[];
 
-      setStats({
-        clientes:         totalClientes || 0,
-        clientesMes:      clientesMes   || 0,
+      setDash({
         compromissosHoje: ativos.length,
-        proximosSete:     proxSete      || 0,
-        pendentes:        (pendentesTotal || 0) + pendentes,
-        confirmadas,
+        pendentes:        pendentesHoje.length,
+        atrasados:        atrasadosList.length,
+        agendaHoje:       lista,
+        proximos:         (prox || []) as AgItem[],
+        atrasadosList,
       });
-      setAgendaHoje(lista);
     } catch (err) {
       console.error(err);
     } finally {
@@ -98,43 +123,45 @@ export default function Dashboard() {
 
   useEffect(() => { carregarDados(); }, [carregarDados]);
 
-  const hoje = new Date();
+  // Date helpers
+  const hojeStr    = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const [ano, mes, dia] = hojeStr.split("-").map(Number);
+  const amanhaStr  = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
+  const hojeDate   = new Date();
   const diasSemana = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
-  const meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-  const dataStr = `${diasSemana[hoje.getDay()]}, ${hoje.getDate()} de ${meses[hoje.getMonth()]}`;
+  const mesesArr   = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const dataStr    = `${diasSemana[hojeDate.getDay()]}, ${hojeDate.getDate()} de ${mesesArr[hojeDate.getMonth()]}`;
 
-  const taxaHoje = stats.compromissosHoje > 0
-    ? Math.round((stats.confirmadas / stats.compromissosHoje) * 100) : null;
+  // Próximo compromisso de hoje ainda não concluído/cancelado
+  const focoDoDia = dash.agendaHoje.find(
+    a => !["concluido", "cancelado", "faltou"].includes(a.status)
+  ) ?? null;
 
-  const prioridade = prioridadeLocal(stats);
+  // Agrupar agenda (hoje + próximos) por data para os 7 dias
+  const gruposDias: Record<string, AgItem[]> = {};
+  dash.agendaHoje
+    .filter(a => !["cancelado", "faltou"].includes(a.status))
+    .forEach(a => {
+      if (!gruposDias[a.data]) gruposDias[a.data] = [];
+      gruposDias[a.data].push(a);
+    });
+  dash.proximos.forEach(a => {
+    if (!gruposDias[a.data]) gruposDias[a.data] = [];
+    gruposDias[a.data].push(a);
+  });
+  const diasOrdenados = Object.keys(gruposDias).sort();
 
-  const chips: Array<{ icon: string; text: string; color?: string }> = [
-    {
-      icon: "📅",
-      text: stats.compromissosHoje === 0
-        ? "Nenhum compromisso hoje"
-        : `${stats.compromissosHoje} compromisso${stats.compromissosHoje > 1 ? "s" : ""} hoje`,
-    },
-    ...(taxaHoje !== null ? [{ icon: "✅", text: `${taxaHoje}% confirmados` }] : []),
-    ...(stats.pendentes > 0
-      ? [{ icon: "⚠", text: `${stats.pendentes} pendente${stats.pendentes > 1 ? "s" : ""}`, color: "#f59e0b" }]
-      : []),
-    ...(stats.proximosSete > 0
-      ? [{ icon: "📆", text: `+${stats.proximosSete} nos próximos 7 dias` }]
-      : []),
-    ...(stats.pendentes === 0 && stats.compromissosHoje > 0
-      ? [{ icon: "✓", text: "Agenda sem pendências" }]
-      : []),
+  // Lembretes = atrasados + pendentes de hoje
+  const lembretes: AgItem[] = [
+    ...dash.atrasadosList,
+    ...dash.agendaHoje.filter(a => a.status === "agendado"),
   ];
 
-  const stStatus: Record<string, { bg: string; color: string; label: string }> = {
-    confirmado: { bg: "#00FF8722", color: "#00FF87", label: "Confirmado" },
-    agendado:   { bg: "#00C6FF22", color: "#00C6FF", label: "Agendado"   },
-    concluido:  { bg: "#1F4E5F22", color: "#4a9bb0", label: "Concluído"  },
-    faltou:     { bg: "#FF444422", color: "#f87171", label: "Faltou"     },
-    cancelado:  { bg: "#64748b22", color: "#94a3b8", label: "Cancelado"  },
-    reagendar:  { bg: "#ea580c22", color: "#fb923c", label: "Reagendar"  },
-  };
+  const botoesRapidos = [
+    { icon: "➕", label: "Novo Cliente",      action: () => router.push("/pacientes")    },
+    { icon: "📅", label: "Novo Compromisso",  action: () => router.push("/agendamentos") },
+    { icon: "🔍", label: "Pesquisar Cliente", action: () => router.push("/pacientes")    },
+  ];
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Inter,sans-serif" }}>
@@ -143,176 +170,223 @@ export default function Dashboard() {
   );
 
   return (
-    <AdminShell
-      title="Dashboard"
-      subtitle={`${dataStr} · ${stats.compromissosHoje} compromisso${stats.compromissosHoje !== 1 ? "s" : ""} hoje`}
-      actionLabel="+ Novo Compromisso"
-      actionOnClick={() => router.push("/agendamentos")}
-    >
+    <AdminShell title="Dashboard" subtitle={dataStr}>
       <style>{`
-        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-        .dc { animation: fadeUp 0.4s ease both; }
-        @media (max-width: 900px) { .d4 { grid-template-columns: 1fr 1fr !important; } }
-        @media (max-width: 500px) { .d4 { grid-template-columns: 1fr !important; } }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .dc  { animation: fadeUp 0.35s ease both; }
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
+        .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
       `}</style>
 
-      {/* ── SAUDAÇÃO ─────────────────────────────────────────────────────────── */}
-      <div className="dc" style={{ marginBottom: 24 }}>
-        <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 2px" }}>
-          👋 {saudacao()}!
-        </p>
-        <div style={{ fontSize: 16, fontWeight: 400, color: "#4a9bb0", margin: "0 0 3px", lineHeight: 1.3 }}>
-          <span style={{ fontWeight: 800, fontSize: 17, color: "#4a9bb0" }}>OrganizaPro</span>
-          {"  "}
-          <span style={{ color: "#475569", fontWeight: 400, fontSize: 13 }}>O sistema mais simples para organizar o seu negócio.</span>
-        </div>
-        <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
-          {stats.compromissosHoje === 0
-            ? `${dataStr} • Nenhum compromisso agendado para hoje.`
-            : `${dataStr} • ${stats.compromissosHoje} compromisso${stats.compromissosHoje > 1 ? "s" : ""} agendado${stats.compromissosHoje > 1 ? "s" : ""} para hoje.`}
-        </p>
-      </div>
-
-      {/* ── PRIORIDADE DO DIA ─────────────────────────────────────────────────── */}
+      {/* ── CARD PRINCIPAL ──────────────────────────────────────────────────── */}
       <div className="dc" style={{
-        background: "linear-gradient(135deg,rgba(31,78,95,0.12),rgba(74,155,176,0.06))",
-        border: "1px solid rgba(31,78,95,0.3)",
-        borderRadius: 16, padding: "18px 22px", marginBottom: 20,
-        display: "flex", alignItems: "center", gap: 16,
+        background: "linear-gradient(135deg,rgba(31,78,95,0.18),rgba(13,53,71,0.25))",
+        border: "1px solid rgba(31,78,95,0.35)",
+        borderRadius: 16, padding: "24px 28px", marginBottom: 16,
       }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-          background: "rgba(31,78,95,0.25)",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-        }}>🎯</div>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 5 }}>
-            Foco do Dia
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", lineHeight: 1.6 }}>
-            {prioridade}
-          </div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "#f1f5f9", marginBottom: 3 }}>
+          {saudacao()}! 👋
         </div>
-      </div>
+        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 22 }}>{dataStr}</div>
 
-      {/* ── CHIPS DE RESUMO ───────────────────────────────────────────────────── */}
-      {chips.length > 0 && (
-        <div className="dc" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
-          {chips.map((chip, i) => (
-            <span key={i} style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 20, padding: "5px 13px",
-              fontSize: 12, color: chip.color ?? "#64748b",
-            }}>
-              <span style={{ fontSize: 13 }}>{chip.icon}</span>
-              {chip.text}
+        <div style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600, marginBottom: 14 }}>
+          Hoje você possui:
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 16 }}>🟢</span>
+            <span style={{ fontSize: 26, fontWeight: 900, color: "#4ade80", minWidth: 36, lineHeight: 1 }}>
+              {dash.compromissosHoje}
             </span>
-          ))}
-        </div>
-      )}
-
-      {/* ── 4 CARDS MÉTRICAS ─────────────────────────────────────────────────── */}
-      <div className="d4 dc" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 24 }}>
-
-        {/* Clientes */}
-        <div style={{ background: "rgba(0,200,150,0.06)", border: "1px solid rgba(0,200,150,0.15)", borderRadius: 18, padding: "20px 18px" }}>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>👥 Clientes</div>
-          <div style={{ fontSize: 38, fontWeight: 900, color: "#00c896", lineHeight: 1, marginBottom: 6 }}>
-            {stats.clientes}
-          </div>
-          <div style={{ fontSize: 11, color: stats.clientesMes > 0 ? "#00c896" : "#475569" }}>
-            {stats.clientesMes > 0 ? `▲ +${stats.clientesMes} este mês` : "cadastrados na plataforma"}
-          </div>
-        </div>
-
-        {/* Compromissos Hoje */}
-        <div style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 18, padding: "20px 18px" }}>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>📅 Compromissos Hoje</div>
-          <div style={{ fontSize: 38, fontWeight: 900, color: "#818cf8", lineHeight: 1, marginBottom: 6 }}>
-            {stats.compromissosHoje}
-          </div>
-          <div style={{ fontSize: 11, color: "#475569" }}>
-            {taxaHoje !== null
-              ? `${taxaHoje}% confirmados`
-              : "nenhum agendado"}
-          </div>
-        </div>
-
-        {/* Próximos 7 dias */}
-        <div style={{ background: "rgba(31,78,95,0.08)", border: "1px solid rgba(31,78,95,0.2)", borderRadius: 18, padding: "20px 18px" }}>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>📆 Próximos 7 Dias</div>
-          <div style={{ fontSize: 38, fontWeight: 900, color: "#4a9bb0", lineHeight: 1, marginBottom: 6 }}>
-            {stats.proximosSete}
-          </div>
-          <div style={{ fontSize: 11, color: stats.proximosSete > 0 ? "#4a9bb0" : "#475569" }}>
-            {stats.proximosSete > 0 ? "compromissos programados" : "agenda livre"}
-          </div>
-        </div>
-
-        {/* Pendentes */}
-        <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.14)", borderRadius: 18, padding: "20px 18px" }}>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>⏳ Pendentes</div>
-          <div style={{ fontSize: 38, fontWeight: 900, color: stats.pendentes > 0 ? "#fbbf24" : "#4ade80", lineHeight: 1, marginBottom: 6 }}>
-            {stats.pendentes}
-          </div>
-          <div style={{ fontSize: 11, color: stats.pendentes > 0 ? "#f59e0b" : "#475569" }}>
-            {stats.pendentes > 0 ? "aguardando confirmação" : "nenhuma pendência"}
-          </div>
-        </div>
-      </div>
-
-      {/* ── COMPROMISSOS DE HOJE ─────────────────────────────────────────────── */}
-      <div className="dc" style={{
-        background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-        borderRadius: 16, padding: "20px",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9" }}>
-            Compromissos de Hoje
-          </div>
-          <button
-            onClick={() => router.push("/agendamentos")}
-            style={{ fontSize: 12, color: "#4a9bb0", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: "4px 8px" }}
-          >
-            Ver agenda →
-          </button>
-        </div>
-
-        {agendaHoje.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "36px 0", color: "#64748b" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📅</div>
-            Nenhum compromisso agendado para hoje.{" "}
-            <span
-              style={{ color: "#4a9bb0", cursor: "pointer", fontWeight: 600 }}
-              onClick={() => router.push("/agendamentos")}
-            >
-              Agendar agora
+            <span style={{ fontSize: 14, color: "#94a3b8" }}>
+              compromisso{dash.compromissosHoje !== 1 ? "s" : ""}
             </span>
           </div>
-        ) : agendaHoje.map((a: AgItem, i: number) => (
-          <div key={a.id} style={{
-            display: "flex", alignItems: "center", gap: 14, padding: "12px 0",
-            borderBottom: i < agendaHoje.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 16 }}>🟡</span>
+            <span style={{ fontSize: 26, fontWeight: 900, color: "#fbbf24", minWidth: 36, lineHeight: 1 }}>
+              {dash.pendentes}
+            </span>
+            <span style={{ fontSize: 14, color: "#94a3b8" }}>
+              pendente{dash.pendentes !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 16 }}>🔴</span>
+            <span style={{ fontSize: 26, fontWeight: 900, color: dash.atrasados > 0 ? "#f87171" : "#475569", minWidth: 36, lineHeight: 1 }}>
+              {dash.atrasados}
+            </span>
+            <span style={{ fontSize: 14, color: "#94a3b8" }}>
+              atrasado{dash.atrasados !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── BOTÕES RÁPIDOS ──────────────────────────────────────────────────── */}
+      <div className="dc" style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+        {botoesRapidos.map(b => (
+          <button key={b.label} className="btn-rapido" onClick={b.action} style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "10px 18px", borderRadius: 10,
+            border: "1px solid rgba(31,78,95,0.35)",
+            background: "rgba(31,78,95,0.12)",
+            color: "#4a9bb0", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", whiteSpace: "nowrap",
           }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#4a9bb0", minWidth: 50 }}>{a.hora}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{a.paciente_nome}</div>
-              <div style={{ fontSize: 11, color: "#64748b" }}>
-                {a.procedimento || "Sem descrição"}{a.profissional ? " · " + a.profissional : ""}
-              </div>
-            </div>
-            <span style={{
-              fontSize: 11, padding: "3px 10px", borderRadius: 10,
-              background: stStatus[a.status]?.bg || "#1a1a2e",
-              color:      stStatus[a.status]?.color || "#64748b",
-              fontWeight: 600, whiteSpace: "nowrap",
-            }}>
-              {stStatus[a.status]?.label || a.status}
-            </span>
-          </div>
+            <span>{b.icon}</span>
+            {b.label}
+          </button>
         ))}
       </div>
+
+      {/* ── FOCO DO DIA + PRÓXIMOS 7 DIAS ──────────────────────────────────── */}
+      <div className="dash-grid dc" style={{ marginBottom: 20 }}>
+
+        {/* FOCO DO DIA */}
+        <div style={{
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 14, padding: "20px",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 16 }}>
+            🎯 Foco do Dia
+          </div>
+          {focoDoDia ? (
+            <div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#4a9bb0", lineHeight: 1, marginBottom: 10 }}>
+                {focoDoDia.hora}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
+                {focoDoDia.paciente_nome}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
+                {focoDoDia.tipo_consulta || "Compromisso"}
+              </div>
+              <span style={{
+                display: "inline-flex",
+                fontSize: 11, padding: "3px 10px", borderRadius: 10,
+                background: stStatus[focoDoDia.status]?.bg || "#1a1a2e",
+                color:      stStatus[focoDoDia.status]?.color || "#64748b",
+                fontWeight: 600,
+              }}>
+                {stStatus[focoDoDia.status]?.label || focoDoDia.status}
+              </span>
+            </div>
+          ) : (
+            <div style={{ color: "#475569", fontSize: 13 }}>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>📅</div>
+              Nenhum compromisso para hoje.{" "}
+              <span
+                style={{ color: "#4a9bb0", cursor: "pointer", fontWeight: 600 }}
+                onClick={() => router.push("/agendamentos")}
+              >
+                Agendar agora
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* PRÓXIMOS 7 DIAS */}
+        <div style={{
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 14, padding: "20px",
+          maxHeight: 340, overflowY: "auto",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase" }}>
+              📆 Próximos 7 Dias
+            </div>
+            <button
+              onClick={() => router.push("/agendamentos")}
+              style={{ fontSize: 11, color: "#4a9bb0", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+            >
+              Ver agenda →
+            </button>
+          </div>
+
+          {diasOrdenados.length === 0 ? (
+            <div style={{ color: "#475569", fontSize: 13, textAlign: "center", paddingTop: 16 }}>
+              Nenhum compromisso nos próximos 7 dias.
+            </div>
+          ) : diasOrdenados.map((d, di) => (
+            <div key={d}>
+              <div style={{
+                fontSize: 10, fontWeight: 700,
+                color: d === hojeStr ? "#4a9bb0" : "#64748b",
+                textTransform: "uppercase", letterSpacing: "0.06em",
+                marginTop: di > 0 ? 14 : 0, marginBottom: 6,
+                paddingBottom: 4,
+                borderBottom: "1px solid rgba(255,255,255,0.05)",
+              }}>
+                {labelDia(d, hojeStr, amanhaStr)}
+              </div>
+              {gruposDias[d].map((a, ai) => (
+                <div key={a.id} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  paddingTop: ai === 0 ? 2 : 6,
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4a9bb0", minWidth: 44 }}>{a.hora}</span>
+                  <span style={{ fontSize: 13, color: "#cbd5e1", flex: 1 }}>{a.paciente_nome}</span>
+                  <span style={{
+                    fontSize: 10, padding: "2px 8px", borderRadius: 8,
+                    background: stStatus[a.status]?.bg || "#1a1a2e",
+                    color:      stStatus[a.status]?.color || "#64748b",
+                    fontWeight: 600, whiteSpace: "nowrap",
+                  }}>
+                    {stStatus[a.status]?.label || a.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+      </div>
+
+      {/* ── LEMBRETES ────────────────────────────────────────────────────────── */}
+      {lembretes.length > 0 && (
+        <div className="dc" style={{
+          background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.18)",
+          borderRadius: 14, padding: "20px",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>
+            ⚠️ Lembretes
+          </div>
+          {lembretes.map((a, i) => (
+            <div key={`${a.id}-${i}`} style={{
+              display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+              borderBottom: i < lembretes.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+            }}>
+              <span style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 6, fontWeight: 700, whiteSpace: "nowrap",
+                background: a.data < hojeStr ? "rgba(248,113,113,0.15)" : "rgba(245,158,11,0.15)",
+                color:      a.data < hojeStr ? "#f87171" : "#fbbf24",
+              }}>
+                {a.data < hojeStr ? "ATRASADO" : "PENDENTE"}
+              </span>
+              <span style={{ fontSize: 12, color: "#64748b", minWidth: 60 }}>
+                {a.data < hojeStr ? formatarDataBR(a.data) : a.hora}
+              </span>
+              <span style={{ fontSize: 13, color: "#f1f5f9", flex: 1, fontWeight: 500 }}>{a.paciente_nome}</span>
+              <span style={{ fontSize: 11, color: "#64748b" }}>{a.tipo_consulta || ""}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 14 }}>
+            <button
+              onClick={() => router.push("/agendamentos")}
+              style={{
+                padding: "8px 16px", borderRadius: 8,
+                border: "1px solid rgba(245,158,11,0.3)",
+                background: "rgba(245,158,11,0.08)",
+                color: "#f59e0b", fontSize: 12, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              Gerenciar na agenda →
+            </button>
+          </div>
+        </div>
+      )}
 
     </AdminShell>
   );
