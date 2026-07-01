@@ -16,6 +16,7 @@ interface Agendamento {
   status: string;
   confirmado?: boolean;
   created_at: string;
+  observacao?: string;
 }
 
 type FormData = {
@@ -52,6 +53,129 @@ const formInicial: FormData = {
   tipo_consulta: 'Reunião', profissional: '', status: 'agendado',
 };
 
+// ── PDF ───────────────────────────────────────────────────────────────
+
+type EmpresaConfig = {
+  nome_clinica?: string;
+  telefone?: string;
+  email?: string;
+  endereco?: string;
+  logo_url?: string;
+};
+
+function buildPdfHtml(ags: Agendamento[], empresa: EmpresaConfig | null, data: string): string {
+  const [y, m, d] = data.split('-');
+  const dataFmt = `${d}/${m}/${y}`;
+
+  const logo = empresa?.logo_url
+    ? `<img src="${empresa.logo_url}" style="height:48px;object-fit:contain" alt="Logo" onerror="this.style.display='none'">`
+    : `<div style="width:48px;height:48px;border-radius:10px;background:#1F4E5F;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:white;font-family:sans-serif">O</div>`;
+
+  const rodape = ([
+    empresa?.telefone ? `📱 ${empresa.telefone}` : null,
+    empresa?.email    ? `📧 ${empresa.email}`    : null,
+    empresa?.endereco ? `📍 ${empresa.endereco}` : null,
+  ] as (string | null)[]).filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+
+  const linhas = ags.map(a => {
+    const stKey = (a.status === 'agendado' && a.data < data) ? 'vencido' : a.status;
+    const stLabel = statusConfig[stKey]?.label || a.status;
+    return `<tr>
+      <td style="font-weight:700;color:#1F4E5F;white-space:nowrap">${a.hora?.substring(0,5) || '-'}</td>
+      <td>${a.paciente_nome || '-'}</td>
+      <td>${a.tipo_consulta || '-'}</td>
+      <td>${a.profissional || '-'}</td>
+      <td class="st-${stKey}">${stLabel}</td>
+      <td style="color:#475569">${a.observacao || ''}</td>
+    </tr>`;
+  }).join('');
+
+  const total      = ags.length;
+  const confirmados = ags.filter(a => a.status === 'confirmado' || a.confirmado).length;
+  const concluidos  = ags.filter(a => a.status === 'concluido').length;
+
+  const tableHtml = total === 0
+    ? `<div style="text-align:center;padding:40px;color:#94a3b8;font-size:14px">Nenhum compromisso agendado para este dia.</div>`
+    : `<table>
+        <thead><tr>
+          <th>Hora</th><th>Cliente</th><th>Serviço</th><th>Responsável</th><th>Status</th><th>Observação</th>
+        </tr></thead>
+        <tbody>${linhas}</tbody>
+       </table>`;
+
+  const now = new Date();
+  const geradoEm = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}`;
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agenda ${dataFmt}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;background:#fff}
+.page{max-width:860px;margin:0 auto;padding:40px 48px}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:22px;border-bottom:2px solid #1F4E5F;margin-bottom:26px}
+.hdr-l{display:flex;align-items:center;gap:16px}
+.brand{font-size:22px;font-weight:800;color:#1F4E5F;letter-spacing:-0.5px}
+.emp{font-size:14px;color:#475569;margin-top:3px}
+.hdr-r{text-align:right}
+.rtitle{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.rdate{font-size:20px;font-weight:700;color:#1F4E5F;margin-top:4px}
+.summary{background:#f8fafc;border-radius:8px;padding:14px 20px;margin-bottom:22px;display:flex;gap:32px;flex-wrap:wrap}
+.si{font-size:13px;color:#475569}
+.si strong{color:#1F4E5F}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:#1F4E5F;color:white}
+thead th{padding:10px 12px;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+tbody tr:nth-child(even){background:#f8fafc}
+tbody tr{border-bottom:1px solid #e2e8f0}
+tbody td{padding:10px 12px;color:#334155;vertical-align:top}
+.st-agendado{color:#0ea5e9;font-weight:600}
+.st-confirmado{color:#16a34a;font-weight:600}
+.st-concluido{color:#4a9bb0;font-weight:600}
+.st-cancelado{color:#64748b;font-weight:600}
+.st-faltou{color:#dc2626;font-weight:600}
+.st-reagendar{color:#f59e0b;font-weight:600}
+.st-vencido{color:#f97316;font-weight:600}
+.footer{margin-top:34px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center}
+.f-contacts{font-size:12px;color:#64748b;margin-bottom:6px}
+.f-gen{font-size:10px;color:#cbd5e1}
+@media print{.page{padding:20px 24px}@page{margin:1.5cm}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hdr">
+    <div class="hdr-l">
+      ${logo}
+      <div>
+        <div class="brand">OrganizaPro</div>
+        ${empresa?.nome_clinica ? `<div class="emp">${empresa.nome_clinica}</div>` : ''}
+      </div>
+    </div>
+    <div class="hdr-r">
+      <div class="rtitle">Relatório de Agenda</div>
+      <div class="rdate">${dataFmt}</div>
+    </div>
+  </div>
+  <div class="summary">
+    <div class="si">Total: <strong>${total} compromisso${total !== 1 ? 's' : ''}</strong></div>
+    <div class="si">Confirmados: <strong>${confirmados}</strong></div>
+    <div class="si">Concluídos: <strong>${concluidos}</strong></div>
+  </div>
+  ${tableHtml}
+  <div class="footer">
+    ${rodape ? `<div class="f-contacts">${rodape}</div>` : ''}
+    <div class="f-gen">Gerado pelo OrganizaPro em ${geradoEm}</div>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+
 export default function AgendamentosPage() {
   const router = useRouter();
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
@@ -68,6 +192,7 @@ export default function AgendamentosPage() {
   const [enviando, setEnviando]         = useState<string | null>(null);
   const [msgEnvio, setMsgEnvio]         = useState('');
   const [filtroData, setFiltroData]     = useState<'proximos' | 'confirmados' | 'historico'>('proximos');
+  const [gerandoPdf, setGerandoPdf]     = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -245,6 +370,40 @@ export default function AgendamentosPage() {
   function formatarData(d: string)    { if (!d) return '-'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
   function formatarHorario(h: string) { if (!h) return '-'; return h.substring(0, 5); }
 
+  async function gerarPDF() {
+    // Abre a janela imediatamente (antes de qualquer await) para não ser bloqueada como popup
+    const win = window.open('', '_blank', 'width=920,height=700');
+    if (!win) { alert('Popup bloqueado. Permita popups para este site e tente novamente.'); return; }
+    win.document.write('<html><body style="font-family:sans-serif;padding:48px;color:#64748b;font-size:15px">⏳ Gerando PDF...</body></html>');
+
+    setGerandoPdf(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: cfg } = await supabase
+        .from('clinica_config')
+        .select('nome_clinica,telefone,email,endereco,logo_url')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const agHoje = agendamentos
+        .filter(a => a.data === hojeLocal)
+        .sort((a, b) => a.hora.localeCompare(b.hora));
+
+      const html = buildPdfHtml(agHoje, cfg, hojeLocal);
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 800);
+    } catch (e) {
+      win.close();
+      console.error('Erro ao gerar PDF:', e);
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
+
   const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 
   const filtrados = agendamentos.filter(a =>
@@ -310,14 +469,21 @@ export default function AgendamentosPage() {
         ))}
       </div>
 
-      {/* BUSCA */}
-      <div style={{ marginBottom:12 }}>
+      {/* BUSCA + PDF */}
+      <div style={{ display:'flex', gap:10, marginBottom:12 }}>
         <input
-          style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }}
+          style={{ flex:1, padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }}
           placeholder="Buscar por cliente ou telefone..."
           value={busca}
           onChange={e => setBusca(e.target.value)}
         />
+        <button
+          onClick={gerarPDF}
+          disabled={gerandoPdf}
+          style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor: gerandoPdf ? 'default' : 'pointer', whiteSpace:'nowrap', opacity: gerandoPdf ? 0.7 : 1 }}
+        >
+          {gerandoPdf ? '⏳ Gerando...' : '📄 Exportar PDF'}
+        </button>
       </div>
 
       {/* ABAS */}
