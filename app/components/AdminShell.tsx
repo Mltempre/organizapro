@@ -8,7 +8,6 @@ const nav = [
   { l: "Dashboard",     h: "/dashboard",     i: "⚡" },
   { l: "Clientes",      h: "/pacientes",     i: "👤" },
   { l: "Agenda",        h: "/agendamentos",  i: "📅" },
-  { l: "Meu Site",      h: "/site",          i: "🌐" },
   { l: "Configuracoes", h: "/configuracoes", i: "⚙️" },
 ];
 

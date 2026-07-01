@@ -126,12 +126,12 @@ export default function ConfiguracoesPage() {
         .from('clinica_usuarios').select('clinica_id').eq('usuario_id', user.id).maybeSingle();
 
       if (!cu?.clinica_id) {
-        setTesteMsg('erro:Clinica nao vinculada ao usuario.');
+        setTesteMsg('erro:Negócio não vinculado ao usuário.');
         return;
       }
 
       if (!config.telefone) {
-        setTesteMsg('erro:Informe o WhatsApp da clinica no campo acima antes de testar.');
+        setTesteMsg('erro:Informe o WhatsApp do negócio no campo acima antes de testar.');
         return;
       }
 
@@ -181,14 +181,14 @@ export default function ConfiguracoesPage() {
   );
 
   return (
-    <AdminShell title="Configuracoes" subtitle="Personalize as informacoes da sua clinica">
+    <AdminShell title="Configuracoes" subtitle="Personalize as informações do seu negócio">
       <div style={{ width: '100%', maxWidth: 960 }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Configuracoes</h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '8px 0 0' }}>Personalize as informacoes da sua clinica</p>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '8px 0 0' }}>Personalize as informações do seu negócio</p>
           </div>
           <button onClick={salvar} disabled={salvando} style={{ padding: '12px 22px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
             {salvando ? 'Salvando...' : 'Salvar'}
@@ -209,12 +209,12 @@ export default function ConfiguracoesPage() {
 
         {/* Card — Informações da Clínica */}
         <div style={card}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Informacoes da Clinica</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Informações do Negócio</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
             {[
-              { k: 'nome_clinica', l: 'Nome da Clinica', t: 'text',  p: 'Ex: Clinica Saude'  },
-              { k: 'telefone',     l: 'WhatsApp',        t: 'text',  p: '11999999999'         },
-              { k: 'email',        l: 'Email',           t: 'email', p: 'contato@clinica.com' },
+              { k: 'nome_clinica', l: 'Nome do Negócio', t: 'text',  p: 'Ex: Meu Negócio'         },
+              { k: 'telefone',     l: 'WhatsApp',        t: 'text',  p: '11999999999'              },
+              { k: 'email',        l: 'Email',           t: 'email', p: 'contato@seunegocio.com'   },
               { k: 'endereco',     l: 'Endereco',        t: 'text',  p: 'Rua das Flores, 123' },
             ].map(f => (
               <div key={f.k}>
