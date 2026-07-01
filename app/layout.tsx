@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ClínicaFlow",
-  description: "Gestão clínica moderna para pacientes, agendamentos e atendimento integrado.",
+  title: "OrganizaPro",
+  description: "O sistema mais simples para organizar o seu negócio.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

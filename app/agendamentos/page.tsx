@@ -273,12 +273,12 @@ export default function AgendamentosPage() {
 
   return (
     <AdminShell
-      title="Agendamentos"
-      subtitle={`${exibidos.length} agendamento${exibidos.length !== 1 ? 's' : ''} encontrado${exibidos.length !== 1 ? 's' : ''}`}
-      actionLabel="+ Novo agendamento"
+      title="Agenda"
+      subtitle={`${exibidos.length} compromisso${exibidos.length !== 1 ? 's' : ''} encontrado${exibidos.length !== 1 ? 's' : ''}`}
+      actionLabel="+ Novo compromisso"
       actionOnClick={abrirNovo}
     >
-      {carregando && <div style={{textAlign:'center', padding:'40px 20px', color:'#64748b'}}>Carregando agendamentos...</div>}
+      {carregando && <div style={{textAlign:'center', padding:'40px 20px', color:'#64748b'}}>Carregando agenda...</div>}
       {!carregando && erro && <div style={{background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:8, padding:16, marginBottom:20, color:'#fca5a5'}}><strong>Erro:</strong> {erro}</div>}
       {msgEnvio && (
         <div style={{ background: msgEnvio.startsWith('sucesso') ? '#052e16' : '#450a0a', border: `1px solid ${msgEnvio.startsWith('sucesso') ? '#166534' : '#7f1d1d'}`, borderRadius:8, padding:'12px 16px', marginBottom:16, color: msgEnvio.startsWith('sucesso') ? '#4ade80' : '#fca5a5', fontSize:13 }}>
@@ -288,7 +288,7 @@ export default function AgendamentosPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:16, marginBottom:28 }}>
         {[
-          { label:'Agendamentos Hoje', valor:agendadosHoje, cor:'#0ea5e9' },
+          { label:'Compromissos Hoje', valor:agendadosHoje, cor:'#0ea5e9' },
           { label:'Confirmados',       valor:confirmados,   cor:'#16a34a' },
           { label:'Faltas',            valor:faltas,        cor:'#dc2626' },
           { label:'Concluidos',        valor:concluidos,    cor:'#7c3aed' },
@@ -301,12 +301,12 @@ export default function AgendamentosPage() {
       </div>
 
       <div style={{ marginBottom:12 }}>
-        <input style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }} placeholder="Buscar por paciente ou telefone..." value={busca} onChange={e => setBusca(e.target.value)} />
+        <input style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }} placeholder="Buscar por cliente ou telefone..." value={busca} onChange={e => setBusca(e.target.value)} />
       </div>
 
       <div style={{ display:'flex', gap:8, marginBottom:16 }}>
         {([
-          { key: 'proximos',    label: 'Próximos Agendamentos' },
+          { key: 'proximos',    label: 'Próximos Compromissos' },
           { key: 'confirmados', label: 'Confirmados'           },
           { key: 'historico',   label: 'Histórico'             },
         ] as const).map(({ key, label }) => {

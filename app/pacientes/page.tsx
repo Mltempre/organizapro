@@ -233,12 +233,12 @@ export default function PacientesPage() {
 
   return (
     <AdminShell
-      title="Pacientes"
-      subtitle={`${filtrados.length} paciente${filtrados.length !== 1 ? 's' : ''} encontrado${filtrados.length !== 1 ? 's' : ''}`}
-      actionLabel="+ Novo paciente"
+      title="Clientes"
+      subtitle={`${filtrados.length} cliente${filtrados.length !== 1 ? 's' : ''} encontrado${filtrados.length !== 1 ? 's' : ''}`}
+      actionLabel="+ Novo cliente"
       actionOnClick={abrirNovo}
     >
-      {carregando && <div style={{textAlign:'center', padding:'40px 20px', color:'#64748b'}}>Carregando pacientes...</div>}
+      {carregando && <div style={{textAlign:'center', padding:'40px 20px', color:'#64748b'}}>Carregando clientes...</div>}
       {!carregando && erro && <div style={{background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:8, padding:16, marginBottom:20, color:'#fca5a5'}}><strong>Erro:</strong> {erro}</div>}
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:16, marginBottom:28 }}>
@@ -251,7 +251,7 @@ export default function PacientesPage() {
       </div>
 
       <div style={{ marginBottom:20 }}>
-        <input style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }} placeholder="Buscar por nome, telefone ou e-mail..." value={busca} onChange={e => setBusca(e.target.value)} />
+        <input style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }} placeholder="Buscar por nome, telefone ou e-mail do cliente..." value={busca} onChange={e => setBusca(e.target.value)} />
       </div>
 
       <div style={{ background:'#1e2130', borderRadius:12, border:'1px solid #2d3148', overflow:'hidden' }}>

@@ -213,8 +213,8 @@ export default function Dashboard() {
   return (
     <AdminShell
       title="Dashboard"
-      subtitle={`${dataStr} · ${stats.consultasHoje} consultas hoje`}
-      actionLabel="+ Nova Consulta"
+      subtitle={`${dataStr} · ${stats.consultasHoje} compromisso${stats.consultasHoje !== 1 ? "s" : ""} hoje`}
+      actionLabel="+ Novo Compromisso"
       actionOnClick={() => router.push("/agendamentos")}
     >
       <style>{`
@@ -246,36 +246,21 @@ export default function Dashboard() {
           <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 2px" }}>
             👋 {saudacao()}!
           </p>
-          <div style={{ fontSize: 16, fontWeight: 400, color: "#7c3aed", margin: "0 0 3px", letterSpacing: 0.2, lineHeight: 1.3 }}>
-            <span style={{ fontWeight: 800, fontSize: 17 }}>ClínicaFlow</span>
+          <div style={{ fontSize: 16, fontWeight: 400, color: "#1F4E5F", margin: "0 0 3px", letterSpacing: 0.2, lineHeight: 1.3 }}>
+            <span style={{ fontWeight: 800, fontSize: 17 }}>OrganizaPro</span>
             {" "}
-            <span style={{ color: "#475569", fontWeight: 400 }}>• Painel Executivo</span>
+            <span style={{ color: "#475569", fontWeight: 400 }}>• Painel de Organização</span>
           </div>
           <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
             {stats.consultasHoje === 0
-              ? `${dataStr} • Nenhuma consulta agendada para hoje.`
-              : `${dataStr} • Sua clínica possui ${stats.consultasHoje} consulta${stats.consultasHoje > 1 ? "s" : ""} agendada${stats.consultasHoje > 1 ? "s" : ""} para hoje.`}
+              ? `${dataStr} • Nenhum compromisso agendado para hoje.`
+              : `${dataStr} • Sua empresa possui ${stats.consultasHoje} compromisso${stats.consultasHoje > 1 ? "s" : ""} agendado${stats.consultasHoje > 1 ? "s" : ""} para hoje.`}
           </p>
         </div>
-
-        {/* 7. Botão Raio-X (substitui o 2º "Nova Consulta") */}
-        <button
-          onClick={() => router.push("/raio-x")}
-          style={{
-            display: "flex", alignItems: "center", gap: 7,
-            padding: "9px 18px", borderRadius: 10,
-            border: "1px solid rgba(124,58,237,0.3)",
-            background: "rgba(124,58,237,0.08)",
-            color: "#c4b5fd", fontSize: 13, fontWeight: 600, cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          📊 Diagnóstico
-        </button>
       </div>
 
       {/* ════════════════════════════════════════════════════════
-          1. HERO EXECUTIVO — Índice ClínicaFlow
+          1. HERO EXECUTIVO — Índice OrganizaPro
           ════════════════════════════════════════════════════════ */}
       {rxLoading ? (
         <div className="rx-sk dc" style={{ height: 168, marginBottom: 20 }} />
@@ -292,7 +277,7 @@ export default function Dashboard() {
           {/* Score */}
           <div style={{ textAlign: "center", flexShrink: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>
-              Índice ClínicaFlow
+              Índice OrganizaPro
             </div>
             <div style={{ fontSize: 68, fontWeight: 900, color: nivel.color, lineHeight: 1, letterSpacing: -4 }}>
               {raioX.indice}
@@ -333,7 +318,7 @@ export default function Dashboard() {
           <div className="hero-cta" style={{ display: "flex", flexDirection: "column", gap: 12, flexShrink: 0, minWidth: 160 }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "#475569" }}>Índice ClínicaFlow</span>
+                <span style={{ fontSize: 11, color: "#475569" }}>Índice OrganizaPro</span>
                 <span style={{ fontSize: 11, color: nivel.color, fontWeight: 700 }}>{raioX.indice}/100</span>
               </div>
               <div style={{ height: 5, background: "rgba(255,255,255,0.05)", borderRadius: 100, overflow: "hidden" }}>
@@ -348,7 +333,7 @@ export default function Dashboard() {
                 color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
               }}
             >
-              📊 Ver Diagnóstico Completo
+              📊 Ver Análise Completa
             </button>
           </div>
         </div>
@@ -407,7 +392,7 @@ export default function Dashboard() {
 
         {/* Pacientes */}
         <div style={{ background: "rgba(0,200,150,0.06)", border: "1px solid rgba(0,200,150,0.15)", borderRadius: 18, padding: "20px 18px" }}>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>👥 Pacientes Ativos</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>👥 Clientes Ativos</div>
           <div style={{ fontSize: 38, fontWeight: 900, color: "#00c896", lineHeight: 1, marginBottom: 6 }}>
             {stats.pacientes}
           </div>
@@ -418,7 +403,7 @@ export default function Dashboard() {
 
         {/* Consultas hoje */}
         <div style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 18, padding: "20px 18px" }}>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>📅 Consultas Hoje</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>📅 Compromissos Hoje</div>
           <div style={{ fontSize: 38, fontWeight: 900, color: "#818cf8", lineHeight: 1, marginBottom: 6 }}>
             {stats.consultasHoje}
           </div>
@@ -431,7 +416,7 @@ export default function Dashboard() {
 
         {/* Agendamentos */}
         <div style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.14)", borderRadius: 18, padding: "20px 18px" }}>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>✅ Agendamentos</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>✅ Compromissos</div>
           <div style={{ fontSize: 38, fontWeight: 900, color: "#60a5fa", lineHeight: 1, marginBottom: 6 }}>
             {stats.agTotal}
           </div>
@@ -489,9 +474,9 @@ export default function Dashboard() {
         </div>
         {agendaHoje.length === 0 ? (
           <div style={{ textAlign: "center", padding: "36px 0", color: "#64748b" }}>
-            Nenhuma consulta agendada.{" "}
+            Nenhum compromisso agendado.{" "}
             <span
-              style={{ color: "#7c3aed", cursor: "pointer", fontWeight: 600 }}
+              style={{ color: "#1F4E5F", cursor: "pointer", fontWeight: 600 }}
               onClick={() => router.push("/agendamentos")}
             >
               Agendar agora
@@ -502,7 +487,7 @@ export default function Dashboard() {
             display: "flex", alignItems: "center", gap: 14, padding: "12px 0",
             borderBottom: i < agendaHoje.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
           }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#7c3aed", minWidth: 50 }}>{a.hora}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1F4E5F", minWidth: 50 }}>{a.hora}</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{a.paciente_nome}</div>
               <div style={{ fontSize: 11, color: "#64748b" }}>
