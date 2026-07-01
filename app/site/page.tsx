@@ -168,7 +168,7 @@ export default function Site() {
     if (!siteUrl) return;
     try {
       if (navigator.share) {
-        await navigator.share({ title: form.nome || "Minha Clínica", text: "Conheça nossa clínica!", url: siteUrl });
+        await navigator.share({ title: form.nome || "Meu Negócio", text: "Conheça nosso negócio!", url: siteUrl });
       } else {
         await navigator.clipboard.writeText(siteUrl);
         setSucesso("Link copiado para compartilhar!");
@@ -215,8 +215,8 @@ export default function Site() {
     setErro("");
 
     const normalizedSlug = generateSlug(computedSlug.trim());
-    if (!normalizedSlug) { setErro("Informe o nome da clínica."); setSalvando(false); return; }
-    if (!clinicaId || !userId) { setErro("Clínica não identificada. Recarregue."); setSalvando(false); return; }
+    if (!normalizedSlug) { setErro("Informe o nome do negócio."); setSalvando(false); return; }
+    if (!clinicaId || !userId) { setErro("Negócio não identificado. Recarregue."); setSalvando(false); return; }
 
     const { data: existing } = await supabase
       .from("clinica_config")
@@ -242,7 +242,7 @@ export default function Site() {
         email:           form.email,
       }, { onConflict: "id" });
 
-    if (clinicaError) { setErro("Erro ao salvar dados da clínica."); setSalvando(false); return; }
+    if (clinicaError) { setErro("Erro ao salvar dados do negócio."); setSalvando(false); return; }
 
     const configBase = {
       user_id:    userId,
@@ -305,7 +305,7 @@ export default function Site() {
   const MIGRATION_SQL = `ALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS hero_url TEXT;\nALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS nota_google NUMERIC(3,1);\nALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS num_avaliacoes INTEGER;`;
 
   return (
-    <AdminShell title="Meu Site" subtitle="Configure as informacoes da sua clinica para o site publico">
+    <AdminShell title="Meu Site" subtitle="Configure as informações do seu negócio para o site público">
 
       {/* ── MODAL FEEDBACK PREMIUM ─────────────────────────────────────────── */}
       {feedbackModal && (
@@ -315,7 +315,7 @@ export default function Site() {
             <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
             <h3 style={{ fontSize:20, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Site publicado com sucesso!</h3>
             <p style={{ fontSize:14, color:"rgba(255,255,255,0.55)", margin:"0 0 20px", lineHeight:1.6 }}>
-              Sua clínica agora tem uma presença digital profissional. Compartilhe o link para atrair novos pacientes.
+              Seu negócio agora tem uma presença digital profissional. Compartilhe o link para atrair novos clientes.
             </p>
             <div style={{ background:"rgba(0,200,150,0.08)", border:"1px solid rgba(0,200,150,0.2)", borderRadius:10, padding:"10px 14px", marginBottom:20, fontSize:13, color:"#00c896", wordBreak:"break-all", fontWeight:600 }}>
               {siteUrl}
@@ -347,8 +347,8 @@ export default function Site() {
           { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
           { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
           { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-          { l:"Servicos",      h:"/site/servicos",     i:"🦷"  },
-          { l:"Estrutura",     h:"/site/estrutura",    i:"🏥"  },
+          { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
+          { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
         ].map(m => (
           <button key={m.h} onClick={() => router.push(m.h)} style={{ padding:"7px 14px", borderRadius:8, border:`1px solid ${m.a ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.08)"}`, background:m.a ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.02)", color:m.a ? "#c4b5fd" : "#64748b", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontWeight:m.a ? 600 : 400, whiteSpace:"nowrap" }}>
             {m.i} {m.l}
@@ -418,7 +418,7 @@ export default function Site() {
       <div className="panel" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
         <div>
           <div style={{ fontSize:13, fontWeight:600, color:"var(--accent)" }}>🔗 URL pública</div>
-          <div style={{ fontSize:12, color:"var(--muted)", marginTop:4 }}>{siteUrl || "Preencha o nome da clínica para gerar a URL"}</div>
+          <div style={{ fontSize:12, color:"var(--muted)", marginTop:4 }}>{siteUrl || "Preencha o nome do negócio para gerar a URL"}</div>
         </div>
         <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
           <button type="button" className="button-secondary" onClick={copyLink} style={{ padding:"10px 16px", fontSize:13 }}>
@@ -436,12 +436,12 @@ export default function Site() {
       {/* ── DADOS DA CLÍNICA ─────────────────────────────────────────────────── */}
       <div className="grid-cards">
         {([
-          { label:"Nome da Clinica",      key:"nome",          placeholder:"Ex: Clinica Sorriso"  },
-          { label:"Slug público",         key:"slug",          placeholder:"slug-da-clinica"       },
-          { label:"Especialidade",        key:"especialidade", placeholder:"Ex: Odontologia"       },
+          { label:"Nome do Negócio",        key:"nome",          placeholder:"Ex: Meu Negócio"      },
+          { label:"Slug público",         key:"slug",          placeholder:"slug-do-negocio"       },
+          { label:"Área de Atuação",      key:"especialidade", placeholder:"Ex: Consultoria, Serviços" },
           { label:"Telefone",             key:"telefone",      placeholder:"(38) 99999-9999"       },
           { label:"WhatsApp (com DDI)",   key:"whatsapp",      placeholder:"5538999999999"         },
-          { label:"Email",                key:"email",         placeholder:"contato@clinica.com"   },
+          { label:"Email",                key:"email",         placeholder:"contato@seunegocio.com" },
           { label:"Endereco",             key:"endereco",      placeholder:"Rua das Flores, 123"   },
           { label:"Cidade",               key:"cidade",        placeholder:"Cornelio Procopio"     },
           { label:"Estado",               key:"estado",        placeholder:"PR"                    },
@@ -485,14 +485,14 @@ export default function Site() {
 
       {/* ── LOGO DA CLÍNICA ─────────────────────────────────────────────────── */}
       <div className="panel">
-        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🏥 Logo da Clínica</div>
+        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🖼️ Logo do Negócio</div>
         <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Exibida no topo do site público.</div>
         <div style={{ maxWidth:320 }}>
           <div style={uploadAreaStyle(!!form.logo_url)} onClick={() => logoInputRef.current?.click()}>
             {form.logo_url
               ? <img src={form.logo_url} alt="Logo" style={{ maxHeight:90, maxWidth:"100%", objectFit:"contain" }} />
               : <div style={{ color:"var(--muted)", fontSize:13, lineHeight:1.7 }}>
-                  <div style={{ fontSize:26, marginBottom:6 }}>🏥</div>
+                  <div style={{ fontSize:26, marginBottom:6 }}>🖼️</div>
                   Clique para enviar a logo<br />
                   <span style={{ fontSize:11, opacity:0.7 }}>PNG ou JPG, até 5 MB</span>
                 </div>

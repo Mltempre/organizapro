@@ -142,7 +142,7 @@ export default function ConfiguracoesPage() {
           clinica_id: cu.clinica_id,
           user_id: user.id,
           telefone: config.telefone,
-          mensagem: '✅ Teste ClínicaFlow: integração Z-API funcionando corretamente!',
+          mensagem: '✅ Teste OrganizaPro: integração Z-API funcionando corretamente!',
         }),
       });
 
