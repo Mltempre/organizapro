@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/lembretes",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/avaliacoes",
+      "schedule": "0 23 * * *"
+    }
+  ]
+}
