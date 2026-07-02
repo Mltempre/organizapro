@@ -270,7 +270,7 @@ export default function AgendamentosPage() {
         const payloadEdicao = editando.data !== form.data
           ? { ...payload, lembrete_enviado: false, confirmacao_enviada: false }
           : payload;
-        ({ error } = await supabase.from('agendamentos').update(payloadEdicao).eq('id', editando.id));
+        ({ error } = await supabase.from('agendamentos').update(payloadEdicao).eq('id', editando.id).eq('clinica_id', clinicaId));
       } else {
         ({ error } = await supabase.from('agendamentos').insert({
           ...payload, lembrete_enviado: false, confirmacao_enviada: false,
@@ -318,7 +318,7 @@ export default function AgendamentosPage() {
     try {
       const ag = agendamentos.find(a => a.id === id);
       const telefoneLimpo = (ag?.telefone || '').replace(/\D/g, '');
-      const { error } = await supabase.from('agendamentos').delete().eq('id', id);
+      const { error } = await supabase.from('agendamentos').delete().eq('id', id).eq('clinica_id', clinicaId);
       if (error) { setErro('Erro ao excluir: ' + error.message); return; }
       if (telefoneLimpo && clinicaId) {
         const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });

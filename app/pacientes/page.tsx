@@ -283,7 +283,7 @@ export default function PacientesPage() {
     setDetalhe(null);
     setExcluindo(id);
     try {
-      const { error } = await supabase.from('pacientes').delete().eq('id', id);
+      const { error } = await supabase.from('pacientes').delete().eq('id', id).eq('clinica_id', clinicaId);
       if (error) { setErro('Erro ao excluir: ' + error.message); return; }
       carregar();
     } catch (e) {
