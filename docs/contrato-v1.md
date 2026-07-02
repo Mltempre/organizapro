@@ -48,7 +48,7 @@ A implantação será realizada pela OrganizaPro e inclui:
 - **Configuração inicial:** cadastro das informações básicas do negócio (nome, WhatsApp, horários)
 - **Treinamento básico:** orientação sobre o uso das principais funcionalidades, realizada via WhatsApp ou videochamada, conforme disponibilidade das partes
 
-O prazo estimado para conclusão da implantação é de até **5 dias úteis** após a confirmação do pagamento.
+A implantação será realizada em até **5 dias úteis** após a confirmação do pagamento. Sempre que possível, buscamos concluir esse processo em prazo menor.
 
 ---
 
@@ -63,6 +63,8 @@ Isso significa que:
 - Os dados cadastrados pelo Contratante (clientes, agendamentos, configurações) pertencem ao Contratante
 
 A licença é **pessoal e intransferível**, válida para um único negócio, conforme os dados informados no cadastro.
+
+O cliente poderá utilizar a plataforma durante a vigência deste contrato, respeitando os termos aqui estabelecidos.
 
 ---
 
@@ -83,10 +85,7 @@ O não pagamento da mensalidade dentro do prazo pode resultar na suspensão temp
 
 ## 5. SUPORTE
 
-O suporte ao Contratante é prestado pela OrganizaPro em **horário comercial (segunda a sexta, das 9h às 18h)**, pelos seguintes canais:
-
-- WhatsApp: (41) 98837-9119
-- E-mail: contato@organizapro.com.br
+O suporte será prestado em dias úteis, em horário comercial, por meio dos canais oficiais da OrganizaPro.
 
 O suporte cobre dúvidas sobre o uso da plataforma, orientações e correção de eventuais problemas técnicos no sistema.
 
@@ -103,6 +102,8 @@ Não estão incluídos no suporte: configurações externas à plataforma (como 
 - Proteger os dados do Contratante conforme as boas práticas e a legislação vigente
 - Prestar suporte nos canais e horários informados
 - Comunicar com antecedência qualquer manutenção programada que afete o acesso
+
+A OrganizaPro adota boas práticas de segurança da informação e realiza rotinas de proteção dos dados da plataforma. Recomenda-se que o cliente também mantenha registros próprios das informações que considerar essenciais.
 
 ### Do Contratante
 
@@ -129,7 +130,7 @@ O Contratante é responsável pelos dados pessoais que cadastra na plataforma (c
 Qualquer uma das partes pode encerrar este contrato mediante aviso com **15 dias de antecedência**.
 
 **Cancelamento pelo Contratante:**
-Basta entrar em contato pelo WhatsApp ou e-mail informando a intenção de cancelamento. Não há multa por cancelamento após o primeiro mês de uso. O valor da implantação não é reembolsável.
+Basta entrar em contato pelos canais oficiais informando a intenção de cancelamento. Não há multa por cancelamento após o primeiro mês de uso. O valor da implantação refere-se aos serviços executados para configuração inicial do ambiente e, após sua realização, não é passível de reembolso.
 
 **Cancelamento pela OrganizaPro:**
 Em caso de inadimplência superior a 30 dias ou uso indevido da plataforma, a OrganizaPro poderá encerrar o contrato sem aviso prévio.
@@ -146,7 +147,7 @@ Este contrato entra em vigor na data da assinatura e tem duração **indetermina
 
 ## 10. FORO
 
-Fica eleito o foro da comarca de ______________________________ / ______ para dirimir eventuais conflitos oriundos deste contrato, com renúncia a qualquer outro, por mais privilegiado que seja.
+Fica eleito o foro da Comarca de **Bandeirantes — Paraná** para dirimir eventuais conflitos oriundos deste contrato, com renúncia a qualquer outro, por mais privilegiado que seja.
 
 ---
 
@@ -179,4 +180,4 @@ Nome / Razão Social
 
 ---
 
-*Versão V1 — OrganizaPro © 2026*
+*Versão V1 — Aprovada — OrganizaPro © 2026*
