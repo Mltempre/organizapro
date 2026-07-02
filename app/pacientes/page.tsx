@@ -17,7 +17,7 @@ interface Paciente {
   created_at: string;
   whatsapp?: string;
   endereco?: string;
-  site?: string;
+  site_link?: string;
   observacoes?: string;
 }
 
@@ -29,7 +29,7 @@ type FormData = {
   proxima_consulta: string;
   status: string;
   endereco: string;
-  site: string;
+  site_link: string;
   observacoes: string;
 };
 
@@ -61,7 +61,7 @@ const stHistorico: Record<string, { color: string; label: string }> = {
 };
 
 type CampoForm = {
-  key: 'nome' | 'telefone' | 'whatsapp' | 'email' | 'proxima_consulta' | 'endereco' | 'site';
+  key: 'nome' | 'telefone' | 'whatsapp' | 'email' | 'proxima_consulta' | 'endereco' | 'site_link';
   label: string;
   type: string;
   placeholder: string;
@@ -74,12 +74,12 @@ const camposForm: CampoForm[] = [
   { key: 'email',            label: 'E-mail',                  type: 'email', placeholder: 'Ex: maria@email.com'                      },
   { key: 'proxima_consulta', label: 'Próximo compromisso',     type: 'date',  placeholder: ''                                         },
   { key: 'endereco',         label: 'Endereço',                type: 'text',  placeholder: 'Ex: Rua das Flores, 123, São Paulo - SP'  },
-  { key: 'site',             label: 'Site / Link',             type: 'url',   placeholder: 'Ex: https://meusite.com.br'              },
+  { key: 'site_link',        label: 'Site / Link',             type: 'url',   placeholder: 'Ex: https://meusite.com.br'              },
 ];
 
 const formInicial: FormData = {
   nome: '', telefone: '', whatsapp: '', email: '',
-  proxima_consulta: '', status: 'ativo', endereco: '', site: '', observacoes: '',
+  proxima_consulta: '', status: 'ativo', endereco: '', site_link: '', observacoes: '',
 };
 
 const cBtn: React.CSSProperties = {
@@ -181,7 +181,7 @@ export default function PacientesPage() {
       proxima_consulta: p.proxima_consulta|| '',
       status:           p.status          || 'ativo',
       endereco:         p.endereco        || '',
-      site:             p.site            || '',
+      site_link:        p.site_link        || '',
       observacoes:      p.observacoes     || '',
     });
     setErro(''); setModal(true);
@@ -240,7 +240,7 @@ export default function PacientesPage() {
         telefone:    telefoneSalvo,
         whatsapp:    form.whatsapp    ? normalizar(form.whatsapp) : null,
         endereco:    form.endereco    || null,
-        site:        form.site        || null,
+        site_link:   form.site_link    || null,
         observacoes: form.observacoes || null,
         user_id:     user?.id,
         clinica_id:  clinicaId,
@@ -508,7 +508,7 @@ export default function PacientesPage() {
                     { icon:'💬', label:'WhatsApp',    value: detalhe.whatsapp    },
                     { icon:'📧', label:'E-mail',      value: detalhe.email       },
                     { icon:'🏠', label:'Endereço',    value: detalhe.endereco    },
-                    { icon:'🌐', label:'Site',        value: detalhe.site        },
+                    { icon:'🌐', label:'Site',        value: detalhe.site_link   },
                     { icon:'📝', label:'Observações', value: detalhe.observacoes },
                   ].filter(f => f.value).map(f => (
                     <div key={f.label} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
@@ -521,7 +521,7 @@ export default function PacientesPage() {
               </div>
 
               {/* Central de Contatos */}
-              {(detalhe.telefone || detalhe.email || detalhe.endereco || detalhe.site) && (
+              {(detalhe.telefone || detalhe.email || detalhe.endereco || detalhe.site_link) && (
                 <div>
                   <div style={{ fontSize:10, fontWeight:800, color:'#4a9bb0', letterSpacing:2, textTransform:'uppercase', marginBottom:14 }}>
                     Central de Contatos
@@ -549,9 +549,9 @@ export default function PacientesPage() {
                         📍 Google Maps
                       </a>
                     )}
-                    {detalhe.site && (
+                    {detalhe.site_link && (
                       <a
-                        href={detalhe.site.startsWith('http') ? detalhe.site : `https://${detalhe.site}`}
+                        href={detalhe.site_link.startsWith('http') ? detalhe.site_link : `https://${detalhe.site_link}`}
                         target="_blank" rel="noreferrer" style={cBtn}
                       >
                         🌐 Site
