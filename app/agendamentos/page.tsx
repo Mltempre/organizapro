@@ -279,7 +279,7 @@ export default function AgendamentosPage() {
           const { data: clienteExistente } = await supabase
             .from('pacientes').select('id').eq('clinica_id', clinicaId)
             .or(`telefone.eq.${telefoneLimpo},whatsapp.eq.${telefoneLimpo}`).maybeSingle();
-          if (!clienteExistente) {
+          if (!clienteExistente && telefoneLimpo) {
             await supabase.from('pacientes').insert({
               nome: form.paciente_nome, telefone: telefoneLimpo, whatsapp: telefoneLimpo,
               email: '', status: 'ativo', clinica_id: clinicaId, user_id: user?.id,
@@ -353,7 +353,7 @@ export default function AgendamentosPage() {
       });
       const json = await res.json();
       if (json.sucesso) {
-        await supabase.from('agendamentos').update({ confirmacao_enviada: true }).eq('id', a.id);
+        await supabase.from('agendamentos').update({ confirmacao_enviada: true }).eq('id', a.id).eq('clinica_id', clinicaId);
         setMsgEnvio('sucesso:Mensagem enviada com sucesso!');
         carregar();
       } else {

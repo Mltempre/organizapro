@@ -13,16 +13,14 @@ function montarMensagem(template: string, nome: string, link: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  // Aceita ambos os formatos: x-cron-secret (legado) e Authorization: Bearer (Vercel)
+  // Aceita Authorization: Bearer ou x-cron-secret (legado)
+  const cronSecret = process.env.CRON_SECRET;
   const secret     = req.headers.get("x-cron-secret");
   const authHeader = req.headers.get("authorization");
   const bearer     = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-  if (process.env.CRON_SECRET) {
-    const valido = secret === process.env.CRON_SECRET || bearer === process.env.CRON_SECRET;
-    if (!valido) {
-      return NextResponse.json({ error: "Nao autorizado" }, { status: 401 });
-    }
+  if (!cronSecret || (secret !== cronSecret && bearer !== cronSecret)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   // Janela de 7 dias: só processa consultas concluídas recentemente
@@ -104,7 +102,7 @@ export async function GET(req: NextRequest) {
       for (const ag of agendamentos) {
         try {
           const template = config.msg_avaliacao ||
-            "Olá, {nome}! 😊\n\nEsperamos que sua consulta tenha sido excelente! Sua opinião é muito importante para nós e ajuda outros pacientes a nos encontrar.\n\nPoderia nos avaliar no Google? Leva menos de 1 minuto:\n👉 {link}\n\nMuito obrigado pela confiança! 🙏";
+            "Olá, {nome}! 😊\n\nEsperamos que seu atendimento tenha sido excelente! Sua opinião é muito importante para nós e ajuda outros clientes a nos encontrar.\n\nPoderia nos avaliar no Google? Leva menos de 1 minuto:\n👉 {link}\n\nMuito obrigado pela confiança! 🙏";
 
           const mensagem = montarMensagem(
             template,
@@ -115,7 +113,10 @@ export async function GET(req: NextRequest) {
           const baseUrl = req.nextUrl.origin;
           const res = await fetch(`${baseUrl}/api/whatsapp`, {
             method:  "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${cronSecret}`,
+            },
             body: JSON.stringify({
               clinica_id: config.clinica_id,
               telefone:   ag.telefone,

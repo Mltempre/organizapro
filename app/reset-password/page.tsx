@@ -14,16 +14,14 @@ export default function ResetPasswordPage() {
   const router = useRouter();
 
   // Supabase lê automaticamente o access_token do hash da URL e
-  // dispara PASSWORD_RECOVERY — aguardamos para habilitar o formulário.
+  // dispara PASSWORD_RECOVERY — aguardamos esse evento para habilitar o formulário.
+  // Aceitar SIGNED_IN ou qualquer sessão existente permitiria que qualquer usuário
+  // autenticado acessasse este formulário sem ter clicado no link de recuperação.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
         setSessaoOk(true);
       }
-    });
-    // Fallback: verifica sessão já existente (e.g. tab recarregada)
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setSessaoOk(true);
     });
     return () => subscription.unsubscribe();
   }, []);

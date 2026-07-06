@@ -9,6 +9,8 @@ const supabase = createClient(
 const BUCKET = "clinica-assets";
 const SINGLE_TIPOS = ["logo", "hero"] as const;
 const VALID_TIPOS  = ["logo", "hero", "galeria", "equipe", "antesdepois", "servico", "estrutura", "depoimento"] as const;
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4"]);
+const ALLOWED_EXT  = new Set(["jpg", "jpeg", "png", "webp", "gif", "mp4"]);
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +40,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Arquivo muito grande. Máximo 5MB." }, { status: 400 });
     }
 
-    const ext  = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const ext  = (file.name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!ALLOWED_EXT.has(ext) || !ALLOWED_MIME.has(file.type)) {
+      return NextResponse.json({ error: "Tipo de arquivo não permitido. Use JPG, PNG, WEBP, GIF ou MP4." }, { status: 400 });
+    }
     const isSingle = (SINGLE_TIPOS as readonly string[]).includes(tipo);
     const filename = isSingle
       ? tipo

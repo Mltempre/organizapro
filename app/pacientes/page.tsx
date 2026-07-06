@@ -210,7 +210,7 @@ export default function PacientesPage() {
     const existente = existentes?.[0] ?? null;
     if (existente) {
       await supabase.from('agendamentos')
-        .update({ paciente_nome: nome, telefone, data: proxima }).eq('id', existente.id);
+        .update({ paciente_nome: nome, telefone, data: proxima }).eq('id', existente.id).eq('clinica_id', clinicaId);
     } else {
       await supabase.from('agendamentos').insert({
         paciente_nome: nome, telefone, data: proxima, hora: '09:00',
@@ -246,7 +246,7 @@ export default function PacientesPage() {
         clinica_id:  clinicaId,
       };
       let error;
-      if (editando) { ({ error } = await supabase.from('pacientes').update(payload).eq('id', editando.id)); }
+      if (editando) { ({ error } = await supabase.from('pacientes').update(payload).eq('id', editando.id).eq('clinica_id', clinicaId)); }
       else          { ({ error } = await supabase.from('pacientes').insert(payload)); }
       if (error) { setErro('Erro ao salvar: ' + error.message); }
       else {

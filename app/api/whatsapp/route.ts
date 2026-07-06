@@ -16,12 +16,29 @@ function normalizarTelefone(telefone: string): string {
   return "55" + soNumeros;
 }
 
+async function verificarAutenticacao(req: NextRequest): Promise<boolean> {
+  const authHeader = req.headers.get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!bearer) return false;
+
+  // Aceita CRON_SECRET como token de serviço interno
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && bearer === cronSecret) return true;
+
+  // Aceita token de usuário autenticado via Supabase
+  const supabaseAnon = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  const { data: { user } } = await supabaseAnon.auth.getUser(bearer);
+  return !!user;
+}
+
 export async function POST(req: NextRequest) {
-  console.log("[WHATSAPP] recebeu envio");
-  console.log("[whatsapp/route] env check:", {
-    url:     !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    service: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-  });
+  const autenticado = await verificarAutenticacao(req);
+  if (!autenticado) {
+    return NextResponse.json({ sucesso: false, error: "Não autenticado" }, { status: 401 });
+  }
 
   let body: { clinica_id?: string; user_id?: string; telefone?: string; mensagem?: string } = {};
   try {
@@ -29,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     const clinica_id = body.clinica_id;
     const user_id    = body.user_id;
+
     const telefone   = body.telefone;
     const mensagem   = body.mensagem;
 

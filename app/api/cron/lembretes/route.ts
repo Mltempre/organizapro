@@ -7,7 +7,7 @@ const supabase = createClient(
 );
 
 const TEMPLATE_PADRAO =
-  "Olá, {nome}! 👋\n\nPassamos para lembrar da sua consulta agendada para *amanhã, {data}* às *{horario}* na {clinica_nome}.\n\nPara confirmar sua presença, responda *SIM*.\nPara remarcar, é só nos avisar com antecedência. 📅\n\nContamos com você. Até amanhã! 😊";
+  "Olá, {nome}! 👋\n\nPassamos para lembrar do seu compromisso agendado para *amanhã, {data}* às *{horario}* na {clinica_nome}.\n\nPara confirmar sua presença, responda *SIM*.\nPara remarcar, é só nos avisar com antecedência. 📅\n\nContamos com você. Até amanhã! 😊";
 
 // Suporta tanto {nome}/{data}/{horario}/{clinica_nome} quanto {{paciente_nome}}/{{hora}}/{{clinica_nome}}
 function interpolar(template: string, vars: Record<string, string>): string {
@@ -20,8 +20,9 @@ function interpolar(template: string, vars: Record<string, string>): string {
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
 
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
@@ -93,7 +94,10 @@ export async function GET(request: Request) {
 
         const res = await fetch(`${baseUrl}/api/whatsapp`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${cronSecret}`,
+          },
           body: JSON.stringify({
             telefone: ag.telefone,
             mensagem,

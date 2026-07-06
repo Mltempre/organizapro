@@ -30,13 +30,13 @@ const configInicial: Config = {
   logo_url: '',
   link_google: '',
   msg_lembrete:
-    'Olá, {nome}! 👋\n\nPassamos para lembrar da sua consulta agendada para *amanhã, {data}* às *{horario}*.\n\nPara confirmar sua presença, responda *SIM*.\nPara remarcar, é só nos avisar com antecedência. 📅\n\nContamos com você. Até amanhã! 😊',
+    'Olá, {nome}! 👋\n\nPassamos para lembrar do seu compromisso agendado para *amanhã, {data}* às *{horario}*.\n\nPara confirmar sua presença, responda *SIM*.\nPara remarcar, é só nos avisar com antecedência. 📅\n\nContamos com você. Até amanhã! 😊',
   msg_confirmacao:
-    'Olá, {nome}! ✅\n\nSua consulta está *confirmada* para *{data}* às *{horario}*.\n\n📍 Chegue com 5 minutos de antecedência.\n📋 Traga documento com foto e cartão do convênio, se houver.\n\nQualquer dúvida, é só chamar aqui. Até lá! 😊',
+    'Olá, {nome}! ✅\n\nSeu compromisso está *confirmado* para *{data}* às *{horario}*.\n\n📍 Chegue com 5 minutos de antecedência.\n\nQualquer dúvida, é só chamar aqui. Até lá! 😊',
   msg_avaliacao:
-    'Olá, {nome}! 😊\n\nEsperamos que sua consulta tenha sido excelente! Sua opinião é muito importante para nós e ajuda outros pacientes a nos encontrar.\n\nPoderia nos avaliar no Google? Leva menos de 1 minuto:\n👉 {link}\n\nMuito obrigado pela confiança! 🙏',
+    'Olá, {nome}! 😊\n\nEsperamos que seu atendimento tenha sido excelente! Sua opinião é muito importante para nós e ajuda outros clientes a nos encontrar.\n\nPoderia nos avaliar no Google? Leva menos de 1 minuto:\n👉 {link}\n\nMuito obrigado pela confiança! 🙏',
   msg_reagendamento:
-    'Olá, {nome}! 📅\n\nIdentificamos que sua consulta do dia *{data}* às *{horario}* precisa ser reagendada.\n\nQual o melhor horário para você? Estamos à disposição para encontrar uma data conveniente.\n\nAguardamos seu retorno! 😊',
+    'Olá, {nome}! 📅\n\nIdentificamos que seu compromisso do dia *{data}* às *{horario}* precisa ser reagendado.\n\nQual o melhor horário para você? Estamos à disposição para encontrar uma data conveniente.\n\nAguardamos seu retorno! 😊',
   horario_funcionamento: 'Seg a Sex: 08h - 18h',
   zapi_instance: '',
   zapi_token: '',
@@ -181,13 +181,13 @@ export default function ConfiguracoesPage() {
   );
 
   return (
-    <AdminShell title="Configuracoes" subtitle="Personalize as informações do seu negócio">
+    <AdminShell title="Configurações" subtitle="Personalize as informações do seu negócio">
       <div style={{ width: '100%', maxWidth: 960 }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Configuracoes</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Configurações</h1>
             <p style={{ fontSize: 13, color: '#64748b', margin: '8px 0 0' }}>Personalize as informações do seu negócio</p>
           </div>
           <button onClick={salvar} disabled={salvando} style={{ padding: '12px 22px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
@@ -198,7 +198,7 @@ export default function ConfiguracoesPage() {
         {/* Feedback */}
         {sucesso && (
           <div style={{ background: '#14532d', border: '1px solid #16a34a', borderRadius: 10, padding: '14px 20px', marginBottom: 20, color: '#4ade80', fontSize: 13, fontWeight: 600 }}>
-            ✅ Configuracoes salvas com sucesso!
+            ✅ Configurações salvas com sucesso!
           </div>
         )}
         {erro && (
@@ -215,7 +215,7 @@ export default function ConfiguracoesPage() {
               { k: 'nome_clinica', l: 'Nome do Negócio', t: 'text',  p: 'Ex: Meu Negócio'         },
               { k: 'telefone',     l: 'WhatsApp',        t: 'text',  p: '11999999999'              },
               { k: 'email',        l: 'Email',           t: 'email', p: 'contato@seunegocio.com'   },
-              { k: 'endereco',     l: 'Endereco',        t: 'text',  p: 'Rua das Flores, 123' },
+              { k: 'endereco',     l: 'Endereço',        t: 'text',  p: 'Rua das Flores, 123' },
             ].map(f => (
               <div key={f.k}>
                 <label style={lbl}>{f.l}</label>
@@ -232,7 +232,7 @@ export default function ConfiguracoesPage() {
             {[
               { k: 'logo_url',              l: 'URL da Logo',                             p: 'https://...'                              },
               { k: 'link_google',           l: 'Link do Perfil da Empresa no Google',     p: 'Cole aqui o link do seu perfil no Google' },
-              { k: 'horario_funcionamento', l: 'Horario de Funcionamento',                p: 'Seg a Sex: 08h-18h'                       },
+              { k: 'horario_funcionamento', l: 'Horário de Funcionamento',                p: 'Seg a Sex: 08h-18h'                       },
             ].map(f => (
               <div key={f.k}>
                 <label style={lbl}>{f.l}</label>
@@ -244,9 +244,9 @@ export default function ConfiguracoesPage() {
 
         {/* Card — Mensagens Automáticas */}
         <div style={card}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 8, marginTop: 0 }}>Mensagens Automaticas</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 8, marginTop: 0 }}>Mensagens Automáticas</h2>
           <p style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>
-            Variaveis disponíveis:{' '}
+            Variáveis disponíveis:{' '}
             <code style={{ color: '#a78bfa' }}>{'{nome}'}</code>{' '}
             <code style={{ color: '#a78bfa' }}>{'{data}'}</code>{' '}
             <code style={{ color: '#a78bfa' }}>{'{horario}'}</code>{' '}
@@ -255,8 +255,8 @@ export default function ConfiguracoesPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {[
               { k: 'msg_lembrete',       l: 'Lembrete de Consulta'     },
-              { k: 'msg_confirmacao',    l: 'Confirmacao de Presenca'   },
-              { k: 'msg_avaliacao',      l: 'Solicitacao de Avaliacao'  },
+              { k: 'msg_confirmacao',    l: 'Confirmação de Presença'   },
+              { k: 'msg_avaliacao',      l: 'Solicitação de Avaliação'  },
               { k: 'msg_reagendamento',  l: 'Reagendamento'             },
             ].map(f => (
               <div key={f.k}>
@@ -271,7 +271,7 @@ export default function ConfiguracoesPage() {
         <div style={{ ...card, border: '1px solid #3b1f6e' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 20 }}>📲</span>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Integracao WhatsApp (Z-API)</h2>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Integração WhatsApp (Z-API)</h2>
           </div>
           <p style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>
             Encontre esses dados em <strong style={{ color: '#a78bfa' }}>app.z-api.io</strong> → sua instância → Credenciais e Segurança.
@@ -312,14 +312,14 @@ export default function ConfiguracoesPage() {
             )}
           </div>
           <p style={{ fontSize: 11, color: '#475569', marginTop: 10, marginBottom: 0 }}>
-            Salve as configuracoes antes de testar. O teste envia uma mensagem para o WhatsApp cadastrado no campo acima.
+            Salve as configurações antes de testar. O teste envia uma mensagem para o WhatsApp cadastrado no campo acima.
           </p>
         </div>
 
         {/* Botão salvar rodapé */}
         <div style={{ textAlign: 'center', paddingBottom: 32 }}>
           <button onClick={salvar} disabled={salvando} style={{ padding: '12px 40px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
-            {salvando ? 'Salvando...' : 'Salvar todas as alteracoes'}
+            {salvando ? 'Salvando...' : 'Salvar todas as alterações'}
           </button>
         </div>
 
