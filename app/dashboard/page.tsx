@@ -341,6 +341,110 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── PRÓXIMA IDEIA ────────────────────────────────────────────────────── */}
+      <div className="dc" style={{
+        background: "linear-gradient(135deg, rgba(74,155,176,0.07), rgba(31,78,95,0.12))",
+        border: "1px solid rgba(74,155,176,0.2)",
+        borderRadius: 14, padding: "20px 22px", marginBottom: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: "rgba(74,155,176,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, flexShrink: 0,
+          }}>
+            {ideia.icone}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
+              💡 Próxima Ideia · Consultoria do dia
+            </div>
+            <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 12px" }}>
+              {ideia.texto}
+            </p>
+            <div style={{
+              marginBottom: 10,
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(74,155,176,0.14)",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                💡 Por que isso importa?
+              </div>
+              <div style={{
+                fontSize: 13,
+                color: "#cbd5e1",
+                lineHeight: 1.45,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}>
+                {ideia.porQueImporta}
+              </div>
+            </div>
+            {ideia.impactoEsperado && (
+              <div style={{
+                marginBottom: 10,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(74,155,176,0.06)",
+                border: "1px solid rgba(74,155,176,0.12)",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                  📈 Impacto esperado
+                </div>
+                <div style={{
+                  fontSize: 13,
+                  color: "#cbd5e1",
+                  lineHeight: 1.45,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}>
+                  {ideia.impactoEsperado}
+                </div>
+              </div>
+            )}
+            {ideia.tempoEstimado && (
+              <div style={{
+                marginBottom: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 10px",
+                borderRadius: 999,
+                background: "rgba(74,155,176,0.1)",
+                border: "1px solid rgba(74,155,176,0.18)",
+                color: "#4a9bb0",
+                fontSize: 12,
+                fontWeight: 700,
+              }}>
+                <span>⏱</span>
+                <span>Tempo estimado</span>
+                <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{ideia.tempoEstimado}</span>
+              </div>
+            )}
+            {ideia.destino && (
+              <button
+                onClick={() => router.push(ideia.destino!)}
+                style={{
+                  padding: "7px 16px", borderRadius: 8,
+                  border: "1px solid rgba(74,155,176,0.3)",
+                  background: "rgba(74,155,176,0.1)",
+                  color: "#4a9bb0", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                {ideia.destino_label} →
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* ── BOTÕES RÁPIDOS ──────────────────────────────────────────────────── */}
       <div className="dc" style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         {botoesRapidos.map(b => (
@@ -504,110 +608,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* ── PRÓXIMA IDEIA ────────────────────────────────────────────────────── */}
-      <div className="dc" style={{
-        background: "linear-gradient(135deg, rgba(74,155,176,0.07), rgba(31,78,95,0.12))",
-        border: "1px solid rgba(74,155,176,0.2)",
-        borderRadius: 14, padding: "20px 22px", marginTop: 20,
-      }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: "rgba(74,155,176,0.15)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, flexShrink: 0,
-          }}>
-            {ideia.icone}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
-              💡 Próxima Ideia · Consultoria do dia
-            </div>
-            <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 12px" }}>
-              {ideia.texto}
-            </p>
-            <div style={{
-              marginBottom: 10,
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(74,155,176,0.14)",
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-                💡 Por que isso importa?
-              </div>
-              <div style={{
-                fontSize: 13,
-                color: "#cbd5e1",
-                lineHeight: 1.45,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}>
-                {ideia.porQueImporta}
-              </div>
-            </div>
-            {ideia.impactoEsperado && (
-              <div style={{
-                marginBottom: 10,
-                padding: "10px 12px",
-                borderRadius: 10,
-                background: "rgba(74,155,176,0.06)",
-                border: "1px solid rgba(74,155,176,0.12)",
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-                  📈 Impacto esperado
-                </div>
-                <div style={{
-                  fontSize: 13,
-                  color: "#cbd5e1",
-                  lineHeight: 1.45,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}>
-                  {ideia.impactoEsperado}
-                </div>
-              </div>
-            )}
-            {ideia.tempoEstimado && (
-              <div style={{
-                marginBottom: 12,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "7px 10px",
-                borderRadius: 999,
-                background: "rgba(74,155,176,0.1)",
-                border: "1px solid rgba(74,155,176,0.18)",
-                color: "#4a9bb0",
-                fontSize: 12,
-                fontWeight: 700,
-              }}>
-                <span>⏱</span>
-                <span>Tempo estimado</span>
-                <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{ideia.tempoEstimado}</span>
-              </div>
-            )}
-            {ideia.destino && (
-              <button
-                onClick={() => router.push(ideia.destino!)}
-                style={{
-                  padding: "7px 16px", borderRadius: 8,
-                  border: "1px solid rgba(74,155,176,0.3)",
-                  background: "rgba(74,155,176,0.1)",
-                  color: "#4a9bb0", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                }}
-              >
-                {ideia.destino_label} →
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
     </AdminShell>
   );
