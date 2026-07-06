@@ -20,7 +20,70 @@ type DashData = {
   agendaHoje:       AgItem[];
   proximos:         AgItem[];
   atrasadosList:    AgItem[];
+  totalPacientes:   number;
+  temLogo:          boolean;
+  temEmail:         boolean;
+  temTelefone:      boolean;
+  temEndereco:      boolean;
 };
+
+type IdeiaDodia = {
+  texto:          string;
+  icone:          string;
+  destino?:       string;
+  destino_label?: string;
+};
+
+function gerarIdeia(ctx: {
+  totalPacientes: number;
+  atrasados:      number;
+  pendentes:      number;
+  proximosSemana: number;
+  temLogo:        boolean;
+  temEmail:       boolean;
+  temTelefone:    boolean;
+  temEndereco:    boolean;
+  hoje:           string;
+}): IdeiaDodia {
+  if (ctx.totalPacientes === 0) return {
+    texto: "Cada cliente cadastrado é um potencial retorno recorrente. Que tal iniciar sua base de clientes hoje?",
+    icone: "👥", destino: "/pacientes", destino_label: "Cadastrar clientes",
+  };
+  if (!ctx.temLogo) return {
+    texto: "Empresas com identidade visual registrada transmitem mais confiança e profissionalismo. Cadastre o logotipo da sua empresa.",
+    icone: "🖼️", destino: "/configuracoes", destino_label: "Acessar configurações",
+  };
+  if (!ctx.temEmail || !ctx.temTelefone || !ctx.temEndereco) return {
+    texto: "Um perfil completo aumenta a credibilidade da sua empresa e facilita que clientes te encontrem. Revise os dados cadastrais.",
+    icone: "📋", destino: "/configuracoes", destino_label: "Completar perfil",
+  };
+  if (ctx.atrasados > 0) return {
+    texto: `Você tem ${ctx.atrasados} compromisso${ctx.atrasados > 1 ? "s" : ""} em atraso. Resolver isso agora mantém a operação organizada e profissional.`,
+    icone: "⏰", destino: "/agendamentos", destino_label: "Ver agenda",
+  };
+  if (ctx.proximosSemana === 0) return {
+    texto: "Sua agenda dos próximos dias está vazia. É um bom momento para prospectar e agendar novos compromissos.",
+    icone: "📅", destino: "/agendamentos", destino_label: "Agendar compromisso",
+  };
+  if (ctx.pendentes > 0) return {
+    texto: `Há ${ctx.pendentes} compromisso${ctx.pendentes > 1 ? "s" : ""} sem confirmação para hoje. Confirme agora e evite ausências inesperadas.`,
+    icone: "✅", destino: "/agendamentos", destino_label: "Confirmar agora",
+  };
+  const gerais: IdeiaDodia[] = [
+    { texto: "Entre em contato com clientes que você não atende há mais de 30 dias. A reativação custa menos do que captar novos clientes.", icone: "📞", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Revise sua base de clientes e complete os dados faltantes. Uma base bem organizada é o ativo mais valioso do seu negócio.", icone: "🗂️", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Considere pedir avaliações aos seus clientes mais recentes. A reputação online cresce uma avaliação de cada vez.", icone: "⭐" },
+    { texto: "Revise os compromissos da próxima semana com antecedência. Empresas organizadas surpreendem positivamente seus clientes.", icone: "📆", destino: "/agendamentos", destino_label: "Ver agenda" },
+    { texto: "Uma empresa bem documentada cresce com mais segurança. Faça backup dos seus documentos e registros importantes.", icone: "💾" },
+    { texto: "Organize e revise os serviços que você mais oferece. Clareza no que você entrega facilita a venda e o relacionamento com clientes.", icone: "📌" },
+    { texto: "Envie uma mensagem para um cliente antigo hoje. Um simples contato pode reativar um relacionamento e gerar nova receita.", icone: "💬", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Atualize o horário de funcionamento da empresa. Clientes que sabem quando te encontrar chegam mais preparados e satisfeitos.", icone: "🕐", destino: "/configuracoes", destino_label: "Configurações" },
+    { texto: "Agende os compromissos da próxima semana hoje. Uma agenda planejada reduz imprevistos e transmite profissionalismo.", icone: "🗓️", destino: "/agendamentos", destino_label: "Agendar" },
+    { texto: "Clientes sem telefone cadastrado ficam fora do alcance dos lembretes automáticos. Vale a pena completar esses dados.", icone: "📱", destino: "/pacientes", destino_label: "Ver clientes" },
+  ];
+  const [y, m, d] = ctx.hoje.split("-").map(Number);
+  return gerais[(y * 366 + m * 31 + d) % gerais.length];
+}
 
 function saudacao(): string {
   const h = parseInt(
@@ -60,6 +123,7 @@ export default function Dashboard() {
   const [dash, setDash] = useState<DashData>({
     compromissosHoje: 0, pendentes: 0, atrasados: 0,
     agendaHoje: [], proximos: [], atrasadosList: [],
+    totalPacientes: 0, temLogo: false, temEmail: false, temTelefone: false, temEndereco: false,
   });
 
   const carregarDados = useCallback(async () => {
@@ -82,6 +146,8 @@ export default function Dashboard() {
         { data: agHoje },
         { data: prox },
         { data: atrasados },
+        { count: pacCount },
+        { data: cfg },
       ] = await Promise.all([
         supabase.from("agendamentos")
           .select("id, hora, paciente_nome, tipo_consulta, status, data")
@@ -99,6 +165,13 @@ export default function Dashboard() {
           .lt("data", hoje).eq("status", "agendado")
           .order("data", { ascending: false }).order("hora")
           .limit(20),
+        supabase.from("pacientes")
+          .select("*", { count: "exact", head: true })
+          .eq("clinica_id", cid),
+        supabase.from("clinica_config")
+          .select("logo_url, email, telefone, endereco")
+          .eq("clinica_id", cid)
+          .maybeSingle(),
       ]);
 
       const lista         = (agHoje       || []) as AgItem[];
@@ -113,6 +186,11 @@ export default function Dashboard() {
         agendaHoje:       lista,
         proximos:         (prox || []) as AgItem[],
         atrasadosList,
+        totalPacientes:   pacCount ?? 0,
+        temLogo:          !!cfg?.logo_url,
+        temEmail:         !!cfg?.email,
+        temTelefone:      !!cfg?.telefone,
+        temEndereco:      !!cfg?.endereco,
       });
     } catch (err) {
       console.error(err);
@@ -162,6 +240,18 @@ export default function Dashboard() {
     { icon: "📅", label: "Novo Compromisso",  action: () => router.push("/agendamentos") },
     { icon: "🔍", label: "Pesquisar Cliente", action: () => router.push("/pacientes")    },
   ];
+
+  const ideia = gerarIdeia({
+    totalPacientes: dash.totalPacientes,
+    atrasados:      dash.atrasados,
+    pendentes:      dash.pendentes,
+    proximosSemana: dash.proximos.length,
+    temLogo:        dash.temLogo,
+    temEmail:       dash.temEmail,
+    temTelefone:    dash.temTelefone,
+    temEndereco:    dash.temEndereco,
+    hoje:           hojeStr,
+  });
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Inter,sans-serif" }}>
@@ -387,6 +477,45 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* ── PRÓXIMA IDEIA ────────────────────────────────────────────────────── */}
+      <div className="dc" style={{
+        background: "linear-gradient(135deg, rgba(74,155,176,0.07), rgba(31,78,95,0.12))",
+        border: "1px solid rgba(74,155,176,0.2)",
+        borderRadius: 14, padding: "20px 22px", marginTop: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: "rgba(74,155,176,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, flexShrink: 0,
+          }}>
+            {ideia.icone}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
+              💡 Próxima Ideia · Consultoria do dia
+            </div>
+            <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 14px" }}>
+              {ideia.texto}
+            </p>
+            {ideia.destino && (
+              <button
+                onClick={() => router.push(ideia.destino!)}
+                style={{
+                  padding: "7px 16px", borderRadius: 8,
+                  border: "1px solid rgba(74,155,176,0.3)",
+                  background: "rgba(74,155,176,0.1)",
+                  color: "#4a9bb0", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                {ideia.destino_label} →
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
     </AdminShell>
   );
