@@ -30,6 +30,9 @@ type DashData = {
 type IdeiaDodia = {
   texto:          string;
   icone:          string;
+  porQueImporta:  string;
+  impactoEsperado?: string;
+  tempoEstimado?: string;
   destino?:       string;
   destino_label?: string;
 };
@@ -47,39 +50,63 @@ function gerarIdeia(ctx: {
 }): IdeiaDodia {
   if (ctx.totalPacientes === 0) return {
     texto: "Cada cliente cadastrado é um potencial retorno recorrente. Que tal iniciar sua base de clientes hoje?",
-    icone: "👥", destino: "/pacientes", destino_label: "Cadastrar clientes",
+    icone: "👥",
+    porQueImporta: "Mais clientes cadastrados ajudam a organizar o relacionamento, acompanhar o crescimento e abrir novas oportunidades de venda.",
+    impactoEsperado: "Sua operação ficará mais completa e o crescimento do negócio ficará mais fácil de acompanhar.",
+    tempoEstimado: "≈ 10 minutos",
+    destino: "/pacientes", destino_label: "Cadastrar clientes",
   };
   if (!ctx.temLogo) return {
     texto: "Empresas com identidade visual registrada transmitem mais confiança e profissionalismo. Cadastre o logotipo da sua empresa.",
-    icone: "🖼️", destino: "/configuracoes", destino_label: "Acessar configurações",
+    icone: "🖼️",
+    porQueImporta: "Uma identidade visual forte transmite mais profissionalismo, ganha confiança e faz a marca se destacar.",
+    impactoEsperado: "Sua empresa passará uma imagem mais profissional e atrativa para os clientes.",
+    tempoEstimado: "≈ 2 minutos",
+    destino: "/configuracoes", destino_label: "Acessar configurações",
   };
   if (!ctx.temEmail || !ctx.temTelefone || !ctx.temEndereco) return {
     texto: "Um perfil completo aumenta a credibilidade da sua empresa e facilita que clientes te encontrem. Revise os dados cadastrais.",
-    icone: "📋", destino: "/configuracoes", destino_label: "Completar perfil",
+    icone: "📋",
+    porQueImporta: "Um cadastro completo deixa a operação mais organizada e prepara a empresa para crescer com mais consistência.",
+    impactoEsperado: "Sua empresa ficará mais preparada para crescer e oferecer uma experiência melhor.",
+    tempoEstimado: "≈ 5 minutos",
+    destino: "/configuracoes", destino_label: "Completar perfil",
   };
   if (ctx.atrasados > 0) return {
     texto: `Você tem ${ctx.atrasados} compromisso${ctx.atrasados > 1 ? "s" : ""} em atraso. Resolver isso agora mantém a operação organizada e profissional.`,
-    icone: "⏰", destino: "/agendamentos", destino_label: "Ver agenda",
+    icone: "⏰",
+    porQueImporta: "Resolver pendências evita esquecimentos, melhora o atendimento e mantém o negócio sob controle.",
+    impactoEsperado: "Menos imprevistos, melhor organização e mais tranquilidade no dia a dia.",
+    tempoEstimado: "≈ 10 minutos",
+    destino: "/agendamentos", destino_label: "Ver agenda",
   };
   if (ctx.proximosSemana === 0) return {
     texto: "Sua agenda dos próximos dias está vazia. É um bom momento para prospectar e agendar novos compromissos.",
-    icone: "📅", destino: "/agendamentos", destino_label: "Agendar compromisso",
+    icone: "📅",
+    porQueImporta: "Reabastecer a agenda cria mais oportunidades, mantém o fluxo de atendimento e fortalece a receita.",
+    impactoEsperado: "Mais oportunidades de atendimento e um fluxo de trabalho mais constante.",
+    tempoEstimado: "≈ 5 minutos",
+    destino: "/agendamentos", destino_label: "Agendar compromisso",
   };
   if (ctx.pendentes > 0) return {
     texto: `Há ${ctx.pendentes} compromisso${ctx.pendentes > 1 ? "s" : ""} sem confirmação para hoje. Confirme agora e evite ausências inesperadas.`,
-    icone: "✅", destino: "/agendamentos", destino_label: "Confirmar agora",
+    icone: "✅",
+    porQueImporta: "Confirmar compromissos reduz faltas, melhora a rotina e mantém o atendimento mais previsível.",
+    impactoEsperado: "Menos ausências e uma rotina mais tranquila para a equipe.",
+    tempoEstimado: "≈ 5 minutos",
+    destino: "/agendamentos", destino_label: "Confirmar agora",
   };
   const gerais: IdeiaDodia[] = [
-    { texto: "Entre em contato com clientes que você não atende há mais de 30 dias. A reativação custa menos do que captar novos clientes.", icone: "📞", destino: "/pacientes", destino_label: "Ver clientes" },
-    { texto: "Revise sua base de clientes e complete os dados faltantes. Uma base bem organizada é o ativo mais valioso do seu negócio.", icone: "🗂️", destino: "/pacientes", destino_label: "Ver clientes" },
-    { texto: "Considere pedir avaliações aos seus clientes mais recentes. A reputação online cresce uma avaliação de cada vez.", icone: "⭐" },
-    { texto: "Revise os compromissos da próxima semana com antecedência. Empresas organizadas surpreendem positivamente seus clientes.", icone: "📆", destino: "/agendamentos", destino_label: "Ver agenda" },
-    { texto: "Uma empresa bem documentada cresce com mais segurança. Faça backup dos seus documentos e registros importantes.", icone: "💾" },
-    { texto: "Organize e revise os serviços que você mais oferece. Clareza no que você entrega facilita a venda e o relacionamento com clientes.", icone: "📌" },
-    { texto: "Envie uma mensagem para um cliente antigo hoje. Um simples contato pode reativar um relacionamento e gerar nova receita.", icone: "💬", destino: "/pacientes", destino_label: "Ver clientes" },
-    { texto: "Atualize o horário de funcionamento da empresa. Clientes que sabem quando te encontrar chegam mais preparados e satisfeitos.", icone: "🕐", destino: "/configuracoes", destino_label: "Configurações" },
-    { texto: "Agende os compromissos da próxima semana hoje. Uma agenda planejada reduz imprevistos e transmite profissionalismo.", icone: "🗓️", destino: "/agendamentos", destino_label: "Agendar" },
-    { texto: "Clientes sem telefone cadastrado ficam fora do alcance dos lembretes automáticos. Vale a pena completar esses dados.", icone: "📱", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Entre em contato com clientes que você não atende há mais de 30 dias. A reativação custa menos do que captar novos clientes.", icone: "📞", porQueImporta: "Reativar clientes antigos é uma forma simples de recuperar receita e fortalecer o relacionamento.", impactoEsperado: "Você pode recuperar vendas e reforçar o relacionamento com clientes antigos.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Revise sua base de clientes e complete os dados faltantes. Uma base bem organizada é o ativo mais valioso do seu negócio.", icone: "🗂️", porQueImporta: "Uma base bem organizada ajuda a vender melhor e a tomar decisões com mais confiança.", impactoEsperado: "Seu time ganha mais organização e suas decisões ficam mais acertadas.", tempoEstimado: "≈ 10 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Considere pedir avaliações aos seus clientes mais recentes. A reputação online cresce uma avaliação de cada vez.", icone: "⭐", porQueImporta: "Boas avaliações aumentam a confiança do cliente e ajudam a atrair novos negócios.", impactoEsperado: "Sua reputação fica mais forte e atrai mais clientes.", tempoEstimado: "≈ 3 minutos", },
+    { texto: "Revise os compromissos da próxima semana com antecedência. Empresas organizadas surpreendem positivamente seus clientes.", icone: "📆", porQueImporta: "Planejar com antecedência reduz imprevistos e melhora a experiência do cliente.", impactoEsperado: "Você evita atrasos e entrega um atendimento mais previsível.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Ver agenda" },
+    { texto: "Uma empresa bem documentada cresce com mais segurança. Faça backup dos seus documentos e registros importantes.", icone: "💾", porQueImporta: "Manter documentos em ordem protege o negócio e facilita a operação no dia a dia.", impactoEsperado: "Seu negócio fica mais seguro e a rotina fica mais tranquila.", tempoEstimado: "≈ 15 minutos", },
+    { texto: "Organize e revise os serviços que você mais oferece. Clareza no que você entrega facilita a venda e o relacionamento com clientes.", icone: "📌", porQueImporta: "Mostrar com clareza o que sua empresa entrega facilita a venda e fortalece a percepção de valor.", impactoEsperado: "Seus clientes entendem melhor o que você oferece e compram com mais facilidade.", tempoEstimado: "≈ 10 minutos", },
+    { texto: "Envie uma mensagem para um cliente antigo hoje. Um simples contato pode reativar um relacionamento e gerar nova receita.", icone: "💬", porQueImporta: "Um contato bem feito pode reabrir oportunidades e trazer nova receita sem grandes esforços.", impactoEsperado: "Você pode reacender oportunidades e gerar mais negócios.", tempoEstimado: "≈ 3 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Atualize o horário de funcionamento da empresa. Clientes que sabem quando te encontrar chegam mais preparados e satisfeitos.", icone: "🕐", porQueImporta: "Informações claras ajudam a atrair clientes certos e evitam frustrações.", impactoEsperado: "Clientes chegam mais preparados e sua comunicação fica mais eficiente.", tempoEstimado: "≈ 3 minutos", destino: "/configuracoes", destino_label: "Configurações" },
+    { texto: "Agende os compromissos da próxima semana hoje. Uma agenda planejada reduz imprevistos e transmite profissionalismo.", icone: "🗓️", porQueImporta: "Uma agenda planejada reduz imprevistos e ajuda a empresa a entregar mais com menos estresse.", impactoEsperado: "Você ganha mais controle do tempo e melhora sua produtividade.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Agendar" },
+    { texto: "Clientes sem telefone cadastrado ficam fora do alcance dos lembretes automáticos. Vale a pena completar esses dados.", icone: "📱", porQueImporta: "Dados completos melhoram o atendimento e aumentam as chances de gerar retorno recorrente.", impactoEsperado: "Você melhora o alcance dos contatos e fortalece a relação com os clientes.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
   ];
   const [y, m, d] = ctx.hoje.split("-").map(Number);
   return gerais[(y * 366 + m * 31 + d) % gerais.length];
@@ -497,9 +524,74 @@ export default function Dashboard() {
             <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
               💡 Próxima Ideia · Consultoria do dia
             </div>
-            <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 14px" }}>
+            <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 12px" }}>
               {ideia.texto}
             </p>
+            <div style={{
+              marginBottom: 10,
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(74,155,176,0.14)",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                💡 Por que isso importa?
+              </div>
+              <div style={{
+                fontSize: 13,
+                color: "#cbd5e1",
+                lineHeight: 1.45,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}>
+                {ideia.porQueImporta}
+              </div>
+            </div>
+            {ideia.impactoEsperado && (
+              <div style={{
+                marginBottom: 10,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(74,155,176,0.06)",
+                border: "1px solid rgba(74,155,176,0.12)",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                  📈 Impacto esperado
+                </div>
+                <div style={{
+                  fontSize: 13,
+                  color: "#cbd5e1",
+                  lineHeight: 1.45,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}>
+                  {ideia.impactoEsperado}
+                </div>
+              </div>
+            )}
+            {ideia.tempoEstimado && (
+              <div style={{
+                marginBottom: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 10px",
+                borderRadius: 999,
+                background: "rgba(74,155,176,0.1)",
+                border: "1px solid rgba(74,155,176,0.18)",
+                color: "#4a9bb0",
+                fontSize: 12,
+                fontWeight: 700,
+              }}>
+                <span>⏱</span>
+                <span>Tempo estimado</span>
+                <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{ideia.tempoEstimado}</span>
+              </div>
+            )}
             {ideia.destino && (
               <button
                 onClick={() => router.push(ideia.destino!)}
