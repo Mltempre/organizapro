@@ -20,14 +20,6 @@ const supabaseAnon = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-async function countTable(table: string, clinicaId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from(table)
-    .select("*", { count: "exact", head: true })
-    .eq("clinica_id", clinicaId);
-  return error ? 0 : (count ?? 0);
-}
-
 export async function GET(req: NextRequest) {
   try {
     const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? "";
@@ -53,43 +45,58 @@ export async function GET(req: NextRequest) {
     const inicioSemanaAnt = new Date(Date.UTC(ano, mes - 1, dia - 13)).toISOString().split("T")[0];
     const fimSemanaAnt    = new Date(Date.UTC(ano, mes - 1, dia - 7)).toISOString().split("T")[0];
 
+    // Date range for upcoming appointments
+    const proximaSemFim = new Date(Date.UTC(ano, mes - 1, dia + 7)).toISOString().split("T")[0];
+
     // Parallel queries
     const [
-      agsAllRes, agsSemanaRes, agsAntRes,
-      pacRes, clinicaRes, configRes,
-      nGaleria, nEquipe, nAntes, nDep, nSrv, nEst,
+      agsAllRes, agsSemanaRes, agsAntRes, agsProximasRes,
+      pacRes, pacSemTelRes, pacSemEmailRes,
+      clinicaRes, configRes,
     ] = await Promise.all([
       supabase.from("agendamentos").select("id,status").eq("clinica_id", cid),
       supabase.from("agendamentos").select("id,status").eq("clinica_id", cid).gte("data", inicioSemana).lte("data", hoje),
       supabase.from("agendamentos").select("id,status").eq("clinica_id", cid).gte("data", inicioSemanaAnt).lte("data", fimSemanaAnt),
+      supabase.from("agendamentos").select("id", { count: "exact", head: true }).eq("clinica_id", cid).gt("data", hoje).lte("data", proximaSemFim).not("status", "in", '("cancelado")'),
       supabase.from("pacientes").select("*", { count: "exact", head: true }).eq("clinica_id", cid),
+      supabase.from("pacientes").select("id", { count: "exact", head: true }).eq("clinica_id", cid).or("telefone.is.null,telefone.eq."),
+      supabase.from("pacientes").select("id", { count: "exact", head: true }).eq("clinica_id", cid).or("email.is.null,email.eq."),
       supabase.from("clinicas").select("*").eq("id", cid).maybeSingle(),
       supabase.from("clinica_config").select("*").eq("clinica_id", cid).maybeSingle(),
-      countTable("clinica_galeria",     cid),
-      countTable("clinica_equipe",      cid),
-      countTable("clinica_antes_depois", cid),
-      countTable("clinica_depoimentos", cid),
-      countTable("clinica_servicos",    cid),
-      countTable("clinica_estrutura",   cid),
     ]);
 
     const agsAll    = agsAllRes.data    ?? [];
     const agsSemana = agsSemanaRes.data ?? [];
     const agsAnt    = agsAntRes.data    ?? [];
-    const totalPacientes = pacRes.count ?? 0;
+    const totalPacientes   = pacRes.count            ?? 0;
+    const pacSemTelefone   = pacSemTelRes.count      ?? 0;
+    const pacSemEmail      = pacSemEmailRes.count    ?? 0;
+    const proximosAgs      = agsProximasRes.count    ?? 0;
 
     const clinica = clinicaRes.data  as Record<string, unknown> | null;
     const config  = configRes.data   as Record<string, unknown> | null;
 
     const notaGoogle    = (config?.nota_google    ?? clinica?.nota_google)    as number | null;
     const numAvaliacoes = (config?.num_avaliacoes ?? clinica?.num_avaliacoes) as number | null;
-    const nomeClinica   = (config?.nome_clinica   ?? clinica?.nome ?? "sua clínica") as string;
-    const hasSlug       = !!(clinica?.slug       || config?.slug);
-    const hasLogo       = !!(clinica?.logo_url   || config?.logo_url);
-    const hasHero       = !!(clinica?.hero_url   || config?.hero_url);
-    const hasNome       = !!(clinica?.nome       || config?.nome_clinica);
-    const hasZapi       = !!config?.zapi_instance;
+    const nomeClinica   = (config?.nome_clinica   ?? clinica?.nome ?? "sua empresa") as string;
+
+    // Map OrganizaPro clinica_config fields to IndiceInput
+    const hasSlug        = !!config?.link_google;              // link_google = "link único"
+    const hasLogo        = !!(clinica?.logo_url || config?.logo_url);
+    const hasHero        = !!config?.email;                    // e-mail field as "presence" marker
+    const hasNome        = !!(clinica?.nome || config?.nome_clinica);
+    const hasZapi        = !!(config?.zapi_instance && config?.zapi_token);
     const hasMsgLembrete = !!config?.msg_lembrete;
+
+    // Count configured message templates (0-4)
+    const nGaleria = [config?.msg_lembrete, config?.msg_confirmacao, config?.msg_avaliacao, config?.msg_reagendamento].filter(Boolean).length;
+    // Telefone and horario as 0/1 counts
+    const nEquipe = config?.telefone ? 1 : 0;
+    const nSrv    = config?.horario_funcionamento ? 1 : 0;
+    // Unused site-builder counts — always 0 for OrganizaPro
+    const nAntes = 0;
+    const nDep   = 0;
+    const nEst   = config?.zapi_instance ? 1 : 0;
 
     // Tendência de confirmação semana atual vs. anterior
     const taxaSemana   = taxaConfirmacao(agsSemana);
@@ -104,7 +111,7 @@ export async function GET(req: NextRequest) {
       ? Math.round(((faltasAnterior - faltasSemana) / faltasAnterior) * 100)
       : null;
 
-    // ── Índice ClínicaFlow (fonte única: lib/raio-x.ts) ──────────────────────
+    // ── Índice OrganizaPro (fonte única: lib/raio-x.ts) ──────────────────────
     const inp: IndiceInput = {
       agsSemana,
       agsHistorico:        agsAll.length,
@@ -124,53 +131,57 @@ export async function GET(req: NextRequest) {
     const proximo = proximoObjetivo(indice);
 
     // ── OpenAI — consultoria executiva personalizada ──────────────────────────
-    const dadosCtx = `Clínica: "${nomeClinica}"
+    const dadosCtx = `Empresa: "${nomeClinica}"
 Agendamentos esta semana: ${agsSemana.length}
 Taxa de confirmação: ${taxaSemana !== null ? taxaSemana + "%" : "sem dados ainda"}
 Variação vs semana anterior: ${tendenciaConfirmacao !== null ? (tendenciaConfirmacao >= 0 ? "+" : "") + tendenciaConfirmacao + "%" : "sem comparativo"}
 Faltas esta semana: ${faltasSemana}
 Redução de faltas: ${reducaoFaltas !== null ? reducaoFaltas + "%" : "sem comparativo"}
-Total de pacientes: ${totalPacientes}
+Total de clientes: ${totalPacientes}
+Clientes sem telefone: ${pacSemTelefone}
+Clientes sem e-mail: ${pacSemEmail}
+Compromissos nos próximos 7 dias: ${proximosAgs}
 Nota Google: ${notaGoogle !== null ? notaGoogle : "não informada"}
 Avaliações Google: ${numAvaliacoes !== null ? numAvaliacoes : "não informadas"}
-Site — galeria: ${nGaleria} foto(s), equipe: ${nEquipe} membro(s), serviços: ${nSrv}
+Mensagens automáticas configuradas: ${nGaleria}/4
 WhatsApp automático: ${hasZapi ? "configurado" : "não configurado"}
-Índice ClínicaFlow: ${indice}/100 — Nível: ${nivel.label}
-Pontos: Gestão ${bd.gestao}/25 · Site ${bd.site}/25 · Google ${bd.reputacao}/20 · WhatsApp ${bd.automacao}/15 · Atividade ${bd.atividade}/15
+Perfil da empresa: logo ${hasLogo ? "✓" : "✗"}, e-mail ${hasHero ? "✓" : "✗"}, telefone ${nEquipe > 0 ? "✓" : "✗"}, link Google ${hasSlug ? "✓" : "✗"}, horário ${nSrv > 0 ? "✓" : "✗"}
+Índice OrganizaPro: ${indice}/100 — Nível: ${nivel.label}
+Pontos: Gestão ${bd.gestao}/25 · Perfil ${bd.site}/25 · Clientes ${bd.reputacao}/20 · WhatsApp ${bd.automacao}/15 · Atividade ${bd.atividade}/15
 Próximo nível: ${proximo ? `${proximo.nivel.label} (faltam ${proximo.pontosRestantes} pontos)` : "nível máximo atingido"}`;
 
     const nivelTom: Record<string, string> = {
-      "Clínica Premium": "Reconheça a excelência alcançada. Celebre os resultados e foque na manutenção do alto padrão.",
-      "Excelente":       "Parabenize os resultados expressivos. Aponte oportunidades de refinamento para alcançar o nível máximo.",
-      "Em Evolução":     "Transmita confiança e mostre a proximidade do próximo nível. Enfatize o progresso contínuo.",
-      "Atenção":         "Foque em ações práticas de maior impacto imediato. Transmita esperança e clareza de caminho.",
-      "Crítico":         "Jamais transmita desânimo. Mostre o grande potencial de evolução com ações objetivas e acessíveis.",
+      "Referência":    "Reconheça a excelência alcançada. Celebre os resultados e foque na manutenção do alto padrão.",
+      "Excelente":     "Parabenize os resultados expressivos. Aponte oportunidades de refinamento para alcançar o nível máximo.",
+      "Em Evolução":   "Transmita confiança e mostre a proximidade do próximo nível. Enfatize o progresso contínuo.",
+      "Atenção":       "Foque em ações práticas de maior impacto imediato. Transmita esperança e clareza de caminho.",
+      "Iniciando":     "Jamais transmita desânimo. Mostre o grande potencial de evolução com ações objetivas e acessíveis.",
     };
 
-    const systemMsg = `Você é um consultor sênior especializado em gestão de clínicas de saúde.
+    const systemMsg = `Você é um consultor sênior especializado em gestão de pequenas e médias empresas.
 Sua comunicação é profissional, positiva, objetiva e estratégica.
-Nunca critique a clínica. Nunca utilize linguagem negativa.
+Nunca critique a empresa. Nunca utilize linguagem negativa.
 Sempre destaque os pontos fortes antes de qualquer oportunidade de melhoria.
 Utilize linguagem semelhante à utilizada por consultorias empresariais premium.
-Evite frases genéricas. Escreva como se estivesse entregando um diagnóstico exclusivo para aquela clínica.
+Evite frases genéricas. Escreva como se estivesse entregando um diagnóstico exclusivo para aquela empresa.
 Nunca use listas. Escreva em linguagem natural, elegante e profissional.
 Palavras proibidas: problema, erro, ruim, péssimo, falha, fraco, insuficiente.
 Palavras preferidas: oportunidade, potencial, evolução, crescimento, fortalecimento, otimização, desenvolvimento, melhoria contínua.
 Tom específico para o nível atual (${nivel.label}): ${nivelTom[nivel.label] ?? ""}
-Nunca mencione o nome da clínica dentro dos textos. Use sempre "sua clínica" para se referir a ela.
+Nunca mencione o nome da empresa dentro dos textos. Use sempre "sua empresa" para se referir a ela.
 Responda sempre em JSON válido.`;
 
     const itensJaFeitos = [
-      hasZapi              && "- WhatsApp automático: JÁ CONFIGURADO — não recomendar configurar",
-      nGaleria > 0         && `- Galeria: ${nGaleria} foto(s) JÁ CADASTRADA(S) — não recomendar adicionar galeria`,
-      nEquipe  > 0         && `- Equipe: ${nEquipe} membro(s) JÁ CADASTRADO(S) — não recomendar apresentar equipe`,
-      notaGoogle !== null  && `- Nota Google ${notaGoogle} JÁ REGISTRADA — não recomendar cadastrar nota Google`,
+      hasZapi      && "- WhatsApp automático: JÁ CONFIGURADO — não recomendar configurar",
+      nGaleria > 0 && `- ${nGaleria} mensagem(s) automática(s) JÁ CONFIGURADA(S) — não recomendar configurar mensagens`,
+      nEquipe  > 0 && "- Telefone da empresa: JÁ CADASTRADO — não recomendar adicionar telefone",
+      notaGoogle !== null && `- Nota Google ${notaGoogle} JÁ REGISTRADA — não recomendar cadastrar nota Google`,
       numAvaliacoes !== null && numAvaliacoes >= 20 && `- ${numAvaliacoes} avaliações Google — reputação consolidada, não recomendar solicitar mais avaliações`,
     ].filter(Boolean).join("\n");
 
     const userMsg = `Analise os dados abaixo e retorne um JSON com exatamente 5 campos:
 
-- "diagnostico": visão executiva da situação atual da clínica (2-3 frases, cite números reais, SEMPRE inicie por algo positivo)
+- "diagnostico": visão executiva da situação atual da empresa (2-3 frases, cite números reais, SEMPRE inicie por algo positivo)
 - "pontos_fortes": principais acertos e resultados positivos desta semana (1-2 frases)
 - "oportunidade": a única ação de maior impacto estratégico ainda não realizada — explique o benefício concreto (2 frases)
 - "missao": a ação prática e objetiva para esta semana (1 frase clara e direta)
@@ -180,7 +191,7 @@ Regras absolutas: português do Brasil, sem asteriscos ou markdown, sem emojis n
 
 ${itensJaFeitos ? `ITENS JÁ REALIZADOS — NÃO recomendar nenhum destes:\n${itensJaFeitos}\n\n` : ""}${dadosCtx}
 
-Exemplo de formato: {"diagnostico":"Sua clínica apresenta...","pontos_fortes":"Os dados mostram...","oportunidade":"A principal oportunidade...","missao":"Solicite avaliações Google...","motivacional":"Sua clínica está em evolução constante..."}`;
+Exemplo de formato: {"diagnostico":"Sua empresa apresenta...","pontos_fortes":"Os dados mostram...","oportunidade":"A principal oportunidade...","missao":"Solicite avaliações Google...","motivacional":"Sua empresa está em evolução constante..."}`;
 
     let ai_diagnostico   = "";
     let ai_pontos_fortes = "";
@@ -279,7 +290,7 @@ Exemplo de formato: {"diagnostico":"Sua clínica apresenta...","pontos_fortes":"
       ai_oportunidade,
       ai_missao,
       ai_motivacional,
-      assinatura: "Análise elaborada com base nos indicadores operacionais atuais da sua clínica pelo Motor de Inteligência ClínicaFlow.",
+      assinatura: "Análise gerada com base nos indicadores operacionais da sua empresa · OrganizaPro",
       nome_clinica: nomeClinica,
       data_geracao: new Date().toISOString(),
     });

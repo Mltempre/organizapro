@@ -5,10 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
 const nav = [
-  { l: "Dashboard",     h: "/dashboard",     i: "⚡" },
-  { l: "Clientes",      h: "/pacientes",     i: "👤" },
-  { l: "Agenda",        h: "/agendamentos",  i: "📅" },
-  { l: "Configuracoes", h: "/configuracoes", i: "⚙️" },
+  { l: "Dashboard",      h: "/dashboard",     i: "⚡" },
+  { l: "Clientes",       h: "/pacientes",     i: "👤" },
+  { l: "Agenda",         h: "/agendamentos",  i: "📅" },
+  { l: "Raio-X",         h: "/raio-x",        i: "📊" },
+  { l: "Configurações",  h: "/configuracoes", i: "⚙️" },
 ];
 
 interface AdminShellProps {

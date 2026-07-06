@@ -132,7 +132,7 @@ export default function RaioX() {
 
   if (loading) {
     return (
-      <AdminShell title="Raio-X da Clínica" subtitle="Consultoria inteligente personalizada">
+      <AdminShell title="Raio-X da Empresa" subtitle="Consultoria inteligente personalizada">
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 380, gap: 18 }}>
           <div style={{ width: 56, height: 56, border: "3px solid rgba(124,58,237,0.15)", borderTopColor: "#7c3aed", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
@@ -145,7 +145,7 @@ export default function RaioX() {
 
   if (erro) {
     return (
-      <AdminShell title="Raio-X da Clínica" subtitle="Consultoria inteligente personalizada">
+      <AdminShell title="Raio-X da Empresa" subtitle="Consultoria inteligente personalizada">
         <div style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 18, padding: "36px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
           <p style={{ color: "#f87171", fontSize: 15, margin: "0 0 20px" }}>{erro}</p>
@@ -196,14 +196,14 @@ export default function RaioX() {
 
   const breakdownRows = [
     { l: "Gestão",    v: bd.gestao,    max: 25, c: "#00c896" },
-    { l: "Site",      v: bd.site,      max: 25, c: "#3b82f6" },
-    { l: "Google",    v: bd.reputacao, max: 20, c: "#f59e0b" },
+    { l: "Perfil",    v: bd.site,      max: 25, c: "#3b82f6" },
+    { l: "Clientes",  v: bd.reputacao, max: 20, c: "#f59e0b" },
     { l: "WhatsApp",  v: bd.automacao, max: 15, c: "#c084fc" },
     { l: "Atividade", v: bd.atividade, max: 15, c: "#f472b6" },
   ];
 
   return (
-    <AdminShell title="📊 Raio-X da Clínica" subtitle={`Semana ${dataRange} · Consultoria executiva`}>
+    <AdminShell title="📊 Raio-X da Empresa" subtitle={`Semana ${dataRange} · Consultoria executiva`}>
 
       {/* ── BOTÃO ATUALIZAR ── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
@@ -232,7 +232,7 @@ export default function RaioX() {
         textAlign: "center", marginBottom: 24,
       }}>
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 3, color: "#475569", textTransform: "uppercase", marginBottom: 18 }}>
-          Índice ClínicaFlow
+          Índice OrganizaPro
         </div>
         <div style={{ fontSize: 96, fontWeight: 900, color: nivel.color, lineHeight: 1, letterSpacing: -4 }}>{indice}</div>
         <div style={{ fontSize: 20, color: "#334155", marginBottom: 20 }}>/100</div>
@@ -393,19 +393,19 @@ export default function RaioX() {
       {/* ── COMPLETUDE DO SITE ── */}
       <div style={{ marginTop: 20, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "22px 24px" }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: 2, textTransform: "uppercase", marginBottom: 18 }}>
-          Completude do Site
+          Perfil da Empresa
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))", gap: 10 }}>
           {[
-            { l: "Logo",         ok: metricas.site.has_logo                },
-            { l: "Foto Hero",    ok: metricas.site.has_hero                },
-            { l: "Link Único",   ok: metricas.site.has_slug                },
-            { l: "Galeria",      ok: metricas.site.galeria     > 0, cnt: metricas.site.galeria     },
-            { l: "Equipe",       ok: metricas.site.equipe      > 0, cnt: metricas.site.equipe      },
-            { l: "Serviços",     ok: metricas.site.servicos    > 0, cnt: metricas.site.servicos    },
-            { l: "Depoimentos",  ok: metricas.site.depoimentos > 0, cnt: metricas.site.depoimentos },
-            { l: "Antes/Depois", ok: metricas.site.antes_depois > 0, cnt: metricas.site.antes_depois },
-            { l: "Estrutura",    ok: metricas.site.estrutura   > 0, cnt: metricas.site.estrutura   },
+            { l: "Logo",       ok: metricas.site.has_logo                                          },
+            { l: "E-mail",     ok: metricas.site.has_hero                                          },
+            { l: "Google",     ok: metricas.site.has_slug                                          },
+            { l: "Mensagens",  ok: metricas.site.galeria     > 0, cnt: metricas.site.galeria        },
+            { l: "Telefone",   ok: metricas.site.equipe      > 0                                   },
+            { l: "Horário",    ok: metricas.site.servicos    > 0                                   },
+            { l: "Endereço",   ok: metricas.site.depoimentos > 0                                   },
+            { l: "WhatsApp",   ok: metricas.site.antes_depois > 0                                  },
+            { l: "Nome",       ok: metricas.site.estrutura   > 0                                   },
           ].map(item => (
             <div key={item.l} style={{
               display: "flex", alignItems: "center", gap: 8,
