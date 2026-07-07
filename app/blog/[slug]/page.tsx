@@ -33,8 +33,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: article.description,
     keywords: article.keywords,
     authors: [{ name: article.author, url: BASE_URL }],
-    creator: "ClínicaFlow",
-    publisher: "ClínicaFlow",
+    creator: "OrganizaPro",
+    publisher: "OrganizaPro",
     metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: url,
@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     openGraph: {
       type: "article",
-      siteName: "ClínicaFlow",
+      siteName: "OrganizaPro",
       locale: "pt_BR",
       url,
       title: article.title,
@@ -63,8 +63,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      site: "@clinicaflow",
-      creator: "@clinicaflow",
+      site: "@organizapro",
+      creator: "@organizapro",
       title: article.title,
       description: article.description,
       images: [ogImage],
@@ -108,7 +108,7 @@ function buildJsonLd(article: Article) {
         },
         publisher: {
           "@type": "Organization",
-          name: "ClínicaFlow",
+          name: "OrganizaPro",
           url: BASE_URL,
           logo: {
             "@type": "ImageObject",
@@ -152,7 +152,7 @@ function buildJsonLd(article: Article) {
       {
         "@type": "Organization",
         "@id": `${BASE_URL}#organization`,
-        name: "ClínicaFlow",
+        name: "OrganizaPro",
         url: BASE_URL,
         description:
           "Sistema de automação de lembretes e avaliações para clínicas de saúde no Brasil.",
@@ -319,13 +319,13 @@ function RenderBlock({ block }: { block: ContentBlock }) {
             ...base, fontSize: "1.4rem", fontWeight: 800, color: "#e7ebff",
             margin: "0 0 12px",
           }}>
-            Quer ver isso funcionando na sua clínica?
+            Quer ver isso funcionando no seu negócio?
           </h3>
           <p style={{
             ...base, fontSize: "0.95rem", color: "#94a3b8", lineHeight: 1.7,
             margin: "0 0 28px",
           }}>
-            O ClínicaFlow automatiza lembretes, confirmações e avaliações pelo WhatsApp. Agende uma demonstração personalizada e veja o sistema funcionando com os dados da sua clínica.
+            O OrganizaPro automatiza lembretes, confirmações e avaliações pelo WhatsApp. Agende uma demonstração personalizada e veja o sistema funcionando com os dados do seu negócio.
           </p>
           <a
             href={`https://wa.me/${WPP_NUMBER}?text=${WPP_MESSAGE_BLOG}`}
@@ -387,7 +387,7 @@ export default function ArticlePage({ params }: Props) {
       }}>
         <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 20, fontWeight: 800, color: "#e7ebff", fontFamily: "DM Sans, sans-serif" }}>
-            Clínica<span style={{ color: "#7c3aed" }}>Flow</span>
+            Organiza<span style={{ color: "#7c3aed" }}>Pro</span>
           </span>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -577,7 +577,7 @@ export default function ArticlePage({ params }: Props) {
               fontSize: "1.2rem", fontWeight: 800, color: "#e7ebff",
               fontFamily: "DM Sans, sans-serif", margin: "0 0 8px",
             }}>
-              Automatize sua clínica com o ClínicaFlow
+              Automatize seu negócio com o OrganizaPro
             </h3>
             <p style={{
               fontSize: "0.9rem", color: "#94a3b8",
@@ -610,7 +610,7 @@ export default function ArticlePage({ params }: Props) {
           color: "#475569", fontSize: 13, fontFamily: "DM Sans, sans-serif",
           textDecoration: "none",
         }}>
-          ← Voltar ao Blog ClínicaFlow
+          ← Voltar ao Blog OrganizaPro
         </Link>
       </footer>
     </>

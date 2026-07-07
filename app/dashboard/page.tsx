@@ -21,6 +21,8 @@ type DashData = {
   proximos:         AgItem[];
   atrasadosList:    AgItem[];
   totalPacientes:   number;
+  clientesParaReativar: number;
+  nomeNegocio:      string;
   temLogo:          boolean;
   temEmail:         boolean;
   temTelefone:      boolean;
@@ -49,39 +51,39 @@ function gerarIdeia(ctx: {
   hoje:           string;
 }): IdeiaDodia {
   if (ctx.totalPacientes === 0) return {
-    texto: "Cada cliente cadastrado é um potencial retorno recorrente. Que tal iniciar sua base de clientes hoje?",
+    texto: "Sua base de clientes ainda está vazia. Cada cadastro é uma oportunidade de retorno recorrente — comece agora.",
     icone: "👥",
-    porQueImporta: "Mais clientes cadastrados ajudam a organizar o relacionamento, acompanhar o crescimento e abrir novas oportunidades de venda.",
-    impactoEsperado: "Sua operação ficará mais completa e o crescimento do negócio ficará mais fácil de acompanhar.",
+    porQueImporta: "Uma base de clientes organizada facilita o relacionamento, revela oportunidades de venda e mostra a evolução do seu negócio.",
+    impactoEsperado: "Uma operação mais completa, com o crescimento do negócio mais fácil de acompanhar.",
     tempoEstimado: "≈ 10 minutos",
     destino: "/pacientes", destino_label: "Cadastrar clientes",
   };
   if (!ctx.temLogo) return {
-    texto: "Empresas com identidade visual registrada transmitem mais confiança e profissionalismo. Cadastre o logotipo da sua empresa.",
+    texto: "Sua empresa ainda não tem um logotipo cadastrado. Uma identidade visual forte transmite mais confiança à primeira vista.",
     icone: "🖼️",
-    porQueImporta: "Uma identidade visual forte transmite mais profissionalismo, ganha confiança e faz a marca se destacar.",
-    impactoEsperado: "Sua empresa passará uma imagem mais profissional e atrativa para os clientes.",
+    porQueImporta: "Marcas com identidade visual definida ganham mais credibilidade e se destacam diante da concorrência.",
+    impactoEsperado: "Uma imagem mais profissional e atrativa diante dos seus clientes.",
     tempoEstimado: "≈ 2 minutos",
     destino: "/configuracoes", destino_label: "Acessar configurações",
   };
   if (!ctx.temEmail || !ctx.temTelefone || !ctx.temEndereco) return {
-    texto: "Um perfil completo aumenta a credibilidade da sua empresa e facilita que clientes te encontrem. Revise os dados cadastrais.",
+    texto: "Seu perfil está incompleto. Dados de contato completos aumentam a credibilidade e facilitam que clientes te encontrem.",
     icone: "📋",
-    porQueImporta: "Um cadastro completo deixa a operação mais organizada e prepara a empresa para crescer com mais consistência.",
-    impactoEsperado: "Sua empresa ficará mais preparada para crescer e oferecer uma experiência melhor.",
+    porQueImporta: "Um cadastro completo organiza a operação e prepara sua empresa para crescer com mais consistência.",
+    impactoEsperado: "Uma empresa mais preparada para crescer e oferecer uma experiência melhor aos clientes.",
     tempoEstimado: "≈ 5 minutos",
     destino: "/configuracoes", destino_label: "Completar perfil",
   };
   if (ctx.atrasados > 0) return {
-    texto: `Você tem ${ctx.atrasados} compromisso${ctx.atrasados > 1 ? "s" : ""} em atraso. Resolver isso agora mantém a operação organizada e profissional.`,
+    texto: `Você tem ${ctx.atrasados} compromisso${ctx.atrasados > 1 ? "s" : ""} em atraso. Resolver agora mantém sua operação organizada e transmite profissionalismo.`,
     icone: "⏰",
-    porQueImporta: "Resolver pendências evita esquecimentos, melhora o atendimento e mantém o negócio sob controle.",
+    porQueImporta: "Resolver pendências evita esquecimentos e mantém o atendimento sob controle.",
     impactoEsperado: "Menos imprevistos, melhor organização e mais tranquilidade no dia a dia.",
     tempoEstimado: "≈ 10 minutos",
     destino: "/agendamentos", destino_label: "Ver agenda",
   };
   if (ctx.proximosSemana === 0) return {
-    texto: "Sua agenda dos próximos dias está vazia. É um bom momento para prospectar e agendar novos compromissos.",
+    texto: "Sua agenda para os próximos dias está livre — um bom momento para prospectar e preencher novos horários.",
     icone: "📅",
     porQueImporta: "Reabastecer a agenda cria mais oportunidades, mantém o fluxo de atendimento e fortalece a receita.",
     impactoEsperado: "Mais oportunidades de atendimento e um fluxo de trabalho mais constante.",
@@ -89,7 +91,7 @@ function gerarIdeia(ctx: {
     destino: "/agendamentos", destino_label: "Agendar compromisso",
   };
   if (ctx.pendentes > 0) return {
-    texto: `Há ${ctx.pendentes} compromisso${ctx.pendentes > 1 ? "s" : ""} sem confirmação para hoje. Confirme agora e evite ausências inesperadas.`,
+    texto: `Você tem ${ctx.pendentes} compromisso${ctx.pendentes > 1 ? "s" : ""} aguardando confirmação hoje. Confirme agora para evitar ausências.`,
     icone: "✅",
     porQueImporta: "Confirmar compromissos reduz faltas, melhora a rotina e mantém o atendimento mais previsível.",
     impactoEsperado: "Menos ausências e uma rotina mais tranquila para a equipe.",
@@ -97,19 +99,109 @@ function gerarIdeia(ctx: {
     destino: "/agendamentos", destino_label: "Confirmar agora",
   };
   const gerais: IdeiaDodia[] = [
-    { texto: "Entre em contato com clientes que você não atende há mais de 30 dias. A reativação custa menos do que captar novos clientes.", icone: "📞", porQueImporta: "Reativar clientes antigos é uma forma simples de recuperar receita e fortalecer o relacionamento.", impactoEsperado: "Você pode recuperar vendas e reforçar o relacionamento com clientes antigos.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
-    { texto: "Revise sua base de clientes e complete os dados faltantes. Uma base bem organizada é o ativo mais valioso do seu negócio.", icone: "🗂️", porQueImporta: "Uma base bem organizada ajuda a vender melhor e a tomar decisões com mais confiança.", impactoEsperado: "Seu time ganha mais organização e suas decisões ficam mais acertadas.", tempoEstimado: "≈ 10 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
-    { texto: "Considere pedir avaliações aos seus clientes mais recentes. A reputação online cresce uma avaliação de cada vez.", icone: "⭐", porQueImporta: "Boas avaliações aumentam a confiança do cliente e ajudam a atrair novos negócios.", impactoEsperado: "Sua reputação fica mais forte e atrai mais clientes.", tempoEstimado: "≈ 3 minutos", },
-    { texto: "Revise os compromissos da próxima semana com antecedência. Empresas organizadas surpreendem positivamente seus clientes.", icone: "📆", porQueImporta: "Planejar com antecedência reduz imprevistos e melhora a experiência do cliente.", impactoEsperado: "Você evita atrasos e entrega um atendimento mais previsível.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Ver agenda" },
-    { texto: "Uma empresa bem documentada cresce com mais segurança. Faça backup dos seus documentos e registros importantes.", icone: "💾", porQueImporta: "Manter documentos em ordem protege o negócio e facilita a operação no dia a dia.", impactoEsperado: "Seu negócio fica mais seguro e a rotina fica mais tranquila.", tempoEstimado: "≈ 15 minutos", },
-    { texto: "Organize e revise os serviços que você mais oferece. Clareza no que você entrega facilita a venda e o relacionamento com clientes.", icone: "📌", porQueImporta: "Mostrar com clareza o que sua empresa entrega facilita a venda e fortalece a percepção de valor.", impactoEsperado: "Seus clientes entendem melhor o que você oferece e compram com mais facilidade.", tempoEstimado: "≈ 10 minutos", },
-    { texto: "Envie uma mensagem para um cliente antigo hoje. Um simples contato pode reativar um relacionamento e gerar nova receita.", icone: "💬", porQueImporta: "Um contato bem feito pode reabrir oportunidades e trazer nova receita sem grandes esforços.", impactoEsperado: "Você pode reacender oportunidades e gerar mais negócios.", tempoEstimado: "≈ 3 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
-    { texto: "Atualize o horário de funcionamento da empresa. Clientes que sabem quando te encontrar chegam mais preparados e satisfeitos.", icone: "🕐", porQueImporta: "Informações claras ajudam a atrair clientes certos e evitam frustrações.", impactoEsperado: "Clientes chegam mais preparados e sua comunicação fica mais eficiente.", tempoEstimado: "≈ 3 minutos", destino: "/configuracoes", destino_label: "Configurações" },
-    { texto: "Agende os compromissos da próxima semana hoje. Uma agenda planejada reduz imprevistos e transmite profissionalismo.", icone: "🗓️", porQueImporta: "Uma agenda planejada reduz imprevistos e ajuda a empresa a entregar mais com menos estresse.", impactoEsperado: "Você ganha mais controle do tempo e melhora sua produtividade.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Agendar" },
-    { texto: "Clientes sem telefone cadastrado ficam fora do alcance dos lembretes automáticos. Vale a pena completar esses dados.", icone: "📱", porQueImporta: "Dados completos melhoram o atendimento e aumentam as chances de gerar retorno recorrente.", impactoEsperado: "Você melhora o alcance dos contatos e fortalece a relação com os clientes.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Reative clientes que você não atende há mais de 30 dias — reconquistar custa menos do que conquistar um cliente novo.", icone: "📞", porQueImporta: "Reativar clientes antigos é uma forma simples de recuperar receita e fortalecer o relacionamento.", impactoEsperado: "Mais vendas recuperadas e um relacionamento mais forte com clientes antigos.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Revise sua base de clientes e complete os dados faltantes — ela é um dos ativos mais valiosos do seu negócio.", icone: "🗂️", porQueImporta: "Uma base bem organizada ajuda a vender melhor e a tomar decisões com mais confiança.", impactoEsperado: "Mais organização para o time e decisões mais acertadas.", tempoEstimado: "≈ 10 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Peça avaliações aos clientes mais recentes — a reputação online cresce uma avaliação de cada vez.", icone: "⭐", porQueImporta: "Boas avaliações aumentam a confiança do cliente e ajudam a atrair novos negócios.", impactoEsperado: "Sua reputação fica mais forte e atrai mais clientes.", tempoEstimado: "≈ 3 minutos", },
+    { texto: "Revise os compromissos da próxima semana com antecedência — empresas organizadas surpreendem positivamente seus clientes.", icone: "📆", porQueImporta: "Planejar com antecedência reduz imprevistos e melhora a experiência do cliente.", impactoEsperado: "Você evita atrasos e entrega um atendimento mais previsível.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Ver agenda" },
+    { texto: "Faça backup dos seus documentos e registros importantes — empresas bem documentadas crescem com mais segurança.", icone: "💾", porQueImporta: "Manter documentos em ordem protege o negócio e facilita a operação no dia a dia.", impactoEsperado: "Seu negócio fica mais seguro e a rotina fica mais tranquila.", tempoEstimado: "≈ 15 minutos", },
+    { texto: "Revise os serviços que você mais oferece — clareza sobre o que você entrega facilita a venda e fortalece o relacionamento com clientes.", icone: "📌", porQueImporta: "Mostrar com clareza o que sua empresa entrega facilita a venda e fortalece a percepção de valor.", impactoEsperado: "Seus clientes entendem melhor o que você oferece e compram com mais facilidade.", tempoEstimado: "≈ 10 minutos", },
+    { texto: "Envie uma mensagem para um cliente antigo hoje — um contato simples pode reativar o relacionamento e gerar nova receita.", icone: "💬", porQueImporta: "Um contato bem feito pode reabrir oportunidades e trazer nova receita sem grandes esforços.", impactoEsperado: "Você pode reacender oportunidades e gerar mais negócios.", tempoEstimado: "≈ 3 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Mantenha o horário de funcionamento sempre atualizado — clientes que sabem quando te encontrar chegam mais preparados.", icone: "🕐", porQueImporta: "Informações claras ajudam a atrair clientes certos e evitam frustrações.", impactoEsperado: "Clientes chegam mais preparados e sua comunicação fica mais eficiente.", tempoEstimado: "≈ 3 minutos", destino: "/configuracoes", destino_label: "Configurações" },
+    { texto: "Planeje os compromissos da próxima semana com antecedência — uma agenda organizada reduz imprevistos e transmite profissionalismo.", icone: "🗓️", porQueImporta: "Uma agenda planejada reduz imprevistos e ajuda a empresa a entregar mais com menos estresse.", impactoEsperado: "Você ganha mais controle do tempo e melhora sua produtividade.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Agendar" },
+    { texto: "Clientes sem telefone cadastrado ficam fora do alcance dos lembretes automáticos — vale a pena completar esses dados.", icone: "📱", porQueImporta: "Dados completos melhoram o atendimento e aumentam as chances de gerar retorno recorrente.", impactoEsperado: "Você melhora o alcance dos contatos e fortalece a relação com os clientes.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
   ];
   const [y, m, d] = ctx.hoje.split("-").map(Number);
   return gerais[(y * 366 + m * 31 + d) % gerais.length];
+}
+
+// ── Insights do Dia ──────────────────────────────────────────────────────
+// Motor de regras de negócio (V1). Nenhuma chamada a LLM: os textos abaixo
+// são gerados por lógica determinística a partir dos dados já carregados
+// no dashboard. A interface (renderização) não depende de como o texto foi
+// gerado — trocar estas regras por uma chamada de IA generativa no futuro
+// não exige nenhuma mudança no JSX que consome `InsightsDoDia`.
+type InsightTile = {
+  numero:         number;
+  label:          string;
+  tom:            "critico" | "positivo" | "neutro";
+  destino?:       string;
+  destino_label?: string;
+};
+
+type SituacaoDia = {
+  emoji: string;
+  texto: string;
+  tom:   "critico" | "atencao" | "positivo";
+};
+
+type InsightsDoDia = {
+  temDados:      boolean;
+  prioridades:   InsightTile;
+  agenda:        InsightTile;
+  oportunidades: InsightTile;
+  recomendacao:  string;
+  situacao:      SituacaoDia;
+};
+
+function gerarInsights(ctx: {
+  totalPacientes:       number;
+  pendentes:            number;
+  atrasados:            number;
+  compromissosHoje:     number;
+  clientesParaReativar: number;
+}): InsightsDoDia {
+  if (ctx.totalPacientes === 0) {
+    return {
+      temDados: false,
+      prioridades:   { numero: 0, label: "", tom: "neutro" },
+      agenda:        { numero: 0, label: "", tom: "neutro" },
+      oportunidades: { numero: 0, label: "", tom: "neutro" },
+      recomendacao:  "",
+      situacao:      { emoji: "🟢", texto: "Tudo em ordem", tom: "positivo" },
+    };
+  }
+
+  const aguardandoRetorno = ctx.pendentes + ctx.atrasados;
+  const prioridades: InsightTile = aguardandoRetorno > 0
+    ? {
+        numero: aguardandoRetorno,
+        label: `cliente${aguardandoRetorno > 1 ? "s" : ""} aguardando retorno.`,
+        tom: "critico",
+        destino: "/agendamentos", destino_label: "Ver Clientes",
+      }
+    : { numero: 0, label: "Nenhuma prioridade crítica.", tom: "positivo" };
+
+  const agenda: InsightTile = ctx.compromissosHoje > 0
+    ? {
+        numero: ctx.compromissosHoje,
+        label: `compromisso${ctx.compromissosHoje > 1 ? "s" : ""} agendado${ctx.compromissosHoje > 1 ? "s" : ""}.`,
+        tom: "neutro",
+        destino: "/agendamentos", destino_label: "Abrir Agenda",
+      }
+    : { numero: 0, label: "Sua agenda está livre hoje.", tom: "neutro", destino: "/agendamentos", destino_label: "Abrir Agenda" };
+
+  const oportunidades: InsightTile = ctx.clientesParaReativar > 0
+    ? {
+        numero: ctx.clientesParaReativar,
+        label: `cliente${ctx.clientesParaReativar > 1 ? "s" : ""} podem voltar a fazer negócio.`,
+        tom: "positivo",
+        destino: "/pacientes", destino_label: "Ver Clientes",
+      }
+    : { numero: 0, label: "Nenhuma oportunidade no momento.", tom: "neutro" };
+
+  let recomendacao: string;
+  if (ctx.atrasados > 0)                       recomendacao = "Comece retornando os clientes pendentes.";
+  else if (ctx.pendentes > 0)                  recomendacao = "Confirme os compromissos de hoje.";
+  else if (ctx.clientesParaReativar > 0)       recomendacao = "Entre em contato com clientes inativos.";
+  else                                          recomendacao = "Sua agenda está tranquila; aproveite para prospectar novos clientes.";
+
+  const situacao: SituacaoDia = ctx.atrasados > 0
+    ? { emoji: "🔴", texto: "Prioridade Alta", tom: "critico" }
+    : ctx.pendentes > 0
+      ? { emoji: "🟡", texto: "Atenção", tom: "atencao" }
+      : { emoji: "🟢", texto: "Tudo em ordem", tom: "positivo" };
+
+  return { temDados: true, prioridades, agenda, oportunidades, recomendacao, situacao };
 }
 
 function saudacao(): string {
@@ -119,6 +211,24 @@ function saudacao(): string {
   if (h >= 6 && h < 12) return "Bom dia";
   if (h >= 12 && h < 18) return "Boa tarde";
   return "Boa noite";
+}
+
+// Saudação do card "Seu Plano para Hoje". Padrão institucional (V1): sempre
+// genérico, sem citar o segmento do cliente — o OrganizaPro atende qualquer
+// tipo de negócio, então a demonstração nunca deve sugerir um nicho (ex.:
+// clínica, consultório, odontologia).
+// Preparação para V2: quando `ambienteProducao` vier de um sinal real (ex.:
+// conta paga vs. conta de demonstração) e houver nome de empresa cadastrado,
+// a saudação passa a ser personalizada automaticamente — sem exigir nenhuma
+// mudança no JSX que consome `SaudacaoCard`.
+type SaudacaoCard = { linha1: string; linha2?: string; subtitulo: string };
+
+function gerarSaudacaoCard(ctx: { nomeNegocio: string; ambienteProducao: boolean }): SaudacaoCard {
+  const subtitulo = "Confira seu plano para hoje e mantenha seu negócio organizado.";
+  if (ctx.ambienteProducao && ctx.nomeNegocio) {
+    return { linha1: `Bem-vindo de volta, ${ctx.nomeNegocio}.`, subtitulo };
+  }
+  return { linha1: `👋 ${saudacao()}!`, linha2: "Bem-vindo ao OrganizaPro.", subtitulo };
 }
 
 function formatarDataBR(d: string): string {
@@ -144,13 +254,21 @@ const stStatus: Record<string, { bg: string; color: string; label: string }> = {
   reagendar:  { bg: "#ea580c22", color: "#fb923c", label: "Reagendar"  },
 };
 
+const stTom: Record<"critico" | "positivo" | "neutro" | "atencao", { bg: string; border: string; color: string }> = {
+  critico:  { bg: "rgba(248,113,113,0.12)", border: "rgba(248,113,113,0.3)",  color: "#f87171" },
+  atencao:  { bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.3)",   color: "#fbbf24" },
+  positivo: { bg: "rgba(74,222,128,0.12)",  border: "rgba(74,222,128,0.3)",   color: "#4ade80" },
+  neutro:   { bg: "rgba(74,155,176,0.12)",  border: "rgba(74,155,176,0.3)",   color: "#4a9bb0" },
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [dash, setDash] = useState<DashData>({
     compromissosHoje: 0, pendentes: 0, atrasados: 0,
     agendaHoje: [], proximos: [], atrasadosList: [],
-    totalPacientes: 0, temLogo: false, temEmail: false, temTelefone: false, temEndereco: false,
+    totalPacientes: 0, clientesParaReativar: 0, nomeNegocio: "",
+    temLogo: false, temEmail: false, temTelefone: false, temEndereco: false,
   });
 
   const carregarDados = useCallback(async () => {
@@ -174,6 +292,7 @@ export default function Dashboard() {
         { data: prox },
         { data: atrasados },
         { count: pacCount },
+        { count: reativarCount },
         { data: cfg },
       ] = await Promise.all([
         supabase.from("agendamentos")
@@ -195,8 +314,13 @@ export default function Dashboard() {
         supabase.from("pacientes")
           .select("*", { count: "exact", head: true })
           .eq("clinica_id", cid),
+        // Insights do Dia · Oportunidades: clientes sem próxima consulta agendada (candidatos a reativação)
+        supabase.from("pacientes")
+          .select("id", { count: "exact", head: true })
+          .eq("clinica_id", cid)
+          .or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`),
         supabase.from("clinica_config")
-          .select("logo_url, email, telefone, endereco")
+          .select("logo_url, email, telefone, endereco, nome_clinica")
           .eq("clinica_id", cid)
           .maybeSingle(),
       ]);
@@ -214,6 +338,8 @@ export default function Dashboard() {
         proximos:         (prox || []) as AgItem[],
         atrasadosList,
         totalPacientes:   pacCount ?? 0,
+        clientesParaReativar: reativarCount ?? 0,
+        nomeNegocio:      cfg?.nome_clinica || "",
         temLogo:          !!cfg?.logo_url,
         temEmail:         !!cfg?.email,
         temTelefone:      !!cfg?.telefone,
@@ -280,21 +406,168 @@ export default function Dashboard() {
     hoje:           hojeStr,
   });
 
+  const insights = gerarInsights({
+    totalPacientes:       dash.totalPacientes,
+    pendentes:            dash.pendentes,
+    atrasados:            dash.atrasados,
+    compromissosHoje:     dash.compromissosHoje,
+    clientesParaReativar: dash.clientesParaReativar,
+  });
+
+  // V2: ambienteProducao virá de um sinal real de conta/ambiente. Mantido
+  // desligado em V1 para nunca personalizar em contas de demonstração.
+  const saudacaoCard = gerarSaudacaoCard({
+    nomeNegocio:      dash.nomeNegocio,
+    ambienteProducao: false,
+  });
+
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Inter,sans-serif" }}>
-      Carregando...
+      Preparando seu painel...
     </div>
   );
 
   return (
-    <AdminShell title="Dashboard" subtitle={dataStr}>
+    <AdminShell title="Central de Gestão" subtitle={dataStr}>
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         .dc  { animation: fadeUp 0.35s ease both; }
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
+        .insights-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        @media (max-width: 860px) { .insights-grid { grid-template-columns: 1fr; } }
         .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
       `}</style>
+
+      {/* ── SEU PLANO PARA HOJE ──────────────────────────────────────────────── */}
+      <div className="dc" style={{
+        background: "linear-gradient(135deg, rgba(74,155,176,0.12), rgba(31,78,95,0.22))",
+        border: "1px solid rgba(74,155,176,0.3)",
+        borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(74,155,176,0.18)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 17, flexShrink: 0,
+            }}>
+              🎯
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
+              Seu Plano para Hoje
+            </div>
+          </div>
+          {insights.temDados && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "5px 12px", borderRadius: 999,
+              background: stTom[insights.situacao.tom].bg,
+              border: `1px solid ${stTom[insights.situacao.tom].border}`,
+              color: stTom[insights.situacao.tom].color,
+              fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+            }}>
+              {insights.situacao.emoji} {insights.situacao.texto}
+            </span>
+          )}
+        </div>
+
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#cbd5e1", margin: "6px 0 4px" }}>
+          {saudacaoCard.linha1}
+          {saudacaoCard.linha2 && <><br />{saudacaoCard.linha2}</>}
+        </div>
+        <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: "0 0 20px" }}>
+          {saudacaoCard.subtitulo}
+        </p>
+
+        {!insights.temDados ? (
+          <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
+            Ainda não há informações suficientes para gerar recomendações. Continue utilizando o OrganizaPro e os Insights ficarão cada vez mais úteis.
+          </div>
+        ) : (
+          <>
+            <div className="insights-grid">
+              {/* Prioridades */}
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                  Prioridades
+                </div>
+                <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, margin: "0 0 6px", color: stTom[insights.prioridades.tom].color }}>
+                  {insights.prioridades.numero}
+                </div>
+                <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 12px" }}>
+                  {insights.prioridades.label}
+                </p>
+                {insights.prioridades.destino && (
+                  <button
+                    onClick={() => router.push(insights.prioridades.destino!)}
+                    style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.1)", color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    {insights.prioridades.destino_label} →
+                  </button>
+                )}
+              </div>
+
+              {/* Agenda */}
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                  Agenda
+                </div>
+                <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, margin: "0 0 6px", color: stTom[insights.agenda.tom].color }}>
+                  {insights.agenda.numero}
+                </div>
+                <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 12px" }}>
+                  {insights.agenda.label}
+                </p>
+                {insights.agenda.destino && (
+                  <button
+                    onClick={() => router.push(insights.agenda.destino!)}
+                    style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(74,155,176,0.3)", background: "rgba(74,155,176,0.1)", color: "#4a9bb0", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    {insights.agenda.destino_label} →
+                  </button>
+                )}
+              </div>
+
+              {/* Oportunidades */}
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                  Oportunidades
+                </div>
+                <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, margin: "0 0 6px", color: stTom[insights.oportunidades.tom].color }}>
+                  {insights.oportunidades.numero}
+                </div>
+                <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 12px" }}>
+                  {insights.oportunidades.label}
+                </p>
+                {insights.oportunidades.destino && (
+                  <button
+                    onClick={() => router.push(insights.oportunidades.destino!)}
+                    style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.1)", color: "#4ade80", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    {insights.oportunidades.destino_label} →
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Recomendação do Dia */}
+            <div style={{
+              marginTop: 16, padding: "12px 16px", borderRadius: 10,
+              background: "rgba(74,155,176,0.08)", border: "1px solid rgba(74,155,176,0.2)",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                💡 Recomendação do OrganizaPro
+              </div>
+              <span style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600, lineHeight: 1.4 }}>
+                {insights.recomendacao}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* ── CARD PRINCIPAL ──────────────────────────────────────────────────── */}
       <div className="dc" style={{
@@ -308,7 +581,7 @@ export default function Dashboard() {
         <div style={{ fontSize: 13, color: "#64748b", marginBottom: 22 }}>{dataStr}</div>
 
         <div style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600, marginBottom: 14 }}>
-          Hoje você possui:
+          Panorama do seu dia
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -317,7 +590,7 @@ export default function Dashboard() {
               {dash.compromissosHoje}
             </span>
             <span style={{ fontSize: 14, color: "#94a3b8" }}>
-              compromisso{dash.compromissosHoje !== 1 ? "s" : ""}
+              compromisso{dash.compromissosHoje !== 1 ? "s" : ""} hoje
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -326,7 +599,7 @@ export default function Dashboard() {
               {dash.pendentes}
             </span>
             <span style={{ fontSize: 14, color: "#94a3b8" }}>
-              pendente{dash.pendentes !== 1 ? "s" : ""}
+              aguardando confirmação
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -335,7 +608,7 @@ export default function Dashboard() {
               {dash.atrasados}
             </span>
             <span style={{ fontSize: 14, color: "#94a3b8" }}>
-              atrasado{dash.atrasados !== 1 ? "s" : ""}
+              em atraso
             </span>
           </div>
         </div>
@@ -358,7 +631,7 @@ export default function Dashboard() {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
-              💡 Próxima Ideia · Consultoria do dia
+              💡 Consultoria do Dia
             </div>
             <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 12px" }}>
               {ideia.texto}
@@ -371,7 +644,7 @@ export default function Dashboard() {
               border: "1px solid rgba(74,155,176,0.14)",
             }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-                💡 Por que isso importa?
+                🧭 Por que isso importa
               </div>
               <div style={{
                 fontSize: 13,
@@ -497,12 +770,12 @@ export default function Dashboard() {
           ) : (
             <div style={{ color: "#475569", fontSize: 13 }}>
               <div style={{ fontSize: 28, marginBottom: 10 }}>📅</div>
-              Nenhum compromisso para hoje.{" "}
+              Sua agenda está livre hoje.{" "}
               <span
                 style={{ color: "#4a9bb0", cursor: "pointer", fontWeight: 600 }}
                 onClick={() => router.push("/agendamentos")}
               >
-                Agendar agora
+                Agendar um compromisso →
               </span>
             </div>
           )}
@@ -528,7 +801,8 @@ export default function Dashboard() {
 
           {diasOrdenados.length === 0 ? (
             <div style={{ color: "#475569", fontSize: 13, textAlign: "center", paddingTop: 16 }}>
-              Nenhum compromisso nos próximos 7 dias.
+              Nenhum compromisso agendado para os próximos 7 dias.<br />
+              Bom momento para planejar a semana.
             </div>
           ) : diasOrdenados.map((d, di) => (
             <div key={d}>

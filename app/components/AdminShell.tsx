@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
 const nav = [
-  { l: "Dashboard",      h: "/dashboard",     i: "⚡" },
+  { l: "Central de Gestão", h: "/dashboard",  i: "⚡" },
   { l: "Clientes",       h: "/pacientes",     i: "👤" },
   { l: "Agenda",         h: "/agendamentos",  i: "📅" },
   { l: "Raio-X",         h: "/raio-x",        i: "📊" },
@@ -142,13 +142,14 @@ export default function AdminShell({
 
         {/* Logo + close button */}
         <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid #1e2130", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
             <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#1F4E5F,#0d3547)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
               📋
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>OrganizaPro</div>
-              <div style={{ fontSize: 10, color: "#4a9bb0", lineHeight: 1.35 }}>Organize sua empresa com inteligência.</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", lineHeight: 1.2 }}>OrganizaPro</div>
+              <div style={{ fontSize: 10, color: "#4a9bb0", lineHeight: 1.35, marginTop: 2, maxWidth: 138, textWrap: "balance" as React.CSSProperties["textWrap"] }}>Organize sua empresa com inteligência.</div>
+              <div style={{ fontSize: 9, color: "#64748b", marginTop: 4, letterSpacing: "0.02em" }}>✨ Assistente de Gestão</div>
             </div>
           </div>
 

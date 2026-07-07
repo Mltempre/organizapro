@@ -24,7 +24,7 @@ export interface LandingPageProps {
   heroSubtitle: string;
   specialty: string;
   wppMessageDefault: string;
-  dashboardDoctorName: string;
+  dashboardOwnerName: string;
   testimonials: Testimonial[];
   faqItems: FaqItem[];
   ctaTitle?: string;
@@ -38,11 +38,11 @@ export default function LandingPage({
   heroSubtitle,
   specialty,
   wppMessageDefault,
-  dashboardDoctorName,
+  dashboardOwnerName,
   testimonials,
   faqItems,
-  ctaTitle = "Pronto para transformar\nsua clínica?",
-  heroBadge = "312 clínicas ativas agora",
+  ctaTitle = "Pronto para transformar\nseu negócio?",
+  heroBadge = "312 negócios ativos agora",
 }: LandingPageProps) {
   const [scrolled, setScrolled] = useState(false);
   const [consultas, setConsultas] = useState(20);
@@ -75,7 +75,7 @@ export default function LandingPage({
   const perdaMensal = faltasPorMes * ticket;
   const recuperacao = Math.round(perdaMensal * 0.72);
 
-  const initials = dashboardDoctorName
+  const initials = dashboardOwnerName
     .split(" ")
     .slice(0, 2)
     .map((n) => n[0])
@@ -124,7 +124,7 @@ export default function LandingPage({
             <div style={{ fontSize: 32, marginBottom: 12 }}>📲</div>
             <h3 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, margin: "0 0 10px" }}>Ver demonstração completa</h3>
             <p style={{ fontSize: 14, color: "rgba(255,255,255,0.6)", margin: "0 0 24px", lineHeight: 1.6 }}>
-              Fale com nossa equipe e veja o ClínicaFlow funcionando na prática com dados reais da sua especialidade.
+              Fale com nossa equipe e veja o OrganizaPro funcionando na prática com dados reais do seu segmento.
             </p>
             <button onClick={() => { setDemoModal(false); wpp(); }} className="btn-primary" style={{ width: "100%", marginBottom: 12 }}>
               Solicitar demonstração pelo WhatsApp
@@ -164,8 +164,8 @@ export default function LandingPage({
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: 20 }}>🏥</span>
-          <span style={{ fontSize: 17, fontWeight: 800, background: "linear-gradient(135deg,#00c896,#00a878)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>ClinicaFlow</span>
+          <span style={{ fontSize: 20 }}>📋</span>
+          <span style={{ fontSize: 17, fontWeight: 800, background: "linear-gradient(135deg,#00c896,#00a878)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>OrganizaPro</span>
         </div>
 
         <div className="nav-links" style={{ display: "flex", gap: 24, alignItems: "center" }}>
@@ -243,7 +243,7 @@ export default function LandingPage({
                 <div style={{ display: "flex", gap: 6 }}>
                   {["#f87171","#fbbf24","#34d399"].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />)}
                 </div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>ClínicaFlow — Painel</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>OrganizaPro — Painel</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#00c896" }}>
                   <span className="status-dot-green" style={{ width: 6, height: 6 }} />
                   Ao vivo
@@ -258,7 +258,7 @@ export default function LandingPage({
                 <div style={{ padding: "14px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Bom dia, {dashboardDoctorName} 👋</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Bom dia, {dashboardOwnerName} 👋</div>
                       <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Segunda-feira, 03 Jun</div>
                     </div>
                     <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#00c896,#00a878)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{initials}</div>
@@ -304,7 +304,7 @@ export default function LandingPage({
 
       {/* SOCIAL PROOF TICKER */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "18px 0", background: "rgba(255,255,255,0.01)", overflow: "hidden" }}>
-        <div style={{ fontSize: 11, textAlign: "center", color: "rgba(255,255,255,0.3)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1px" }}>Usado por clínicas em todo o Brasil</div>
+        <div style={{ fontSize: 11, textAlign: "center", color: "rgba(255,255,255,0.3)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1px" }}>Usado por negócios em todo o Brasil</div>
         <div className="ticker-wrap">
           <div className="ticker">
             {[...Array(2)].map((_, ri) =>
@@ -321,8 +321,8 @@ export default function LandingPage({
       {/* DEPOIMENTOS */}
       <section style={{ padding: isMobile ? "60px 16px" : "80px 40px", maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <h2 style={{ fontSize: "clamp(22px,3.6vw,40px)", fontWeight: 800, margin: "0 0 12px" }}>O que dizem nossas clínicas</h2>
-          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", margin: 0 }}>Resultados reais de quem já usa o ClínicaFlow</p>
+          <h2 style={{ fontSize: "clamp(22px,3.6vw,40px)", fontWeight: 800, margin: "0 0 12px" }}>O que dizem nossos clientes</h2>
+          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", margin: 0 }}>Resultados reais de quem já usa o OrganizaPro</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(300px,1fr))", gap: 20 }}>
           {testimonials.map(t => (
@@ -350,34 +350,34 @@ export default function LandingPage({
       <section style={{ padding: isMobile ? "60px 16px" : "80px 40px", background: "rgba(255,255,255,0.015)" }}>
         <div style={{ maxWidth: 860, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <h2 style={{ fontSize: "clamp(22px,3.6vw,40px)", fontWeight: 800, margin: "0 0 12px" }}>Quanto sua clínica perde por mês?</h2>
+            <h2 style={{ fontSize: "clamp(22px,3.6vw,40px)", fontWeight: 800, margin: "0 0 12px" }}>Quanto seu negócio perde por mês?</h2>
             <p style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", margin: 0 }}>Ajuste os valores e veja o impacto em tempo real</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 24 : 32, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                  <label style={{ fontSize: 14, color: "rgba(255,255,255,0.65)" }}>Consultas por semana</label>
+                  <label style={{ fontSize: 14, color: "rgba(255,255,255,0.65)" }}>Atendimentos por semana</label>
                   <span style={{ fontSize: 16, fontWeight: 800, color: "#00c896" }}>{consultas}</span>
                 </div>
                 <input type="range" min={5} max={80} value={consultas} onChange={e => setConsultas(Number(e.target.value))} />
               </div>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                  <label style={{ fontSize: 14, color: "rgba(255,255,255,0.65)" }}>Ticket médio por consulta</label>
+                  <label style={{ fontSize: 14, color: "rgba(255,255,255,0.65)" }}>Ticket médio por atendimento</label>
                   <span style={{ fontSize: 16, fontWeight: 800, color: "#00c896" }}>R${ticket}</span>
                 </div>
                 <input type="range" min={80} max={800} step={10} value={ticket} onChange={e => setTicket(Number(e.target.value))} />
               </div>
               <div style={{ padding: 16, borderRadius: 14, background: "rgba(0,200,150,0.05)", border: "1px solid rgba(0,200,150,0.12)", fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.6 }}>
-                Cálculo baseado em taxa média de 18% de faltas em clínicas sem sistema de confirmação automatizada.
+                Cálculo baseado em taxa média de 18% de faltas em negócios sem sistema de confirmação automatizada.
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {[
-                { label: "Faltas estimadas por mês", value: `${faltasPorMes} consultas`, color: "#f87171", bg: "rgba(248,113,113,0.06)", border: "rgba(248,113,113,0.15)" },
+                { label: "Faltas estimadas por mês", value: `${faltasPorMes} atendimentos`, color: "#f87171", bg: "rgba(248,113,113,0.06)", border: "rgba(248,113,113,0.15)" },
                 { label: "Faturamento perdido/mês", value: `R$${perdaMensal.toLocaleString("pt-BR")}`, color: "#fbbf24", bg: "rgba(251,191,36,0.06)", border: "rgba(251,191,36,0.15)" },
-                { label: "Recuperação estimada com ClínicaFlow", value: `R$${recuperacao.toLocaleString("pt-BR")}`, color: "#00c896", bg: "rgba(0,200,150,0.08)", border: "rgba(0,200,150,0.2)" },
+                { label: "Recuperação estimada com OrganizaPro", value: `R$${recuperacao.toLocaleString("pt-BR")}`, color: "#00c896", bg: "rgba(0,200,150,0.08)", border: "rgba(0,200,150,0.2)" },
               ].map(r => (
                 <div key={r.label} style={{ padding: "16px 20px", borderRadius: 14, background: r.bg, border: `1px solid ${r.border}` }}>
                   <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 5 }}>{r.label}</div>
@@ -395,16 +395,16 @@ export default function LandingPage({
       {/* BENEFÍCIOS */}
       <section id="beneficios" style={{ padding: isMobile ? "60px 16px" : "80px 40px", maxWidth: 1200, margin: "0 auto", scrollMarginTop: "80px" }}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <h2 style={{ fontSize: "clamp(22px,3.6vw,40px)", fontWeight: 800, margin: "0 0 12px" }}>Tudo que sua clínica precisa</h2>
+          <h2 style={{ fontSize: "clamp(22px,3.6vw,40px)", fontWeight: 800, margin: "0 0 12px" }}>Tudo que seu negócio precisa</h2>
           <p style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", margin: 0 }}>em uma plataforma só</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 20 }}>
           {[
-            { icon: "💬", title: "WhatsApp Automático", desc: "Lembretes, confirmações e mensagens pós-atendimento enviados automaticamente para seus pacientes." },
-            { icon: "⭐", title: "Avaliações Google", desc: "Solicite avaliações automaticamente após cada consulta e aumente sua nota no Google." },
-            { icon: "🤖", title: "Conteúdo IA para Instagram", desc: "Gere posts, legendas e hashtags com IA. Ajudamos sua clínica a usar redes sociais de forma profissional." },
-            { icon: "🌐", title: "Site Profissional", desc: "Cada clínica ganha uma página profissional com WhatsApp, localização e SEO básico incluso." },
-            { icon: "📊", title: "Dashboard Completo", desc: "Gerencie pacientes, agendamentos e métricas em tempo real. Tudo em um só lugar." },
+            { icon: "💬", title: "WhatsApp Automático", desc: "Lembretes, confirmações e mensagens pós-atendimento enviados automaticamente para seus clientes." },
+            { icon: "⭐", title: "Avaliações Google", desc: "Solicite avaliações automaticamente após cada atendimento e aumente sua nota no Google." },
+            { icon: "🤖", title: "Conteúdo IA para Instagram", desc: "Gere posts, legendas e hashtags com IA. Ajudamos seu negócio a usar redes sociais de forma profissional." },
+            { icon: "🌐", title: "Site Profissional", desc: "Cada negócio ganha uma página profissional com WhatsApp, localização e SEO básico incluso." },
+            { icon: "📊", title: "Dashboard Completo", desc: "Gerencie clientes, agendamentos e métricas em tempo real. Tudo em um só lugar." },
             { icon: "🚀", title: "Setup em 5 Minutos", desc: "Crie sua conta, conecte o WhatsApp e personalize suas mensagens. Sem burocracia." },
           ].map(b => (
             <div key={b.title} className="card">
@@ -420,7 +420,7 @@ export default function LandingPage({
       <section id="dashboard-demo" style={{ padding: isMobile ? "40px 16px 60px" : "40px 40px 60px", maxWidth: 1200, margin: "0 auto", scrollMarginTop: "80px" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <h2 style={{ fontSize: "clamp(22px,3.6vw,40px)", fontWeight: 800, margin: "0 0 12px" }}>Um painel que parece seu produto</h2>
-          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", maxWidth: 560, margin: "0 auto" }}>Interface limpa para acompanhar pacientes, consultas, confirmações e resultados.</p>
+          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", maxWidth: 560, margin: "0 auto" }}>Interface limpa para acompanhar clientes, atendimentos, confirmações e resultados.</p>
         </div>
 
         {/* Wrapper com scroll horizontal controlado no mobile */}
@@ -430,7 +430,7 @@ export default function LandingPage({
               <div style={{ display: "flex", gap: 7 }}>
                 {["#f87171","#fbbf24","#34d399"].map(c => <div key={c} style={{ width: 11, height: 11, borderRadius: "50%", background: c }} />)}
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.35)" }}>clinicafllow.com.br/painel</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.35)" }}>organizaprooficial.com.br/painel</div>
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <span className="status-dot-green" style={{ width: 6, height: 6 }} />
                 <span style={{ fontSize: 11, color: "#00c896" }}>Conectado</span>
@@ -446,7 +446,7 @@ export default function LandingPage({
               <div style={{ padding: 24 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, gap: 12, flexWrap: "wrap" }}>
                   <div>
-                    <div style={{ fontSize: 16, fontWeight: 800 }}>Bom dia, {dashboardDoctorName} 👋</div>
+                    <div style={{ fontSize: 16, fontWeight: 800 }}>Bom dia, {dashboardOwnerName} 👋</div>
                     <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Segunda-feira, 03 de Junho de 2026</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -474,7 +474,7 @@ export default function LandingPage({
                   <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 18 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>Agenda de Hoje</div>
-                      <div style={{ fontSize: 11, color: "#00c896", background: "rgba(0,200,150,0.08)", border: "1px solid rgba(0,200,150,0.15)", borderRadius: 6, padding: "2px 8px", whiteSpace: "nowrap" }}>18 consultas</div>
+                      <div style={{ fontSize: 11, color: "#00c896", background: "rgba(0,200,150,0.08)", border: "1px solid rgba(0,200,150,0.15)", borderRadius: 6, padding: "2px 8px", whiteSpace: "nowrap" }}>18 atendimentos</div>
                     </div>
                     {[
                       { time: "09:00", name: "Carlos Mendonça", type: "Retorno", status: "green" },
@@ -506,7 +506,7 @@ export default function LandingPage({
                       ))}
                     </div>
                     <div style={{ background: "rgba(0,200,150,0.07)", border: "1px solid rgba(0,200,150,0.18)", borderRadius: 14, padding: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#00c896", marginBottom: 8 }}>✅ 37 consultas recuperadas</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#00c896", marginBottom: 8 }}>✅ 37 atendimentos recuperados</div>
                       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.6 }}>Automações de lembrete recuperaram R$7.400 este mês.</div>
                     </div>
                   </div>
@@ -528,7 +528,7 @@ export default function LandingPage({
           <div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(0,200,150,0.07)", border: "1px solid rgba(0,200,150,0.2)", borderRadius: 999, padding: "4px 14px", marginBottom: 16, fontSize: 12, color: "#00c896", fontWeight: 700 }}>PLANO PREMIUM</div>
             <h2 style={{ fontSize: "clamp(20px,3vw,34px)", fontWeight: 800, margin: "0 0 14px" }}>Site profissional incluso</h2>
-            <p style={{ fontSize: 15, color: "rgba(255,255,255,0.55)", margin: "0 0 24px", lineHeight: 1.65 }}>Ao contratar o Plano Premium você recebe um site moderno integrado ao WhatsApp para captar novos pacientes.</p>
+            <p style={{ fontSize: 15, color: "rgba(255,255,255,0.55)", margin: "0 0 24px", lineHeight: 1.65 }}>Ao contratar o Plano Premium você recebe um site moderno integrado ao WhatsApp para captar novos clientes.</p>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
               {["Responsivo para celular","Botão WhatsApp","Google Maps integrado","Página de serviços","Formulário de contato","SEO básico incluso"].map(item => (
                 <div key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
@@ -538,7 +538,7 @@ export default function LandingPage({
             </div>
           </div>
           <div style={{ background: "#080f1c", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", padding: 20 }}>
-            <div style={{ borderRadius: 8, background: "rgba(0,200,150,0.08)", border: "1px solid rgba(0,200,150,0.15)", padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#00c896", fontWeight: 700 }}>clinicabemestar.com.br</div>
+            <div style={{ borderRadius: 8, background: "rgba(0,200,150,0.08)", border: "1px solid rgba(0,200,150,0.15)", padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#00c896", fontWeight: 700 }}>seunegocio.com.br</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ height: 12, borderRadius: 6, background: "rgba(255,255,255,0.08)", width: "80%" }} />
               <div style={{ height: 8, borderRadius: 6, background: "rgba(255,255,255,0.05)", width: "60%" }} />
@@ -556,9 +556,9 @@ export default function LandingPage({
           <p style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", margin: "0 0 52px" }}>Em 3 passos simples</p>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(250px,1fr))", gap: isMobile ? 36 : 32 }}>
             {[
-              { n: "01", title: "Agende sua demonstração", desc: "Veja o ClínicaFlow funcionando na prática com dados reais da sua especialidade. Nossa equipe cuida de toda a implantação assistida." },
-              { n: "02", title: "Configure sua clínica", desc: "Adicione seus dados, conecte o WhatsApp e personalize suas mensagens automáticas." },
-              { n: "03", title: "Veja os resultados", desc: "Mais confirmações, mais avaliações Google e mais pacientes novos todo mês." },
+              { n: "01", title: "Agende sua demonstração", desc: "Veja o OrganizaPro funcionando na prática com dados reais do seu segmento. Nossa equipe cuida de toda a implantação assistida." },
+              { n: "02", title: "Configure seu negócio", desc: "Adicione seus dados, conecte o WhatsApp e personalize suas mensagens automáticas." },
+              { n: "03", title: "Veja os resultados", desc: "Mais confirmações, mais avaliações Google e mais clientes novos todo mês." },
             ].map(s => (
               <div key={s.n}>
                 <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg,#00c896,#00a878)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, margin: "0 auto 18px" }}>{s.n}</div>
@@ -578,14 +578,14 @@ export default function LandingPage({
         </div>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={{ display: "inline-block", background: "rgba(0,200,150,0.06)", border: "1px solid rgba(0,200,150,0.18)", borderRadius: 10, padding: "10px 20px", fontSize: isMobile ? 13 : 14, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, maxWidth: "100%" }}>
-            💡 Clínicas no Plano Pro recuperam em média <strong style={{ color: "#00c896" }}>R$2.400/mês</strong> em consultas que seriam perdidas. O plano custa R$497.
+            💡 Negócios no Plano Pro recuperam em média <strong style={{ color: "#00c896" }}>R$2.400/mês</strong> em atendimentos que seriam perdidos. O plano custa R$497.
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 22, alignItems: "start" }}>
           {[
-            { name: "Start", price: "R$297", period: "/mês", color: "#64748b", features: ["Cadastro de pacientes","Agendamentos","Lembretes automáticos"], cta: "Solicitar Demonstração", msg: `Olá, quero conhecer o Plano Start da ClínicaFlow para ${specialty}.` },
-            { name: "Pro", price: "R$497", period: "/mês", color: "#00c896", popular: true, features: ["Tudo do Start","Avaliações Google","WhatsApp automatizado","Relatórios completos"], cta: "Solicitar Demonstração", msg: `Olá, quero uma demonstração do Plano Pro da ClínicaFlow para ${specialty}.` },
-            { name: "Premium", price: "R$697", period: "/mês", color: "#94a3b8", features: ["Tudo do Pro","🏆 Site Profissional Incluso","Landing page da clínica","Suporte prioritário"], cta: "Falar com Vendas", msg: `Olá, quero conhecer o Plano Premium da ClínicaFlow para ${specialty}.` },
+            { name: "Start", price: "R$297", period: "/mês", color: "#64748b", features: ["Cadastro de clientes","Agendamentos","Lembretes automáticos"], cta: "Solicitar Demonstração", msg: `Olá, quero conhecer o Plano Start do OrganizaPro para ${specialty}.` },
+            { name: "Pro", price: "R$497", period: "/mês", color: "#00c896", popular: true, features: ["Tudo do Start","Avaliações Google","WhatsApp automatizado","Relatórios completos"], cta: "Solicitar Demonstração", msg: `Olá, quero uma demonstração do Plano Pro do OrganizaPro para ${specialty}.` },
+            { name: "Premium", price: "R$697", period: "/mês", color: "#94a3b8", features: ["Tudo do Pro","🏆 Site Profissional Incluso","Landing page do negócio","Suporte prioritário"], cta: "Falar com Vendas", msg: `Olá, quero conhecer o Plano Premium do OrganizaPro para ${specialty}.` },
           ].map(p => (
             <div key={p.name} style={{ background: p.popular ? "rgba(0,200,150,0.04)" : "rgba(255,255,255,0.02)", border: p.popular ? "1px solid rgba(0,200,150,0.35)" : "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: isMobile ? 24 : 28, position: "relative", marginTop: p.popular && isMobile ? 16 : 0 }}>
               {p.popular && <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "linear-gradient(135deg,#00c896,#00a878)", borderRadius: 999, padding: "4px 16px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>MAIS VENDIDO</div>}
@@ -644,7 +644,7 @@ export default function LandingPage({
               </span>
             ))}
           </h2>
-          <p style={{ fontSize: isMobile ? 15 : 16, color: "rgba(255,255,255,0.45)", margin: "0 0 32px", lineHeight: 1.6 }}>Junte-se a mais de 300 clínicas que já usam o ClínicaFlow. Veja o ClínicaFlow funcionando na prática..</p>
+          <p style={{ fontSize: isMobile ? 15 : 16, color: "rgba(255,255,255,0.45)", margin: "0 0 32px", lineHeight: 1.6 }}>Junte-se a mais de 300 negócios que já usam o OrganizaPro. Veja o OrganizaPro funcionando na prática.</p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
             <button className="btn-primary" style={{ fontSize: isMobile ? 15 : 16, padding: isMobile ? "14px 24px" : "15px 36px" }} onClick={() => wpp()}>📲 Solicitar Demonstração</button>
             <button onClick={() => setDemoModal(true)} className="btn-secondary" style={{ fontSize: 15, padding: "15px 24px" }}>Ver demonstração</button>
@@ -656,13 +656,13 @@ export default function LandingPage({
       {/* FOOTER */}
       <footer style={{ padding: isMobile ? "24px 16px" : "32px 40px", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: "center", gap: 12, textAlign: isMobile ? "center" : "left" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16 }}>🏥</span>
-          <span style={{ fontSize: 15, fontWeight: 700, background: "linear-gradient(135deg,#00c896,#00a878)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>ClinicaFlow</span>
+          <span style={{ fontSize: 16 }}>📋</span>
+          <span style={{ fontSize: 15, fontWeight: 700, background: "linear-gradient(135deg,#00c896,#00a878)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>OrganizaPro</span>
         </div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.25)" }}>© 2026 ClinicaFlow. Todos os direitos reservados.</div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.25)" }}>© 2026 OrganizaPro. Todos os direitos reservados.</div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
-          <a href="https://www.clinicafllow.com.br" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.35)", textDecoration: "none" }}>www.clinicafllow.com.br</a>
-          <a href="mailto:contato@clinicafllow.com.br" style={{ color: "rgba(255,255,255,0.35)", textDecoration: "none" }}>📧 contato@clinicafllow.com.br</a>
+          <a href="https://www.organizaprooficial.com.br" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.35)", textDecoration: "none" }}>www.organizaprooficial.com.br</a>
+          <a href="mailto:contato@organizaprooficial.com.br" style={{ color: "rgba(255,255,255,0.35)", textDecoration: "none" }}>📧 contato@organizaprooficial.com.br</a>
         </div>
       </footer>
 

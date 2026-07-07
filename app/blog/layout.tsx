@@ -3,8 +3,8 @@ import { BASE_URL } from "./data/articles";
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Blog ClínicaFlow",
-    default: "Blog ClínicaFlow — Estratégias para Clínicas de Saúde",
+    template: "%s | Blog OrganizaPro",
+    default: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
   },
   description:
     "Conteúdo especializado sobre WhatsApp para clínicas, avaliações no Google, marketing para consultórios e gestão automatizada para profissionais de saúde.",
@@ -18,9 +18,9 @@ export const metadata: Metadata = {
     "reduzir faltas pacientes",
     "confirmar consultas automaticamente",
   ],
-  authors: [{ name: "Equipe ClínicaFlow", url: BASE_URL }],
-  creator: "ClínicaFlow",
-  publisher: "ClínicaFlow",
+  authors: [{ name: "Equipe OrganizaPro", url: BASE_URL }],
+  creator: "OrganizaPro",
+  publisher: "OrganizaPro",
   metadataBase: new URL(BASE_URL),
   alternates: {
     canonical: `${BASE_URL}/blog`,
@@ -28,10 +28,10 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    siteName: "ClínicaFlow",
+    siteName: "OrganizaPro",
     locale: "pt_BR",
     url: `${BASE_URL}/blog`,
-    title: "Blog ClínicaFlow — Estratégias para Clínicas de Saúde",
+    title: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
     description:
       "Guias práticos sobre WhatsApp, avaliações no Google, marketing e automação para dentistas, dermatologistas, estetas e fisioterapeutas.",
     images: [
@@ -39,15 +39,15 @@ export const metadata: Metadata = {
         url: `${BASE_URL}/og-blog.png`,
         width: 1200,
         height: 630,
-        alt: "Blog ClínicaFlow — Estratégias para Clínicas de Saúde",
+        alt: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    site: "@clinicaflow",
-    creator: "@clinicaflow",
-    title: "Blog ClínicaFlow — Estratégias para Clínicas de Saúde",
+    site: "@organizapro",
+    creator: "@organizapro",
+    title: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
     description:
       "Guias práticos sobre WhatsApp, avaliações no Google e automação para clínicas de saúde.",
     images: [`${BASE_URL}/og-blog.png`],

@@ -34,7 +34,7 @@ export default function Page() {
     { icon: "📅", title: "Agenda simples",               desc: "Visualize todos os seus compromissos do dia em um calendário limpo e intuitivo."                       },
     { icon: "👥", title: "Cadastro de clientes",         desc: "Registre dados, histórico de atendimentos e observações de cada cliente em um único lugar."           },
     { icon: "📞", title: "Central de contatos",          desc: "Acesse rapidamente o WhatsApp, telefone e e-mail de qualquer cliente com um toque."                   },
-    { icon: "📊", title: "Dashboard diário",             desc: "Veja de forma clara os números do dia: compromissos, confirmações e pendências."                       },
+    { icon: "📊", title: "Central de gestão diária",      desc: "Veja de forma clara os números do dia: compromissos, confirmações e pendências."                       },
     { icon: "📄", title: "PDF personalizado",            desc: "Exporte a agenda do dia em PDF com a identidade visual do seu negócio, pronto para imprimir."         },
     { icon: "🌐", title: "Landing page do negócio",      desc: "Página profissional com botão WhatsApp, localização e informações do seu negócio — inclusa no plano." },
     { icon: "📍", title: "Perfil Google e SEO inicial",  desc: "Orientação para configurar seu Perfil da Empresa no Google e aparecer nas buscas locais."             },
@@ -372,7 +372,7 @@ export default function Page() {
                 {[
                   "Acesso ao OrganizaPro",
                   "Agenda e cadastro de clientes",
-                  "Dashboard e PDF diário",
+                  "Central de gestão e PDF diário",
                   "Suporte via WhatsApp",
                   "Atualizações incluídas",
                 ].map(item => (

@@ -1,9 +1,9 @@
 import LandingPage from "../components/LandingPage";
 
 export const metadata = {
-  title: "ClínicaFlow para Clínicas de Estética — Reduza faltas e aumente avaliações",
+  title: "OrganizaPro para Clínicas de Estética — Reduza faltas e aumente avaliações",
   description:
-    "O ClínicaFlow confirma agendamentos pelo WhatsApp, recupera clientes faltantes e aumenta as avaliações Google da sua clínica de estética automaticamente.",
+    "O OrganizaPro confirma agendamentos pelo WhatsApp, recupera clientes faltantes e aumenta as avaliações Google da sua clínica de estética automaticamente.",
 };
 
 export default function EsteticaPage() {
@@ -12,9 +12,9 @@ export default function EsteticaPage() {
       specialty="Estética"
       heroBadge="312 clínicas de estética ativas"
       heroTitle="Reduza faltas na sua clínica de estética e fidelize mais clientes automaticamente."
-      heroSubtitle="O ClínicaFlow confirma agendamentos pelo WhatsApp, recupera clientes faltantes e faz sua clínica de estética crescer — sem contratar ninguém."
-      wppMessageDefault="Olá, quero solicitar uma demonstração da ClínicaFlow para minha clínica de estética."
-      dashboardDoctorName="Dra. Camila Rocha"
+      heroSubtitle="O OrganizaPro confirma agendamentos pelo WhatsApp, recupera clientes faltantes e faz sua clínica de estética crescer — sem contratar ninguém."
+      wppMessageDefault="Olá, quero solicitar uma demonstração do OrganizaPro para minha clínica de estética."
+      dashboardOwnerName="Camila Rocha"
       ctaTitle="Pronto para transformar\nsua clínica de estética?"
       testimonials={[
         {
@@ -22,7 +22,7 @@ export default function EsteticaPage() {
           role: "Esteticista",
           city: "São Paulo, SP",
           avatar: "C",
-          text: "Minha clínica tinha um problema sério com no-shows nos procedimentos de alta complexidade. Com o ClínicaFlow os lembretes automáticos reduziram as faltas em 68% no primeiro mês. Recuperei o investimento em uma semana.",
+          text: "Minha clínica tinha um problema sério com no-shows nos procedimentos de alta complexidade. Com o OrganizaPro os lembretes automáticos reduziram as faltas em 68% no primeiro mês. Recuperei o investimento em uma semana.",
           stars: 5,
           metric: "−68% de no-shows",
         },
@@ -40,7 +40,7 @@ export default function EsteticaPage() {
           role: "Clínica de Estética Avançada",
           city: "Rio de Janeiro, RJ",
           avatar: "J",
-          text: "Trabalho com procedimentos estéticos premium e o reengajamento automático de pacientes inativos foi um diferencial enorme. O sistema lembra clientes que não vieram há 3 meses e traz eles de volta.",
+          text: "Trabalho com procedimentos estéticos premium e o reengajamento automático de clientes inativos foi um diferencial enorme. O sistema lembra clientes que não vieram há 3 meses e traz eles de volta.",
           stars: 5,
           metric: "+29 reativações/mês",
         },
@@ -52,11 +52,11 @@ export default function EsteticaPage() {
         },
         {
           q: "Como funciona o lembrete de agendamentos?",
-          a: "O ClínicaFlow envia lembretes automáticos pelo WhatsApp 48h e 2h antes do procedimento, pedindo confirmação. Clientes que não respondem recebem um segundo lembrete.",
+          a: "O OrganizaPro envia lembretes automáticos pelo WhatsApp 48h e 2h antes do procedimento, pedindo confirmação. Clientes que não respondem recebem um segundo lembrete.",
         },
         {
           q: "O sistema ajuda a conseguir mais avaliações no Google?",
-          a: "Sim. Após cada atendimento concluído, o ClínicaFlow envia automaticamente uma mensagem pedindo avaliação no Google, aumentando a reputação da sua clínica de estética e ajudando a atrair novos clientes.",
+          a: "Sim. Após cada atendimento concluído, o OrganizaPro envia automaticamente uma mensagem pedindo avaliação no Google, aumentando a reputação da sua clínica de estética e ajudando a atrair novos clientes.",
         },
         {
           q: "Preciso instalar aplicativo ou ter conhecimento técnico?",
@@ -64,7 +64,7 @@ export default function EsteticaPage() {
         },
         {
           q: "Como funciona a demonstração personalizada?",
-          a: "Trabalhamos com demonstração personalizada e implantação assistida para mostrar exatamente como o ClínicaFlow funciona na rotina da sua clínica de estética.",
+          a: "Trabalhamos com demonstração personalizada e implantação assistida para mostrar exatamente como o OrganizaPro funciona na rotina da sua clínica de estética.",
         },
         {
           q: "Posso cancelar quando quiser?",

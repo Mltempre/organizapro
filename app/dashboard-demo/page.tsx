@@ -1,30 +1,30 @@
 export default function Page() {
   const stats = [
-    { label: "Pacientes Ativos", value: "248", subtitle: "Fluxo saudável", gradient: "linear-gradient(135deg,#5b5dff,#8f3dff)" },
-    { label: "Consultas Hoje", value: "18", subtitle: "Agenda dinâmica", gradient: "linear-gradient(135deg,#00bcd4,#3b82f6)" },
+    { label: "Clientes Ativos", value: "248", subtitle: "Fluxo saudável", gradient: "linear-gradient(135deg,#5b5dff,#8f3dff)" },
+    { label: "Compromissos Hoje", value: "18", subtitle: "Agenda dinâmica", gradient: "linear-gradient(135deg,#00bcd4,#3b82f6)" },
     { label: "94% Taxa de Confirmação", value: "94%", subtitle: "Compromisso real", gradient: "linear-gradient(135deg,#6366f1,#a855f7)" },
-    { label: "4.9 ⭐ Avaliação Média", value: "4.9", subtitle: "Confiança clínica", gradient: "linear-gradient(135deg,#f97316,#facc15)" },
+    { label: "4.9 ⭐ Avaliação Média", value: "4.9", subtitle: "Confiança do negócio", gradient: "linear-gradient(135deg,#f97316,#facc15)" },
   ];
 
   const results = [
-    "✅ 37 consultas recuperadas",
+    "✅ 37 compromissos recuperados",
     "✅ 94% de confirmações",
     "✅ 4.9 estrelas de satisfação",
-    "✅ 248 pacientes ativos",
+    "✅ 248 clientes ativos",
   ];
 
   const whatsappItems = [
     "✓ Lembrete 24h antes",
     "✓ Confirmação automática",
     "✓ Pedido de avaliação Google",
-    "✓ Recuperação de pacientes faltosos",
+    "✓ Recuperação de clientes ausentes",
   ];
 
   const beforeAfter = [
     {
       title: "ANTES",
       items: [
-        "❌ Pacientes esquecem consultas",
+        "❌ Clientes esquecem compromissos",
         "❌ Agenda desorganizada",
         "❌ Poucas avaliações",
       ],
@@ -50,8 +50,8 @@ export default function Page() {
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999, padding: "8px 16px", marginBottom: 18 }}>
             <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.2em", color: "#a5b4fc" }}>DEMO PREMIUM</span>
           </div>
-          <h1 style={{ fontSize: "clamp(36px,4vw,64px)", fontWeight: 900, margin: "0 0 18px", lineHeight: 1.05 }}>Sua clínica está pronta para crescer 🚀</h1>
-          <p style={{ fontSize: 18, maxWidth: 760, margin: "0 auto 12px", lineHeight: 1.7, color: "rgba(255,255,255,0.8)" }}>Reduza faltas, aumente confirmações e acompanhe os resultados da sua clínica em tempo real.</p>
+          <h1 style={{ fontSize: "clamp(36px,4vw,64px)", fontWeight: 900, margin: "0 0 18px", lineHeight: 1.05 }}>Seu negócio está pronto para crescer 🚀</h1>
+          <p style={{ fontSize: 18, maxWidth: 760, margin: "0 auto 12px", lineHeight: 1.7, color: "rgba(255,255,255,0.8)" }}>Reduza faltas, aumente confirmações e acompanhe os resultados do seu negócio em tempo real.</p>
           <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", margin: 0 }}>Demonstração ilustrativa da plataforma.</p>
         </header>
 
@@ -114,7 +114,7 @@ export default function Page() {
         </section>
 
         <div style={{ textAlign: "center", padding: "32px 20px", borderRadius: 32, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.75)", marginBottom: 18 }}>Exiba um atendimento premium e fale direto com a equipe ClínicaFlow via WhatsApp.</p>
+          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.75)", marginBottom: 18 }}>Exiba um atendimento premium e fale direto com a equipe OrganizaPro via WhatsApp.</p>
           <a
             href="https://wa.me/5541988379119"
             target="_blank"

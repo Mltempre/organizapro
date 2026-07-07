@@ -3,10 +3,10 @@ import { ARTICLES_PART3 } from "./articles-part3";
 export type { Category, ContentBlock, Article } from "./types";
 import type { Article, Category } from "./types";
 
-export const BASE_URL = "https://clinicafllow.com.br";
+export const BASE_URL = "https://organizaprooficial.com.br";
 export const WPP_NUMBER = "5541988379119";
 export const WPP_MESSAGE_BLOG = encodeURIComponent(
-  "Olá, li um artigo no blog da ClínicaFlow e quero agendar uma demonstração para minha clínica."
+  "Olá, li um artigo no blog do OrganizaPro e quero agendar uma demonstração para o meu negócio."
 );
 
 const ARTICLES_BASE: Article[] = [
@@ -16,7 +16,7 @@ const ARTICLES_BASE: Article[] = [
     description:
       "Descubra como usar o WhatsApp para reduzir faltas de pacientes na sua clínica em até 70%. Estratégias práticas de lembretes automáticos e confirmações que funcionam de verdade.",
     category: "WhatsApp para Clínicas",
-    author: "Equipe ClínicaFlow",
+    author: "Equipe OrganizaPro",
     authorRole: "Especialistas em Gestão de Clínicas",
     publishedAt: "2026-06-10",
     readingTime: 7,
@@ -132,7 +132,7 @@ const ARTICLES_BASE: Article[] = [
       {
         type: "tip",
         label: "Modelo de mensagem 48h",
-        text: "Olá, [Nome]! 😊 Lembrando que sua consulta com [Dr. Nome] está agendada para amanhã, [data], às [horário]. Confirme com SIM ou avise se precisar remarcar. — ClínicaFlow",
+        text: "Olá, [Nome]! 😊 Lembrando que sua consulta com [Dr. Nome] está agendada para amanhã, [data], às [horário]. Confirme com SIM ou avise se precisar remarcar. — OrganizaPro",
       },
       {
         type: "h3",
@@ -216,7 +216,7 @@ const ARTICLES_BASE: Article[] = [
       },
       {
         type: "p",
-        text: "O ClínicaFlow faz exatamente isso: envia lembretes automáticos personalizados pelo WhatsApp, processa confirmações e cancelamentos em tempo real, e notifica sua equipe para aproveitar cada horário liberado. Tudo sem nenhuma ação manual da sua equipe.",
+        text: "O OrganizaPro faz exatamente isso: envia lembretes automáticos personalizados pelo WhatsApp, processa confirmações e cancelamentos em tempo real, e notifica sua equipe para aproveitar cada horário liberado. Tudo sem nenhuma ação manual da sua equipe.",
       },
       { type: "cta" },
     ],
@@ -228,7 +228,7 @@ const ARTICLES_BASE: Article[] = [
     description:
       "Aprenda a automatizar a confirmação de consultas pelo WhatsApp na sua clínica. Economize horas da sua equipe, reduza no-shows e melhore a experiência do paciente com automação inteligente.",
     category: "WhatsApp para Clínicas",
-    author: "Equipe ClínicaFlow",
+    author: "Equipe OrganizaPro",
     authorRole: "Especialistas em Gestão de Clínicas",
     publishedAt: "2026-06-12",
     readingTime: 6,
@@ -396,7 +396,7 @@ const ARTICLES_BASE: Article[] = [
       },
       {
         type: "p",
-        text: "O ClínicaFlow integra todas essas funções em um único painel. Da confirmação da consulta à avaliação pós-atendimento, o sistema cuida de toda a comunicação com seus pacientes de forma automática, personalizada e profissional.",
+        text: "O OrganizaPro integra todas essas funções em um único painel. Da confirmação da consulta à avaliação pós-atendimento, o sistema cuida de toda a comunicação com seus pacientes de forma automática, personalizada e profissional.",
       },
       { type: "cta" },
     ],
@@ -408,7 +408,7 @@ const ARTICLES_BASE: Article[] = [
     description:
       "Guia prático para clínicas e consultórios aumentarem avaliações no Google de forma ética e automatizada. Estratégias que funcionam para dentistas, dermatologistas, estetas e mais.",
     category: "Google Avaliações",
-    author: "Equipe ClínicaFlow",
+    author: "Equipe OrganizaPro",
     authorRole: "Especialistas em Gestão de Clínicas",
     publishedAt: "2026-06-15",
     readingTime: 7,
@@ -591,7 +591,7 @@ const ARTICLES_BASE: Article[] = [
       },
       {
         type: "p",
-        text: "O ClínicaFlow automatiza todo esse processo: envia o pedido de avaliação pelo WhatsApp no momento certo após cada atendimento, monitora as avaliações recebidas e ajuda sua clínica a construir uma reputação online sólida e crescente — sem nenhum trabalho manual da sua equipe.",
+        text: "O OrganizaPro automatiza todo esse processo: envia o pedido de avaliação pelo WhatsApp no momento certo após cada atendimento, monitora as avaliações recebidas e ajuda sua clínica a construir uma reputação online sólida e crescente — sem nenhum trabalho manual da sua equipe.",
       },
       { type: "cta" },
     ],

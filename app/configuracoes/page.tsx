@@ -53,6 +53,7 @@ export default function ConfiguracoesPage() {
   const [clinicaId, setClinicaId] = useState('');
   const [testando, setTestando] = useState(false);
   const [testeMsg, setTesteMsg] = useState('');
+  const [linkGoogleMsg, setLinkGoogleMsg] = useState('');
 
   async function carregar() {
     setLoading(true);
@@ -97,7 +98,13 @@ export default function ConfiguracoesPage() {
   useEffect(() => { carregar(); }, []);
 
   async function salvar() {
-    setSalvando(true); setErro(''); setSucesso(false);
+    setErro(''); setSucesso(false);
+    const link = config.link_google.trim();
+    if (link && !/^https?:\/\//i.test(link)) {
+      setErro('Informe um link válido do Google.');
+      return;
+    }
+    setSalvando(true);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) { router.push('/login'); return; }
@@ -114,6 +121,16 @@ export default function ConfiguracoesPage() {
     } finally {
       setSalvando(false);
     }
+  }
+
+  function testarLinkGoogle() {
+    const link = config.link_google.trim();
+    if (!link) {
+      setLinkGoogleMsg('Informe primeiro o link de avaliação.');
+      return;
+    }
+    setLinkGoogleMsg('');
+    window.open(link, '_blank', 'noopener,noreferrer');
   }
 
   async function testarWhatsapp() {
@@ -227,18 +244,49 @@ export default function ConfiguracoesPage() {
 
         {/* Card — Links e Horários */}
         <div style={card}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Google Meu Negócio e Horários</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Google, Avaliações e Horários</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
             {[
-              { k: 'logo_url',              l: 'URL da Logo',                             p: 'https://...'                              },
-              { k: 'link_google',           l: 'Link do Perfil da Empresa no Google',     p: 'Cole aqui o link do seu perfil no Google' },
-              { k: 'horario_funcionamento', l: 'Horário de Funcionamento',                p: 'Seg a Sex: 08h-18h'                       },
+              { k: 'logo_url',              l: 'URL da Logo',              p: 'https://...'         },
+              { k: 'horario_funcionamento', l: 'Horário de Funcionamento', p: 'Seg a Sex: 08h-18h'  },
             ].map(f => (
               <div key={f.k}>
                 <label style={lbl}>{f.l}</label>
                 <input type="text" placeholder={f.p} value={config[f.k as keyof Config]} onChange={e => setConfig(p => ({ ...p, [f.k]: e.target.value }))} style={inp} />
               </div>
             ))}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={lbl}>Link para Avaliação no Google</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Cole aqui o link do seu perfil no Google"
+                  value={config.link_google}
+                  onChange={e => { setConfig(p => ({ ...p, link_google: e.target.value })); setLinkGoogleMsg(''); }}
+                  style={{ ...inp, flex: '1 1 260px' }}
+                />
+                <button
+                  type="button"
+                  onClick={testarLinkGoogle}
+                  style={{
+                    padding: '10px 16px', borderRadius: 8,
+                    border: '1px solid #4f46e5', background: 'rgba(79,70,229,0.12)',
+                    color: '#a78bfa', fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}
+                >
+                  🔗 Testar Link
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: '#475569', margin: '6px 0 0' }}>
+                Cole aqui o link direto para que seus clientes deixem uma avaliação no Google. Esse link será utilizado nas mensagens automáticas do OrganizaPro.
+              </p>
+              {linkGoogleMsg && (
+                <p style={{ fontSize: 11, color: '#f87171', margin: '4px 0 0', fontWeight: 600 }}>
+                  {linkGoogleMsg}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 

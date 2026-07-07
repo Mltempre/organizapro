@@ -59,7 +59,7 @@ export default function BlogPage() {
       }}>
         <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 20, fontWeight: 800, color: "#e7ebff", fontFamily: "DM Sans, sans-serif" }}>
-            Clínica<span style={{ color: "#7c3aed" }}>Flow</span>
+            Organiza<span style={{ color: "#7c3aed" }}>Pro</span>
           </span>
           <span style={{
             background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)",
@@ -307,13 +307,13 @@ export default function BlogPage() {
               fontSize: "1.5rem", fontWeight: 800, color: "#e7ebff",
               margin: "0 0 8px", fontFamily: "DM Sans, sans-serif",
             }}>
-              Pronto para automatizar sua clínica?
+              Pronto para automatizar seu negócio?
             </h2>
             <p style={{
               color: "#94a3b8", fontSize: "1rem", margin: 0,
               fontFamily: "DM Sans, sans-serif",
             }}>
-              Veja o ClínicaFlow funcionando com os dados da sua clínica em uma demonstração personalizada.
+              Veja o OrganizaPro funcionando com os dados do seu negócio em uma demonstração personalizada.
             </p>
           </div>
           <a
@@ -338,7 +338,7 @@ export default function BlogPage() {
         padding: "32px 24px", textAlign: "center",
       }}>
         <p style={{ color: "#334155", fontSize: 13, fontFamily: "DM Sans, sans-serif", margin: 0 }}>
-          © {new Date().getFullYear()} ClínicaFlow · Conteúdo especializado para clínicas de saúde
+          © {new Date().getFullYear()} OrganizaPro · Conteúdo especializado para clínicas de saúde
         </p>
       </footer>
     </>
