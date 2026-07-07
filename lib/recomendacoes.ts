@@ -19,6 +19,12 @@
 //   3. Acrescente um objeto ao array REGRAS com id, categoria e a função
 //      `avaliar`. Retorne `null` quando a regra não se aplica.
 //   4. Pronto — o motor já ordena, prioriza e limita automaticamente.
+//
+// Voz (Intelligence 1.6 · "O Nascimento do Diretor Digital"): título e
+// explicação são a fala do Diretor Digital em primeira pessoa — "Analisei",
+// "Percebi", "Identifiquei", "Minha recomendação", nunca "O sistema
+// encontrou". `motivo` é o único campo que pode ficar factual/neutro (é o
+// dado bruto que embasa a fala). Toda regra nova deve seguir essa voz.
 
 export type CategoriaRecomendacao = "atencao" | "oportunidade" | "organizacao" | "sugestao";
 
@@ -63,8 +69,8 @@ const REGRAS: Regra[] = [
       if (ctx.atrasados <= 0) return null;
       const plural = ctx.atrasados > 1;
       return {
-        titulo: `Você tem ${ctx.atrasados} compromisso${plural ? "s" : ""} em atraso.`,
-        explicacao: "Compromissos atrasados costumam virar clientes esquecidos se não forem resolvidos rápido.",
+        titulo: `Analisei sua agenda e encontrei ${ctx.atrasados} compromisso${plural ? "s" : ""} em atraso.`,
+        explicacao: "Compromissos atrasados costumam virar clientes esquecidos se não forem resolvidos rápido. Vale sua atenção agora.",
         motivo: `${ctx.atrasados} compromisso${plural ? "s" : ""} passou da data sem ser concluído, cancelado ou reagendado.`,
         acao: "Resolver agora",
         destino: "/agendamentos", destinoLabel: "Ver agenda",
@@ -78,8 +84,8 @@ const REGRAS: Regra[] = [
       if (ctx.pendentesHoje <= 0) return null;
       const plural = ctx.pendentesHoje > 1;
       return {
-        titulo: `${ctx.pendentesHoje} compromisso${plural ? "s" : ""} de hoje sem confirmação.`,
-        explicacao: "Compromissos não confirmados têm mais chance de virar ausência.",
+        titulo: `Percebi ${ctx.pendentesHoje} compromisso${plural ? "s" : ""} de hoje ainda sem confirmação.`,
+        explicacao: "Sem confirmação, a chance de ausência aumenta. Minha recomendação é confirmar antes do horário chegar.",
         motivo: `${ctx.pendentesHoje} cliente${plural ? "s" : ""} ainda não confirmou presença para hoje.`,
         acao: "Confirmar agora",
         destino: "/agendamentos", destinoLabel: "Confirmar",
@@ -93,8 +99,8 @@ const REGRAS: Regra[] = [
       if (ctx.clientesParaReativar <= 0) return null;
       const plural = ctx.clientesParaReativar > 1;
       return {
-        titulo: "Você possui clientes sem movimentação.",
-        explicacao: "Clientes sem nenhum compromisso futuro tendem a esfriar o relacionamento com o tempo.",
+        titulo: "Identifiquei clientes sem nenhuma movimentação recente.",
+        explicacao: "Relacionamentos esfriam quando ficam tempo demais sem contato. Vale a pena retomar hoje.",
         motivo: `${ctx.clientesParaReativar} cliente${plural ? "s" : ""} sem próximo compromisso agendado.`,
         acao: "Entrar em contato hoje",
         destino: "/pacientes", destinoLabel: "Ver clientes",
@@ -109,8 +115,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (ctx.proximosSemana > 0) return null;
       return {
-        titulo: "Sua agenda dos próximos dias está vazia.",
-        explicacao: "Horário livre é oportunidade de prospecção antes que vire tempo ocioso.",
+        titulo: "Observei que sua agenda dos próximos dias está livre.",
+        explicacao: "Hoje eu faria uso desse espaço para prospectar — horário livre é oportunidade parada.",
         motivo: "Nenhum compromisso encontrado nos próximos 7 dias.",
         acao: "Agendar novos compromissos",
         destino: "/agendamentos", destinoLabel: "Agendar",
@@ -123,8 +129,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (ctx.proximosSemana === 0 || ctx.proximosSemana >= 5) return null;
       return {
-        titulo: "Sua agenda da semana está com poucos compromissos.",
-        explicacao: "Preencher os próximos dias aumenta a receita prevista da semana.",
+        titulo: "Notei poucos compromissos agendados para esta semana.",
+        explicacao: "Preencher os próximos dias aumenta a receita prevista. Vale a pena agir cedo.",
         motivo: `Apenas ${ctx.proximosSemana} compromisso${ctx.proximosSemana > 1 ? "s" : ""} nos próximos 7 dias.`,
         acao: "Preencher a agenda",
         destino: "/agendamentos", destinoLabel: "Ver agenda",
@@ -137,8 +143,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (ctx.temWhatsapp) return null;
       return {
-        titulo: "O WhatsApp automático ainda não está configurado.",
-        explicacao: "Sem essa integração, lembretes e confirmações precisam ser feitos manualmente.",
+        titulo: "Percebi que o WhatsApp automático ainda não está ativo.",
+        explicacao: "Sem essa integração, lembretes e confirmações dependem de você fazer manualmente. Recomendo configurar assim que possível.",
         motivo: "Nenhuma credencial de WhatsApp foi encontrada nas configurações.",
         acao: "Configurar WhatsApp",
         destino: "/configuracoes", destinoLabel: "Configurações",
@@ -151,8 +157,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (ctx.temEmail && ctx.temTelefone && ctx.temEndereco) return null;
       return {
-        titulo: "O perfil da sua empresa está incompleto.",
-        explicacao: "Um cadastro completo passa mais confiança e facilita o contato com clientes.",
+        titulo: "Encontrei dados da empresa ainda incompletos.",
+        explicacao: "Um cadastro completo passa mais confiança aos seus clientes. Vale completar isso hoje.",
         motivo: "Faltam dados como e-mail, telefone ou endereço nas configurações.",
         acao: "Completar cadastro",
         destino: "/configuracoes", destinoLabel: "Configurações",
@@ -167,8 +173,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (!(ctx.temEmail && ctx.temTelefone && ctx.temEndereco)) return null;
       return {
-        titulo: "Todos os dados da empresa estão completos.",
-        explicacao: "Um cadastro completo transmite mais confiança para os seus clientes.",
+        titulo: "Revisei o cadastro da empresa: está tudo completo.",
+        explicacao: "Isso passa mais confiança aos seus clientes. Excelente trabalho de organização.",
         motivo: "E-mail, telefone e endereço já estão preenchidos nas configurações.",
         acao: "Excelente trabalho",
       };
@@ -180,8 +186,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (ctx.atrasados > 0 || ctx.pendentesHoje > 0) return null;
       return {
-        titulo: "Sua agenda está em dia.",
-        explicacao: "Nenhum atraso ou pendência de confirmação — a operação está sob controle.",
+        titulo: "Analisei sua agenda: nenhuma pendência para hoje.",
+        explicacao: "Sem atrasos, sem confirmações pendentes — a operação está sob controle.",
         motivo: "Não há compromissos atrasados nem sem confirmação hoje.",
         acao: "Continue assim",
       };
@@ -195,8 +201,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (ctx.totalAgendamentos > 0) return null;
       return {
-        titulo: "Cadastre novos compromissos para manter sua agenda organizada.",
-        explicacao: "Registrar compromissos ajuda a antecipar o dia e não esquecer nenhum cliente.",
+        titulo: "Ainda não encontrei nenhum compromisso cadastrado.",
+        explicacao: "Minha recomendação é começar registrando os próximos atendimentos — isso me ajuda a acompanhar sua rotina.",
         motivo: "Nenhum compromisso foi cadastrado ainda.",
         acao: "Criar primeiro compromisso",
         destino: "/agendamentos", destinoLabel: "Agendar",
@@ -209,8 +215,8 @@ const REGRAS: Regra[] = [
     avaliar: (ctx) => {
       if (ctx.totalPacientes > 0) return null;
       return {
-        titulo: "Cadastre seus primeiros clientes.",
-        explicacao: "Uma base de clientes organizada é o ponto de partida de qualquer recomendação futura.",
+        titulo: "Ainda não encontrei clientes cadastrados.",
+        explicacao: "Uma base organizada é o ponto de partida para qualquer recomendação futura minha.",
         motivo: "Nenhum cliente foi cadastrado ainda.",
         acao: "Cadastrar cliente",
         destino: "/pacientes", destinoLabel: "Cadastrar",

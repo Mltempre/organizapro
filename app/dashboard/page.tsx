@@ -228,6 +228,23 @@ function gerarSaudacaoCard(ctx: { nomeNegocio: string; ambienteProducao: boolean
   return { linha1: `👋 ${saudacao()}!`, linha2: "Bem-vindo ao OrganizaPro.", subtitulo };
 }
 
+// Intelligence 1.6 · "O Nascimento do Diretor Digital" — a fala do briefing
+// que abre o bloco de recomendações. Puramente apresentação: não decide
+// nada, só narra em primeira pessoa o que `gerarRecomendacoes` já apurou.
+// Preparado para a Intelligence 2.0 (uma única "Prioridade do Diretor"):
+// quando isso existir, basta um novo branch aqui — o restante do componente
+// (avatar, nome, badge) não precisa mudar.
+function gerarBriefingDiretor(qtdRecomendacoes: number, temDados: boolean): string {
+  if (!temDados) {
+    return `${saudacao()}. Ainda estou conhecendo o seu negócio — continue usando o OrganizaPro para que eu possa trazer recomendações cada vez mais precisas.`;
+  }
+  if (qtdRecomendacoes === 0) {
+    return `${saudacao()}. Revisei sua rotina com calma — está tudo em ordem por aqui.`;
+  }
+  const pontos = qtdRecomendacoes === 1 ? "um ponto que merece" : `${qtdRecomendacoes} pontos que merecem`;
+  return `${saudacao()}. Enquanto você administrava seu negócio, analisei sua rotina — encontrei ${pontos} sua atenção hoje.`;
+}
+
 function formatarDataBR(d: string): string {
   const [y, m, dd] = d.split("-");
   return `${dd}/${m}/${y}`;
@@ -527,8 +544,29 @@ export default function Dashboard() {
         </p>
 
         {!insights.temDados ? (
-          <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
-            Ainda não há informações suficientes para gerar recomendações. Continue utilizando o OrganizaPro e os Insights ficarão cada vez mais úteis.
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+              background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+            }}>
+              👔
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9" }}>Diretor Digital</span>
+                <span style={{
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+                  color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
+                  borderRadius: 999, padding: "2px 8px",
+                }}>
+                  OrganizaPro Intelligence
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
+                {gerarBriefingDiretor(0, false)}
+              </p>
+            </div>
           </div>
         ) : (
           <>
@@ -597,12 +635,36 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Recomendação do Dia */}
-            {recomendacoes.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-                  🧭 O Diretor Digital recomenda
+            {/* ── Diretor Digital ──────────────────────────────────────────── */}
+            <div style={{
+              marginTop: 20, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.08)",
+              display: "flex", alignItems: "flex-start", gap: 12,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+              }}>
+                👔
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9" }}>Diretor Digital</span>
+                  <span style={{
+                    fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+                    color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
+                    borderRadius: 999, padding: "2px 8px",
+                  }}>
+                    OrganizaPro Intelligence
+                  </span>
                 </div>
+                <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: "0 0 16px" }}>
+                  {gerarBriefingDiretor(recomendacoes.length, true)}
+                </p>
+
+                {/* Corpo do briefing — hoje é a lista de recomendações; na Intelligence
+                    2.0 este bloco poderá virar uma única "🎯 Prioridade do Diretor"
+                    sem precisar alterar o cabeçalho (avatar, nome, badge, saudação) acima. */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {recomendacoes.map(r => {
                     const cat = stCategoria[r.categoria];
@@ -644,7 +706,7 @@ export default function Dashboard() {
                   })}
                 </div>
               </div>
-            )}
+            </div>
           </>
         )}
       </div>
