@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 import OnboardingCard from "../components/onboarding/OnboardingCard";
+import { gerarRecomendacoes, type CategoriaRecomendacao } from "../../lib/recomendacoes";
 
 type AgItem = {
   id: string;
@@ -143,7 +144,6 @@ type InsightsDoDia = {
   prioridades:   InsightTile;
   agenda:        InsightTile;
   oportunidades: InsightTile;
-  recomendacao:  string;
   situacao:      SituacaoDia;
 };
 
@@ -160,7 +160,6 @@ function gerarInsights(ctx: {
       prioridades:   { numero: 0, label: "", tom: "neutro" },
       agenda:        { numero: 0, label: "", tom: "neutro" },
       oportunidades: { numero: 0, label: "", tom: "neutro" },
-      recomendacao:  "",
       situacao:      { emoji: "🟢", texto: "Tudo em ordem", tom: "positivo" },
     };
   }
@@ -193,19 +192,13 @@ function gerarInsights(ctx: {
       }
     : { numero: 0, label: "Nenhuma oportunidade no momento.", tom: "neutro" };
 
-  let recomendacao: string;
-  if (ctx.atrasados > 0)                       recomendacao = "Comece retornando os clientes pendentes.";
-  else if (ctx.pendentes > 0)                  recomendacao = "Confirme os compromissos de hoje.";
-  else if (ctx.clientesParaReativar > 0)       recomendacao = "Entre em contato com clientes inativos.";
-  else                                          recomendacao = "Sua agenda está tranquila; aproveite para prospectar novos clientes.";
-
   const situacao: SituacaoDia = ctx.atrasados > 0
     ? { emoji: "🔴", texto: "Prioridade Alta", tom: "critico" }
     : ctx.pendentes > 0
       ? { emoji: "🟡", texto: "Atenção", tom: "atencao" }
       : { emoji: "🟢", texto: "Tudo em ordem", tom: "positivo" };
 
-  return { temDados: true, prioridades, agenda, oportunidades, recomendacao, situacao };
+  return { temDados: true, prioridades, agenda, oportunidades, situacao };
 }
 
 function saudacao(): string {
@@ -263,6 +256,15 @@ const stTom: Record<"critico" | "positivo" | "neutro" | "atencao", { bg: string;
   atencao:  { bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.3)",   color: "#fbbf24" },
   positivo: { bg: "rgba(74,222,128,0.12)",  border: "rgba(74,222,128,0.3)",   color: "#4ade80" },
   neutro:   { bg: "rgba(74,155,176,0.12)",  border: "rgba(74,155,176,0.3)",   color: "#4a9bb0" },
+};
+
+// Categoria da recomendação (lib/recomendacoes.ts) → estilo visual + emoji.
+// Reaproveita as mesmas cores de `stTom` já usadas nos tiles acima.
+const stCategoria: Record<CategoriaRecomendacao, { emoji: string; label: string; tom: keyof typeof stTom }> = {
+  atencao:      { emoji: "🔴", label: "Atenção",      tom: "critico"  },
+  oportunidade: { emoji: "🟡", label: "Oportunidade", tom: "atencao"  },
+  organizacao:  { emoji: "🟢", label: "Organização",  tom: "positivo" },
+  sugestao:     { emoji: "💡", label: "Sugestão",     tom: "neutro"   },
 };
 
 export default function Dashboard() {
@@ -427,6 +429,25 @@ export default function Dashboard() {
     clientesParaReativar: dash.clientesParaReativar,
   });
 
+  // Intelligence 1.5 — primeiro módulo oficial do Diretor Digital
+  // (docs/organizapro-intelligence-engine-v1.html). Regras de negócio
+  // determinísticas, sem IA generativa; usa só dados já carregados acima.
+  const recomendacoes = insights.temDados
+    ? gerarRecomendacoes({
+        totalPacientes:       dash.totalPacientes,
+        totalAgendamentos:    dash.totalAgendamentos,
+        compromissosHoje:     dash.compromissosHoje,
+        pendentesHoje:        dash.pendentes,
+        atrasados:            dash.atrasados,
+        proximosSemana:       dash.proximos.length,
+        clientesParaReativar: dash.clientesParaReativar,
+        temEmail:             dash.temEmail,
+        temTelefone:          dash.temTelefone,
+        temEndereco:          dash.temEndereco,
+        temWhatsapp:          dash.temWhatsapp,
+      })
+    : [];
+
   // V2: ambienteProducao virá de um sinal real de conta/ambiente. Mantido
   // desligado em V1 para nunca personalizar em contas de demonstração.
   const saudacaoCard = gerarSaudacaoCard({
@@ -577,17 +598,53 @@ export default function Dashboard() {
             </div>
 
             {/* Recomendação do Dia */}
-            <div style={{
-              marginTop: 16, padding: "12px 16px", borderRadius: 10,
-              background: "rgba(74,155,176,0.08)", border: "1px solid rgba(74,155,176,0.2)",
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-                💡 Recomendação do OrganizaPro
+            {recomendacoes.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+                  🧭 O Diretor Digital recomenda
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {recomendacoes.map(r => {
+                    const cat = stCategoria[r.categoria];
+                    const cor = stTom[cat.tom];
+                    return (
+                      <div key={r.id} style={{
+                        background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
+                        borderRadius: 12, padding: "14px 16px",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: 13 }}>{cat.emoji}</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: cor.color }}>
+                            {cat.label}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
+                          {r.titulo}
+                        </div>
+                        <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 6px" }}>
+                          {r.explicacao}
+                        </p>
+                        <p style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.4, margin: "0 0 12px", fontStyle: "italic" }}>
+                          Por quê: {r.motivo}
+                        </p>
+                        {r.destino ? (
+                          <button
+                            onClick={() => router.push(r.destino!)}
+                            style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${cor.border}`, background: cor.bg, color: cor.color, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                          >
+                            {r.acao} →
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
+                            ✓ {r.acao}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <span style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600, lineHeight: 1.4 }}>
-                {insights.recomendacao}
-              </span>
-            </div>
+            )}
           </>
         )}
       </div>
