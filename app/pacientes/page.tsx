@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
+import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -138,7 +139,8 @@ export default function PacientesPage() {
       if (data) setPacientes(data);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') { router.push('/login'); return; }
-      setErro(err instanceof Error ? err.message : String(err));
+      console.error(err);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setCarregando(false);
     }
@@ -251,7 +253,7 @@ export default function PacientesPage() {
       let error;
       if (editando) { ({ error } = await supabase.from('pacientes').update(payload).eq('id', editando.id).eq('clinica_id', clinicaId)); }
       else          { ({ error } = await supabase.from('pacientes').insert(payload)); }
-      if (error) { setErro('Erro ao salvar: ' + error.message); }
+      if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
       else {
         if (form.proxima_consulta) {
           const telefoneAnterior = editando ? normalizar(editando.telefone) : undefined;
@@ -262,7 +264,8 @@ export default function PacientesPage() {
         setTimeout(() => setSucesso(''), 3500);
       }
     } catch (e) {
-      setErro('Erro inesperado: ' + (e instanceof Error ? e.message : String(e)));
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setSalvando(false);
     }
@@ -289,12 +292,13 @@ export default function PacientesPage() {
     setExcluindo(id);
     try {
       const { error } = await supabase.from('pacientes').delete().eq('id', id).eq('clinica_id', clinicaId);
-      if (error) { setErro('Erro ao excluir: ' + error.message); return; }
+      if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); return; }
       carregar();
       setSucesso('Cliente removido.');
       setTimeout(() => setSucesso(''), 3500);
     } catch (e) {
-      setErro('Erro ao excluir: ' + (e instanceof Error ? e.message : String(e)));
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setExcluindo(null);
     }
@@ -344,14 +348,10 @@ export default function PacientesPage() {
 
       {carregando && <PageLoader title="Carregando clientes..." />}
       {!carregando && erro && (
-        <div style={{ background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:8, padding:16, marginBottom:20, color:'#fca5a5' }}>
-          <strong>Erro:</strong> {erro}
-        </div>
+        <Feedback type="erro" message={erro} onClose={() => setErro('')} />
       )}
       {!carregando && sucesso && (
-        <div style={{ background:'#14532d', border:'1px solid #16a34a', borderRadius:10, padding:'14px 20px', marginBottom:20, color:'#4ade80', fontSize:13, fontWeight:600 }}>
-          ✅ {sucesso}
-        </div>
+        <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />
       )}
 
       {/* ── BUSCA + ORDENAÇÃO ─────────────────────────────────────────────── */}
@@ -677,7 +677,7 @@ export default function PacientesPage() {
                 </select>
               </div>
             </div>
-            {erro && <p style={{ color:'#f87171', fontSize:12, marginTop:8 }}>{erro}</p>}
+            {erro && <div style={{ marginTop: 16 }}><Feedback type="erro" message={erro} onClose={() => setErro('')} /></div>}
             <div style={{ display:'flex', gap:10, marginTop:24 }}>
               <button
                 className="cli-btn-cancelar"

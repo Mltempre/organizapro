@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import EmptyState from '../components/EmptyState';
+import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 
 interface WhatsappLog {
   id: string;
@@ -94,12 +95,8 @@ export default function AutomacaoPage() {
       ]);
 
       if (logsErro || avErro || confErro) {
-        const msg = [
-          logsErro  && `whatsapp_logs: ${logsErro.message}`,
-          avErro    && `avaliacoes: ${avErro.message}`,
-          confErro  && `agendamentos: ${confErro.message}`,
-        ].filter(Boolean).join(' | ');
-        setErro(msg);
+        console.error({ logsErro, avErro, confErro });
+        setErro(MSG_ERRO_PADRAO);
       }
 
       setLogs(logsData     || []);
@@ -108,8 +105,8 @@ export default function AutomacaoPage() {
       setUltimaAtualizacao(new Date());
 
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErro(msg);
+      console.error(err);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setCarregando(false);
     }
@@ -189,9 +186,7 @@ export default function AutomacaoPage() {
       <div style={{ maxWidth: 1100 }}>
 
         {erro && (
-          <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: '12px 16px', marginBottom: 20, color: '#fca5a5', fontSize: 13 }}>
-            {erro}
-          </div>
+          <Feedback type="erro" message={erro} onClose={() => setErro('')} />
         )}
 
         {/* Cards de métricas */}

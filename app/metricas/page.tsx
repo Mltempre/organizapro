@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminShell from '../components/AdminShell'
 import PageLoader from '../components/PageLoader'
 import EmptyState from '../components/EmptyState'
+import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback'
 import { supabase } from '../../lib/supabase'
 
 export default function Metricas() {
@@ -82,7 +83,7 @@ export default function Metricas() {
       })
     } catch (err: unknown) {
       console.error("Erro ao carregar métricas:", err)
-      setErro(err instanceof Error ? err.message : "Erro ao carregar dados")
+      setErro(MSG_ERRO_PADRAO)
     } finally {
       setLoading(false)
     }
@@ -97,9 +98,7 @@ export default function Metricas() {
   return (
     <AdminShell title="Métricas" subtitle="Visão geral do seu negócio">
       {erro && (
-        <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: '12px 16px', marginBottom: 20, color: '#fca5a5', fontSize: 13 }}>
-          {erro}
-        </div>
+        <Feedback type="erro" message={erro} onClose={() => setErro('')} />
       )}
       {!erro && dados.totalPacientes === 0 && dados.totalAgendamentos === 0 ? (
         <EmptyState

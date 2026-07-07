@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
+import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 
 interface Agendamento {
   id: string;
@@ -193,7 +194,6 @@ export default function AgendamentosPage() {
   const [clinicaId, setClinicaId]       = useState('');
   const [userId, setUserId]             = useState('');
   const [enviando, setEnviando]         = useState<string | null>(null);
-  const [msgEnvio, setMsgEnvio]         = useState('');
   const [filtroData, setFiltroData]     = useState<'proximos' | 'confirmados' | 'historico'>('proximos');
   const [gerandoPdf, setGerandoPdf]     = useState(false);
 
@@ -224,8 +224,8 @@ export default function AgendamentosPage() {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') {
         router.push('/login'); return;
       }
-      const message = err instanceof Error ? err.message : String(err);
-      setErro(message || 'Erro ao carregar compromissos');
+      console.error(err);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setCarregando(false);
     }
@@ -306,14 +306,15 @@ export default function AgendamentosPage() {
           .or(`telefone.eq.${telefoneLimpo},whatsapp.eq.${telefoneLimpo}`);
       }
 
-      if (error) { setErro('Erro ao salvar: ' + error.message); }
+      if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
       else {
         setModal(false); carregar();
         setSucesso(editando ? 'Compromisso atualizado.' : 'Agendamento criado.');
-        setTimeout(() => setSucesso(''), 3500);
+        setTimeout(() => setSucesso(''), 4000);
       }
     } catch (e) {
-      setErro('Erro inesperado: ' + (e instanceof Error ? e.message : String(e)));
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setSalvando(false);
     }
@@ -326,9 +327,9 @@ export default function AgendamentosPage() {
       const ag = agendamentos.find(a => a.id === id);
       const telefoneLimpo = (ag?.telefone || '').replace(/\D/g, '');
       const { error } = await supabase.from('agendamentos').delete().eq('id', id).eq('clinica_id', clinicaId);
-      if (error) { setErro('Erro ao excluir: ' + error.message); return; }
+      if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); return; }
       setSucesso('Registro removido.');
-      setTimeout(() => setSucesso(''), 3500);
+      setTimeout(() => setSucesso(''), 4000);
       if (telefoneLimpo && clinicaId) {
         const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
         const { data: proximoAg } = await supabase
@@ -344,7 +345,8 @@ export default function AgendamentosPage() {
       }
       carregar();
     } catch (e) {
-      setErro('Erro ao excluir: ' + (e instanceof Error ? e.message : String(e)));
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setExcluindo(null);
     }
@@ -352,7 +354,7 @@ export default function AgendamentosPage() {
 
   async function enviarWhatsapp(a: Agendamento) {
     if (!a.telefone) return;
-    setEnviando(a.id); setMsgEnvio('');
+    setEnviando(a.id); setErro(''); setSucesso('');
     try {
       const mensagem = `Olá ${a.paciente_nome}! Confirmando seu compromisso em ${formatarData(a.data)} às ${formatarHorario(a.hora)}. Por favor confirme sua presença.`;
       const res = await fetch('/api/whatsapp', {
@@ -363,16 +365,18 @@ export default function AgendamentosPage() {
       const json = await res.json();
       if (json.sucesso) {
         await supabase.from('agendamentos').update({ confirmacao_enviada: true }).eq('id', a.id).eq('clinica_id', clinicaId);
-        setMsgEnvio('sucesso:Mensagem enviada com sucesso!');
+        setSucesso('Mensagem enviada com sucesso.');
+        setTimeout(() => setSucesso(''), 4000);
         carregar();
       } else {
-        setMsgEnvio('erro:' + (json.error ?? JSON.stringify(json)));
+        console.error(json);
+        setErro(MSG_ERRO_PADRAO);
       }
     } catch (err) {
-      setMsgEnvio('erro:' + (err instanceof Error ? err.message : String(err)));
+      console.error(err);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setEnviando(null);
-      setTimeout(() => setMsgEnvio(''), 4000);
     }
   }
 
@@ -458,24 +462,10 @@ export default function AgendamentosPage() {
       {carregando ? <PageLoader title="Carregando agenda..." /> : (
       <>
       {erro && (
-        <div style={{ background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:8, padding:16, marginBottom:20, color:'#fca5a5' }}>
-          <strong>Erro:</strong> {erro}
-        </div>
+        <Feedback type="erro" message={erro} onClose={() => setErro('')} />
       )}
       {sucesso && (
-        <div style={{ background:'#14532d', border:'1px solid #16a34a', borderRadius:10, padding:'14px 20px', marginBottom:20, color:'#4ade80', fontSize:13, fontWeight:600 }}>
-          ✅ {sucesso}
-        </div>
-      )}
-      {msgEnvio && (
-        <div style={{
-          background: msgEnvio.startsWith('sucesso') ? '#052e16' : '#450a0a',
-          border: `1px solid ${msgEnvio.startsWith('sucesso') ? '#166534' : '#7f1d1d'}`,
-          borderRadius:8, padding:'12px 16px', marginBottom:16,
-          color: msgEnvio.startsWith('sucesso') ? '#4ade80' : '#fca5a5', fontSize:13,
-        }}>
-          {msgEnvio.replace(/^(sucesso|erro):/, '')}
-        </div>
+        <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />
       )}
 
       {/* CARDS */}
@@ -698,7 +688,7 @@ export default function AgendamentosPage() {
                 </select>
               </div>
             </div>
-            {erro && <p style={{ color:'#f87171', fontSize:12, marginTop:8 }}>{erro}</p>}
+            {erro && <div style={{ marginTop: 16 }}><Feedback type="erro" message={erro} onClose={() => setErro('')} /></div>}
             <div style={{ display:'flex', gap:10, marginTop:24 }}>
               <button
                 className="ag-btn-cancelar"

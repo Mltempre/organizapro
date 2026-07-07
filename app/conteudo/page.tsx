@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
+import Feedback, { MSG_ERRO_PADRAO } from "../components/Feedback";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -202,16 +203,17 @@ export default function Conteudo() {
       });
 
       const data = await res.json();
-      if (!res.ok) { setRawError(data.error || "Erro ao gerar. Tente novamente."); setLoading(false); return; }
+      if (!res.ok) { console.error(data); setRawError(MSG_ERRO_PADRAO); setLoading(false); return; }
 
       const parsed = parseResult(data.content || "");
       if (parsed) {
         setResultado(parsed);
       } else {
-        setRawError("A IA retornou um formato inesperado. Tente novamente.");
+        setRawError("Não foi possível interpretar o conteúdo gerado. Tente novamente.");
       }
-    } catch {
-      setRawError("Erro de conexão. Tente novamente.");
+    } catch (e) {
+      console.error(e);
+      setRawError(MSG_ERRO_PADRAO);
     }
     setLoading(false);
   }
@@ -355,9 +357,7 @@ export default function Conteudo() {
 
         {/* ── Erro ── */}
         {rawError && (
-          <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color: "#fca5a5" }}>❌ {rawError}</span>
-          </div>
+          <Feedback type="erro" message={rawError} onClose={() => setRawError("")} />
         )}
 
         {/* ── Resultado ── */}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
+import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 
 type Config = {
   nome_clinica: string;
@@ -48,7 +49,7 @@ export default function ConfiguracoesPage() {
   const router = useRouter();
   const [config, setConfig]     = useState<Config>(configInicial);
   const [salvando, setSalvando] = useState(false);
-  const [sucesso, setSucesso]   = useState(false);
+  const [sucesso, setSucesso]   = useState('');
   const [erro, setErro]         = useState('');
   const [loading, setLoading]   = useState(true);
   const [clinicaId, setClinicaId] = useState('');
@@ -99,7 +100,7 @@ export default function ConfiguracoesPage() {
   useEffect(() => { carregar(); }, []);
 
   async function salvar() {
-    setErro(''); setSucesso(false);
+    setErro(''); setSucesso('');
     const link = config.link_google.trim();
     if (link && !/^https?:\/\//i.test(link)) {
       setErro('Informe um link válido do Google.');
@@ -115,10 +116,11 @@ export default function ConfiguracoesPage() {
           { ...config, user_id: user.id, clinica_id: clinicaId, updated_at: new Date().toISOString() },
           { onConflict: 'user_id' }
         );
-      if (error) setErro('Erro: ' + error.message);
-      else { setSucesso(true); setTimeout(() => setSucesso(false), 3000); }
+      if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
+      else { setSucesso('Configuração salva.'); setTimeout(() => setSucesso(''), 4000); }
     } catch (e) {
-      setErro('Erro inesperado: ' + (e instanceof Error ? e.message : String(e)));
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
     } finally {
       setSalvando(false);
     }
@@ -166,15 +168,17 @@ export default function ConfiguracoesPage() {
 
       const data = await res.json();
       if (data.sucesso) {
-        const aviso = data.log_error ? ` (aviso: log não gravado — ${data.log_error})` : '';
-        setTesteMsg('sucesso:Mensagem enviada com sucesso!' + aviso);
+        setTesteMsg('sucesso:Mensagem enviada com sucesso.');
       } else {
-        setTesteMsg('erro:' + JSON.stringify(data));
+        console.error(data);
+        setTesteMsg('erro:' + MSG_ERRO_PADRAO);
       }
     } catch (e) {
-      setTesteMsg('erro:Erro de conexão: ' + (e instanceof Error ? e.message : String(e)));
+      console.error(e);
+      setTesteMsg('erro:' + MSG_ERRO_PADRAO);
     } finally {
       setTestando(false);
+      setTimeout(() => setTesteMsg(''), 4000);
     }
   }
 
@@ -219,14 +223,10 @@ export default function ConfiguracoesPage() {
 
         {/* Feedback */}
         {sucesso && (
-          <div style={{ background: '#14532d', border: '1px solid #16a34a', borderRadius: 10, padding: '14px 20px', marginBottom: 20, color: '#4ade80', fontSize: 13, fontWeight: 600 }}>
-            ✅ Configurações salvas com sucesso!
-          </div>
+          <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />
         )}
         {erro && (
-          <div style={{ background: '#450a0a', border: '1px solid #dc2626', borderRadius: 10, padding: '14px 20px', marginBottom: 20, color: '#f87171', fontSize: 13 }}>
-            {erro}
-          </div>
+          <Feedback type="erro" message={erro} onClose={() => setErro('')} />
         )}
 
         {/* Card — Informações da Clínica */}
@@ -288,9 +288,9 @@ export default function ConfiguracoesPage() {
                 Cole aqui o link direto para que seus clientes deixem uma avaliação no Google. Esse link será utilizado nas mensagens automáticas do OrganizaPro.
               </p>
               {linkGoogleMsg && (
-                <p style={{ fontSize: 11, color: '#f87171', margin: '4px 0 0', fontWeight: 600 }}>
-                  {linkGoogleMsg}
-                </p>
+                <div style={{ marginTop: 8 }}>
+                  <Feedback type="aviso" message={linkGoogleMsg} onClose={() => setLinkGoogleMsg('')} />
+                </div>
               )}
             </div>
           </div>
@@ -359,13 +359,16 @@ export default function ConfiguracoesPage() {
             >
               {testando ? '⏳ Enviando...' : '🧪 Enviar mensagem de teste'}
             </button>
-            {testeMsg && (
-              <span style={{ fontSize: 13, fontWeight: 600, color: testeMsg.startsWith('sucesso:') ? '#4ade80' : '#f87171' }}>
-                {testeMsg.startsWith('sucesso:') ? '✅ ' : '❌ '}
-                {testeMsg.split(':').slice(1).join(':')}
-              </span>
-            )}
           </div>
+          {testeMsg && (
+            <div style={{ marginTop: 14 }}>
+              <Feedback
+                type={testeMsg.startsWith('sucesso:') ? 'sucesso' : 'erro'}
+                message={testeMsg.split(':').slice(1).join(':')}
+                onClose={() => setTesteMsg('')}
+              />
+            </div>
+          )}
           <p style={{ fontSize: 11, color: '#475569', marginTop: 10, marginBottom: 0 }}>
             Salve as configurações antes de testar. O teste envia uma mensagem para o WhatsApp cadastrado no campo acima.
           </p>

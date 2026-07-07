@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import AdminShell from '../components/AdminShell'
 import EmptyState from '../components/EmptyState'
+import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback'
 
 interface Avaliacao {
   id: string
@@ -29,9 +30,10 @@ export default function ReputacaoPage() {
   const [resumo, setResumo] = useState<Resumo>({ total: 0, recebidas: 0, pendentes: 0, taxa: 0 })
   const [carregando, setCarregando] = useState(true)
   const [clinicaId, setClinicaId] = useState<string | null>(null)
+  const [erro, setErro] = useState('')
 
   async function carregarDados(cid: string) {
-    setCarregando(true)
+    setCarregando(true); setErro('')
     const { data, error } = await supabase
       .from('avaliacoes')
       .select('id, clinica_id, agendamento_id, paciente_nome, telefone, enviado_em, respondeu')
@@ -45,6 +47,9 @@ export default function ReputacaoPage() {
       const pendentes = total - recebidas
       const taxa = total > 0 ? Math.round((recebidas / total) * 100) : 0
       setResumo({ total, recebidas, pendentes, taxa })
+    } else if (error) {
+      console.error(error)
+      setErro(MSG_ERRO_PADRAO)
     }
     setCarregando(false)
   }
@@ -100,6 +105,10 @@ export default function ReputacaoPage() {
     <AdminShell title="Reputação" subtitle="Avaliações enviadas e respondidas pelos clientes">
       <style>{`.rep-btn-atualizar:hover:not(:disabled) { background: rgba(148,163,184,0.08) !important; border-color: #3d4360 !important; }`}</style>
       <div style={{ maxWidth: 1100 }}>
+
+        {erro && (
+          <Feedback type="erro" message={erro} onClose={() => setErro('')} />
+        )}
 
         {/* Cards de métricas */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 28 }}>
