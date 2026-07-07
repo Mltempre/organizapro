@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
+import PageLoader from '../components/PageLoader';
 
 interface Agendamento {
   id: string;
@@ -187,6 +188,7 @@ export default function AgendamentosPage() {
   const [excluindo, setExcluindo]       = useState<string | null>(null);
   const [carregando, setCarregando]     = useState(true);
   const [erro, setErro]                 = useState('');
+  const [sucesso, setSucesso]           = useState('');
   const [clinicaId, setClinicaId]       = useState('');
   const [userId, setUserId]             = useState('');
   const [enviando, setEnviando]         = useState<string | null>(null);
@@ -304,7 +306,11 @@ export default function AgendamentosPage() {
       }
 
       if (error) { setErro('Erro ao salvar: ' + error.message); }
-      else { setModal(false); carregar(); }
+      else {
+        setModal(false); carregar();
+        setSucesso(editando ? 'Compromisso atualizado.' : 'Agendamento criado.');
+        setTimeout(() => setSucesso(''), 3500);
+      }
     } catch (e) {
       setErro('Erro inesperado: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -320,6 +326,8 @@ export default function AgendamentosPage() {
       const telefoneLimpo = (ag?.telefone || '').replace(/\D/g, '');
       const { error } = await supabase.from('agendamentos').delete().eq('id', id).eq('clinica_id', clinicaId);
       if (error) { setErro('Erro ao excluir: ' + error.message); return; }
+      setSucesso('Registro removido.');
+      setTimeout(() => setSucesso(''), 3500);
       if (telefoneLimpo && clinicaId) {
         const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
         const { data: proximoAg } = await supabase
@@ -437,10 +445,26 @@ export default function AgendamentosPage() {
       actionLabel="+ Novo compromisso"
       actionOnClick={abrirNovo}
     >
-      {carregando && <div style={{ textAlign:'center', padding:'40px 20px', color:'#64748b' }}>Carregando agenda...</div>}
-      {!carregando && erro && (
+      <style>{`
+        .ag-btn-novo:hover { filter: brightness(1.1); }
+        .ag-btn-pdf:hover:not(:disabled) { background: rgba(31,78,95,0.22) !important; }
+        .ag-tab-pill:hover { border-color: #3d4360 !important; color: #94a3b8 !important; }
+        .ag-btn-wa:hover:not(:disabled) { filter: brightness(1.15); }
+        .ag-btn-editar:hover { background: rgba(148,163,184,0.1) !important; border-color: #3d4360 !important; color:#cbd5e1 !important; }
+        .ag-btn-excluir:hover:not(:disabled) { background: rgba(248,113,113,0.1) !important; }
+        .ag-btn-cancelar:hover { background: rgba(148,163,184,0.08) !important; border-color: #3d4360 !important; }
+        .ag-btn-salvar:hover:not(:disabled) { filter: brightness(1.1); }
+      `}</style>
+      {carregando ? <PageLoader title="Carregando agenda..." /> : (
+      <>
+      {erro && (
         <div style={{ background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:8, padding:16, marginBottom:20, color:'#fca5a5' }}>
           <strong>Erro:</strong> {erro}
+        </div>
+      )}
+      {sucesso && (
+        <div style={{ background:'#14532d', border:'1px solid #16a34a', borderRadius:10, padding:'14px 20px', marginBottom:20, color:'#4ade80', fontSize:13, fontWeight:600 }}>
+          ✅ {sucesso}
         </div>
       )}
       {msgEnvio && (
@@ -478,9 +502,10 @@ export default function AgendamentosPage() {
           onChange={e => setBusca(e.target.value)}
         />
         <button
+          className="ag-btn-pdf"
           onClick={gerarPDF}
           disabled={gerandoPdf}
-          style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor: gerandoPdf ? 'default' : 'pointer', whiteSpace:'nowrap', opacity: gerandoPdf ? 0.7 : 1 }}
+          style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor: gerandoPdf ? 'default' : 'pointer', whiteSpace:'nowrap', opacity: gerandoPdf ? 0.7 : 1, transition:'background 0.15s' }}
         >
           {gerandoPdf ? '⏳ Gerando...' : '📄 Exportar PDF'}
         </button>
@@ -497,6 +522,7 @@ export default function AgendamentosPage() {
           return (
             <button
               key={key}
+              className={ativo ? undefined : 'ag-tab-pill'}
               onClick={() => setFiltroData(key)}
               style={{
                 padding:'5px 16px', borderRadius:20,
@@ -515,13 +541,24 @@ export default function AgendamentosPage() {
 
       {/* TABELA */}
       <div style={{ background:'#1e2130', borderRadius:12, border:'1px solid #2d3148', overflow:'hidden' }}>
-        {carregando ? (
-          <div style={{ textAlign:'center', padding:'60px 20px', color:'#475569' }}>Carregando...</div>
-        ) : exibidos.length === 0 ? (
+        {exibidos.length === 0 ? (
           <div style={{ textAlign:'center', padding:'60px 20px', color:'#475569' }}>
             <div style={{ fontSize:40, marginBottom:12 }}>📅</div>
-            <div style={{ fontSize:15, fontWeight:600 }}>Nenhum compromisso encontrado</div>
-            <div style={{ fontSize:13, marginTop:4 }}>Clique em + Novo compromisso para começar</div>
+            <div style={{ fontSize:15, fontWeight:600, marginBottom:6 }}>
+              {agendamentos.length === 0 ? 'Ainda não há compromissos cadastrados.' : 'Nenhum compromisso encontrado.'}
+            </div>
+            <div style={{ fontSize:13, marginBottom:20 }}>
+              {agendamentos.length === 0
+                ? 'Cadastre seu primeiro compromisso para começar a organizar sua agenda.'
+                : 'Ajuste a busca ou o filtro para ver outros resultados.'}
+            </div>
+            <button
+              className="ag-btn-novo"
+              onClick={abrirNovo}
+              style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'12px 28px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#1F4E5F,#0d3547)', color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', transition:'filter 0.15s' }}
+            >
+              ➕ Novo Compromisso
+            </button>
           </div>
         ) : (
           <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
@@ -571,23 +608,26 @@ export default function AgendamentosPage() {
                       <td style={{ padding:'14px 16px', fontSize:13, borderBottom:'1px solid #1a1d2e', whiteSpace:'nowrap' }}>
                         {a.telefone && (
                           <button
+                            className="ag-btn-wa"
                             onClick={() => enviarWhatsapp(a)}
                             disabled={enviando === a.id}
-                            style={{ padding:'6px 10px', borderRadius:6, border:'none', background:'#16a34a22', color:'#4ade80', fontSize:11, cursor: enviando === a.id ? 'default' : 'pointer', marginRight:4, fontWeight:600, opacity: enviando === a.id ? 0.6 : 1 }}
+                            style={{ padding:'6px 10px', borderRadius:6, border:'none', background:'#16a34a22', color:'#4ade80', fontSize:11, cursor: enviando === a.id ? 'default' : 'pointer', marginRight:4, fontWeight:600, opacity: enviando === a.id ? 0.6 : 1, transition:'filter 0.15s' }}
                           >
                             {enviando === a.id ? '...' : 'WA'}
                           </button>
                         )}
                         <button
+                          className="ag-btn-editar"
                           onClick={() => abrirEdicao(a)}
-                          style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:11, cursor:'pointer', marginRight:4 }}
+                          style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:11, cursor:'pointer', marginRight:4, transition:'background 0.15s, border-color 0.15s, color 0.15s' }}
                         >
                           Editar
                         </button>
                         <button
+                          className="ag-btn-excluir"
                           onClick={() => excluir(a.id)}
                           disabled={excluindo === a.id}
-                          style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #450a0a', background:'transparent', color:'#f87171', fontSize:11, cursor:'pointer' }}
+                          style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #450a0a', background:'transparent', color:'#f87171', fontSize:11, cursor:'pointer', transition:'background 0.15s' }}
                         >
                           {excluindo === a.id ? '...' : 'Excluir'}
                         </button>
@@ -600,6 +640,8 @@ export default function AgendamentosPage() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* MODAL */}
       {modal && (
@@ -659,15 +701,17 @@ export default function AgendamentosPage() {
             {erro && <p style={{ color:'#f87171', fontSize:12, marginTop:8 }}>{erro}</p>}
             <div style={{ display:'flex', gap:10, marginTop:24 }}>
               <button
+                className="ag-btn-cancelar"
                 onClick={() => setModal(false)}
-                style={{ flex:1, padding:'10px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:13, cursor:'pointer' }}
+                style={{ flex:1, padding:'10px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:13, cursor:'pointer', transition:'background 0.15s, border-color 0.15s' }}
               >
                 Cancelar
               </button>
               <button
+                className="ag-btn-salvar"
                 onClick={salvar}
                 disabled={salvando}
-                style={{ flex:2, padding:'10px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1F4E5F,#0d3547)', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', opacity:salvando ? 0.7 : 1 }}
+                style={{ flex:2, padding:'10px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1F4E5F,#0d3547)', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', opacity:salvando ? 0.7 : 1, transition:'filter 0.15s' }}
               >
                 {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Adicionar compromisso'}
               </button>

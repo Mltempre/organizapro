@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
+import PageLoader from "../components/PageLoader";
 
 type AgItem = {
   id: string;
@@ -422,9 +423,9 @@ export default function Dashboard() {
   });
 
   if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Inter,sans-serif" }}>
-      Preparando seu painel...
-    </div>
+    <AdminShell title="Central de Gestão" subtitle={dataStr}>
+      <PageLoader title="Preparando seu painel..." />
+    </AdminShell>
   );
 
   return (

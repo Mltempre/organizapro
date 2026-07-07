@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminShell from '../components/AdminShell'
+import PageLoader from '../components/PageLoader'
 import { supabase } from '../../lib/supabase'
 
 export default function Metricas() {
@@ -86,11 +87,14 @@ export default function Metricas() {
     }
   }
 
-  if (loading) return <div style={{ minHeight: '100vh', background: '#060913', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: '#7c3aed' }}>Carregando...</p></div>
-
+  if (loading) return (
+    <AdminShell title="Métricas" subtitle="Visão geral do seu negócio">
+      <PageLoader title="Carregando métricas..." />
+    </AdminShell>
+  )
 
   return (
-    <AdminShell title="Metricas" subtitle="Visao geral da sua clinica">
+    <AdminShell title="Métricas" subtitle="Visão geral do seu negócio">
       {erro && (
         <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: '12px 16px', marginBottom: 20, color: '#fca5a5', fontSize: 13 }}>
           {erro}
@@ -98,7 +102,7 @@ export default function Metricas() {
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
         {[
-          { label: 'Total de Pacientes', value: dados.totalPacientes, color: '#00e5b4' },
+          { label: 'Total de Clientes', value: dados.totalPacientes, color: '#00e5b4' },
           { label: 'Total Agendamentos', value: dados.totalAgendamentos, color: '#6366f1' },
           { label: 'Confirmados', value: dados.confirmados, color: '#22c55e' },
           { label: 'Pendentes',   value: dados.pendentes,  color: '#f59e0b' },

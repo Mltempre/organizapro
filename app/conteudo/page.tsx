@@ -7,9 +7,9 @@ import AdminShell from "../components/AdminShell";
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const OBJETIVOS = [
-  { id: "atrair",     icon: "📅", label: "Atrair novos pacientes" },
+  { id: "atrair",     icon: "📅", label: "Atrair novos clientes" },
   { id: "avaliacoes", icon: "⭐", label: "Conseguir avaliações Google" },
-  { id: "educar",     icon: "📚", label: "Educar pacientes" },
+  { id: "educar",     icon: "📚", label: "Educar clientes" },
   { id: "engajar",    icon: "📱", label: "Engajar Instagram" },
   { id: "reels",      icon: "🎥", label: "Criar Reels" },
   { id: "carrossel",  icon: "📖", label: "Criar Carrossel" },
@@ -64,7 +64,7 @@ type ConteudoResult = {
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
 function buildPrompt(obj: Objetivo, esp: Especialidade): string {
-  return `Você é um consultor especializado em marketing digital para clínicas de ${esp.label}, contratado pela ClínicaFlow. Crie conteúdos de alta conversão para Instagram de clínicas premium.
+  return `Você é um consultor especializado em marketing digital para clínicas de ${esp.label}, contratado pelo OrganizaPro. Crie conteúdos de alta conversão para Instagram de clínicas premium.
 
 Objetivo deste post: ${obj.label}
 Especialidade: ${esp.label}
@@ -120,11 +120,11 @@ function StepLabel({ n, label, done }: { n: number; label: string; done: boolean
       <div style={{
         width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center",
         justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0,
-        background: done ? "#7c3aed" : "#e2e8f0",
-        color: done ? "#fff" : "#94a3b8",
+        background: done ? "#7c3aed" : "#2d3148",
+        color: done ? "#fff" : "#64748b",
         transition: "all 0.2s",
       }}>{n}</div>
-      <span style={{ fontSize: 13, fontWeight: 700, color: done ? "#1e293b" : "#94a3b8", transition: "color 0.2s" }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: done ? "#f1f5f9" : "#64748b", transition: "color 0.2s" }}>{label}</span>
     </div>
   );
 }
@@ -150,7 +150,7 @@ function HashGroup({ label, tags, chipBg, chipColor, chipBorder }: {
 }
 
 function ResultSection({
-  label, icon, children, bg = "#fff", border = "#e2e8f0", labelColor = "#475569",
+  label, icon, children, bg = "#1e2130", border = "#2d3148", labelColor = "#94a3b8",
 }: {
   label: string; icon: string; children: React.ReactNode;
   bg?: string; border?: string; labelColor?: string;
@@ -231,29 +231,40 @@ export default function Conteudo() {
   }
 
   const corCopiar = copiado === "ok"
-    ? { bg: "#f0fdf4", border: "#bbf7d0", color: "#16a34a" }
+    ? { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.3)", color: "#4ade80" }
     : copiado === "erro"
-    ? { bg: "#fef2f2", border: "#fecaca", color: "#dc2626" }
+    ? { bg: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.3)", color: "#f87171" }
     : { bg: "#7c3aed", border: "#7c3aed", color: "#fff" };
 
   return (
     <AdminShell
       title="Biblioteca de Marketing"
-      subtitle="Conteúdos profissionais criados por IA para ajudar sua clínica a atrair pacientes e fortalecer sua presença digital."
+      subtitle="Conteúdos profissionais criados por IA para ajudar seu negócio a atrair clientes e fortalecer sua presença digital."
     >
+      <style>{`
+        .ct-obj-card:hover:not(.ct-sel) { border-color: #3d4360 !important; }
+        .ct-esp-card:hover:not(.ct-sel) { border-color: #3d4360 !important; }
+        .ct-btn-gerar:hover:not(:disabled) { filter: brightness(1.1); }
+        .ct-btn-regerar:hover { background: rgba(148,163,184,0.1) !important; border-color: #3d4360 !important; }
+        .ct-btn-copiar:hover { filter: brightness(1.1); }
+        .ct-objetivos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .ct-especialidades-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+        .ct-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
+      `}</style>
       <main style={{ overflowY: "auto", padding: "28px 32px" }}>
 
         {/* ── Etapa 1: Objetivo ── */}
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
+        <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
           <StepLabel n={1} label="Qual seu objetivo hoje?" done={!!objetivo} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+          <div className="ct-objetivos-grid">
             {OBJETIVOS.map(o => {
               const sel = objetivo?.id === o.id;
               return (
                 <div key={o.id} onClick={() => { setObjetivo(o); setResultado(null); }}
+                  className={`ct-obj-card${sel ? " ct-sel" : ""}`}
                   style={{
-                    background:  sel ? "#7c3aed" : "#f8fafc",
-                    border:      sel ? "2px solid #7c3aed" : "2px solid #e2e8f0",
+                    background:  sel ? "#7c3aed" : "#0f1117",
+                    border:      sel ? "2px solid #7c3aed" : "2px solid #2d3148",
                     borderRadius: 10, padding: "14px 10px", cursor: "pointer",
                     textAlign:   "center", transition: "all 0.18s",
                     transform:   sel ? "scale(1.03)" : "scale(1)",
@@ -263,11 +274,11 @@ export default function Conteudo() {
                     width: 36, height: 36, borderRadius: "50%", margin: "0 auto 8px",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 18,
-                    background: sel ? "rgba(255,255,255,0.2)" : "#fff",
-                    border:     sel ? "1px solid rgba(255,255,255,0.3)" : "1px solid #e2e8f0",
+                    background: sel ? "rgba(255,255,255,0.2)" : "#1e2130",
+                    border:     sel ? "1px solid rgba(255,255,255,0.3)" : "1px solid #2d3148",
                     transition: "all 0.18s",
                   }}>{o.icon}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: sel ? "#fff" : "#475569", lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: sel ? "#fff" : "#94a3b8", lineHeight: 1.3 }}>
                     {o.label}
                   </div>
                 </div>
@@ -277,31 +288,32 @@ export default function Conteudo() {
         </div>
 
         {/* ── Etapa 2: Especialidade ── */}
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
+        <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
           <StepLabel n={2} label="Escolha sua especialidade" done={!!especialidade} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+          <div className="ct-especialidades-grid">
             {ESPECIALIDADES.map(e => {
               const sel = especialidade?.id === e.id;
               return (
                 <div key={e.id} onClick={() => { setEspecialidade(e); setResultado(null); }}
+                  className={`ct-esp-card${sel ? " ct-sel" : ""}`}
                   style={{
-                    background:   sel ? "#f5f3ff" : "#fff",
-                    border:       sel ? "2px solid #7c3aed" : "2px solid #e2e8f0",
+                    background:   sel ? "rgba(124,58,237,0.12)" : "#0f1117",
+                    border:       sel ? "2px solid #7c3aed" : "2px solid #2d3148",
                     borderRadius: 12, padding: "22px 18px", cursor: "pointer",
                     textAlign:    "center", transition: "all 0.2s",
-                    boxShadow:    sel ? "0 6px 20px rgba(124,58,237,0.15)" : "0 1px 3px rgba(0,0,0,0.04)",
+                    boxShadow:    sel ? "0 6px 20px rgba(124,58,237,0.15)" : "none",
                     transform:    sel ? "scale(1.02)" : "scale(1)",
                   }}>
                   <div style={{ fontSize: sel ? 40 : 32, marginBottom: 10, transition: "font-size 0.2s" }}>{e.icon}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: sel ? "#5b21b6" : "#1e293b", marginBottom: 12, transition: "color 0.2s" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: sel ? "#c4b5fd" : "#f1f5f9", marginBottom: 12, transition: "color 0.2s" }}>
                     {e.label}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "center" }}>
                     {e.chips.map((chip, i) => (
                       <span key={i} style={{
-                        background: sel ? "#ede9fe" : "#f1f5f9",
-                        color:      sel ? "#7c3aed" : "#64748b",
-                        border:     sel ? "1px solid #ddd6fe" : "1px solid #e2e8f0",
+                        background: sel ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.04)",
+                        color:      sel ? "#c4b5fd" : "#94a3b8",
+                        border:     sel ? "1px solid rgba(124,58,237,0.3)" : "1px solid #2d3148",
                         fontSize: 10, padding: "3px 8px", borderRadius: 5,
                         fontWeight: 500, transition: "all 0.2s",
                       }}>{chip}</span>
@@ -314,27 +326,27 @@ export default function Conteudo() {
         </div>
 
         {/* ── Etapa 3: Gerar ── */}
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "22px 24px", marginBottom: 20 }}>
+        <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 12, padding: "22px 24px", marginBottom: 20 }}>
           <StepLabel n={3} label="Gerar conteúdo" done={false} />
           {!pronto ? (
-            <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 14px" }}>
+            <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 14px" }}>
               Selecione o objetivo e a especialidade para liberar a geração.
             </p>
           ) : (
-            <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 14px" }}>
-              <span style={{ color: "#7c3aed", fontWeight: 600 }}>{objetivo!.icon} {objetivo!.label}</span>
+            <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 14px" }}>
+              <span style={{ color: "#a78bfa", fontWeight: 600 }}>{objetivo!.icon} {objetivo!.label}</span>
               {" · "}
-              <span style={{ color: "#7c3aed", fontWeight: 600 }}>{especialidade!.icon} {especialidade!.label}</span>
+              <span style={{ color: "#a78bfa", fontWeight: 600 }}>{especialidade!.icon} {especialidade!.label}</span>
             </p>
           )}
-          <button onClick={gerar} disabled={!pronto || loading}
+          <button className="ct-btn-gerar" onClick={gerar} disabled={!pronto || loading}
             style={{
               padding: "13px 36px", borderRadius: 10, border: "none",
-              background: pronto && !loading ? "#7c3aed" : "#e2e8f0",
-              color:      pronto && !loading ? "#fff"    : "#94a3b8",
+              background: pronto && !loading ? "#7c3aed" : "#2d3148",
+              color:      pronto && !loading ? "#fff"    : "#64748b",
               fontSize: 14, fontWeight: 700,
               cursor:     pronto && !loading ? "pointer" : "not-allowed",
-              transition: "all 0.2s",
+              transition: "filter 0.2s",
               boxShadow:  pronto && !loading ? "0 4px 14px rgba(124,58,237,0.3)" : "none",
             }}>
             {loading ? "✨ Gerando conteúdo..." : "✨ Gerar Conteúdo Inteligente"}
@@ -343,8 +355,8 @@ export default function Conteudo() {
 
         {/* ── Erro ── */}
         {rawError && (
-          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color: "#dc2626" }}>❌ {rawError}</span>
+          <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: "#fca5a5" }}>❌ {rawError}</span>
           </div>
         )}
 
@@ -352,25 +364,25 @@ export default function Conteudo() {
         {resultado && (
           <div>
             {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b" }}>✅ Conteúdo gerado</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>✅ Conteúdo gerado</div>
                 <div style={{ fontSize: 11, color: "#64748b" }}>
                   {objetivo!.icon} {objetivo!.label} · {especialidade!.icon} {especialidade!.label}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => { setResultado(null); setCopiado("idle"); }}
-                  style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                <button className="ct-btn-regerar" onClick={() => { setResultado(null); setCopiado("idle"); }}
+                  style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #2d3148", background: "transparent", color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background 0.15s, border-color 0.15s" }}>
                   🔄 Gerar novamente
                 </button>
-                <button onClick={copiarInstagram}
+                <button className="ct-btn-copiar" onClick={copiarInstagram}
                   style={{
                     padding: "7px 18px", borderRadius: 8,
                     border:      `1px solid ${corCopiar.border}`,
                     background:  corCopiar.bg,
                     color:       corCopiar.color,
-                    fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s",
+                    fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "filter 0.15s",
                   }}>
                   {copiado === "ok" ? "✅ Copiado!" : copiado === "erro" ? "❌ Erro" : "📋 Copiar para Instagram"}
                 </button>
@@ -378,74 +390,74 @@ export default function Conteudo() {
             </div>
 
             {/* 1 — Gancho */}
-            <ResultSection label="1️⃣  Chamada inicial — Gancho" icon="⚡" bg="#f5f3ff" border="#ddd6fe" labelColor="#7c3aed">
-              <p style={{ fontSize: 20, fontWeight: 800, color: "#3b0764", lineHeight: 1.3, margin: 0 }}>
+            <ResultSection label="1️⃣  Chamada inicial — Gancho" icon="⚡" bg="rgba(124,58,237,0.08)" border="rgba(124,58,237,0.25)" labelColor="#a78bfa">
+              <p style={{ fontSize: 20, fontWeight: 800, color: "#e9d5ff", lineHeight: 1.3, margin: 0 }}>
                 {resultado.gancho}
               </p>
             </ResultSection>
 
             {/* 2 — Legenda */}
             <ResultSection label="2️⃣  Legenda" icon="✍️">
-              <p style={{ fontSize: 13, color: "#334155", lineHeight: 1.85, margin: 0, whiteSpace: "pre-wrap" }}>
+              <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.85, margin: 0, whiteSpace: "pre-wrap" }}>
                 {resultado.legenda}
               </p>
             </ResultSection>
 
             {/* 3 — CTA */}
-            <ResultSection label="3️⃣  CTA para WhatsApp" icon="💬" bg="#f0fdf4" border="#bbf7d0" labelColor="#16a34a">
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#15803d", margin: 0 }}>
+            <ResultSection label="3️⃣  CTA para WhatsApp" icon="💬" bg="rgba(34,197,94,0.08)" border="rgba(34,197,94,0.25)" labelColor="#4ade80">
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#86efac", margin: 0 }}>
                 {resultado.cta_whatsapp}
               </p>
             </ResultSection>
 
             {/* 4 — Imagem */}
-            <ResultSection label="4️⃣  Sugestão de imagem / vídeo" icon="📸" bg="#eff6ff" border="#bfdbfe" labelColor="#2563eb">
-              <p style={{ fontSize: 13, color: "#1e3a8a", lineHeight: 1.7, margin: 0 }}>
+            <ResultSection label="4️⃣  Sugestão de imagem / vídeo" icon="📸" bg="rgba(59,130,246,0.08)" border="rgba(59,130,246,0.25)" labelColor="#60a5fa">
+              <p style={{ fontSize: 13, color: "#bfdbfe", lineHeight: 1.7, margin: 0 }}>
                 {resultado.sugestao_imagem}
               </p>
             </ResultSection>
 
             {/* 5 — Hashtags por categoria */}
-            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 12 }}>
+            <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 10, padding: "16px 18px", marginBottom: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 12 }}>
                 #️⃣  5️⃣  Hashtags
               </div>
               <HashGroup
                 label="Grande alcance (100k+)"
                 tags={resultado.hashtags_grandes ?? []}
-                chipBg="#f1f5f9" chipColor="#334155" chipBorder="#e2e8f0"
+                chipBg="rgba(255,255,255,0.04)" chipColor="#cbd5e1" chipBorder="#2d3148"
               />
               <HashGroup
                 label="Nicho da especialidade (10k–100k)"
                 tags={resultado.hashtags_medias ?? []}
-                chipBg="#f5f3ff" chipColor="#6d28d9" chipBorder="#ddd6fe"
+                chipBg="rgba(124,58,237,0.1)" chipColor="#c4b5fd" chipBorder="rgba(124,58,237,0.3)"
               />
               <HashGroup
                 label="Micro-nicho (abaixo de 10k)"
                 tags={resultado.hashtags_nicho ?? []}
-                chipBg="#ecfdf5" chipColor="#065f46" chipBorder="#a7f3d0"
+                chipBg="rgba(34,197,94,0.1)" chipColor="#86efac" chipBorder="rgba(34,197,94,0.25)"
               />
             </div>
 
             {/* 6 — Info row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>🕐 Melhor horário</div>
-                <p style={{ fontSize: 12, color: "#334155", margin: 0, lineHeight: 1.55 }}>{resultado.melhor_horario}</p>
+            <div className="ct-info-grid">
+              <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>🕐 Melhor horário</div>
+                <p style={{ fontSize: 12, color: "#cbd5e1", margin: 0, lineHeight: 1.55 }}>{resultado.melhor_horario}</p>
               </div>
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>🎯 Objetivo</div>
-                <p style={{ fontSize: 12, color: "#334155", margin: 0, lineHeight: 1.55 }}>{resultado.objetivo_post}</p>
+              <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>🎯 Objetivo</div>
+                <p style={{ fontSize: 12, color: "#cbd5e1", margin: 0, lineHeight: 1.55 }}>{resultado.objetivo_post}</p>
               </div>
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>🎙️ Tom de voz</div>
-                <p style={{ fontSize: 12, color: "#334155", margin: 0, lineHeight: 1.55 }}>{resultado.tom}</p>
+              <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>🎙️ Tom de voz</div>
+                <p style={{ fontSize: 12, color: "#cbd5e1", margin: 0, lineHeight: 1.55 }}>{resultado.tom}</p>
               </div>
             </div>
 
             {/* 7 — Dica de marketing */}
-            <ResultSection label="7️⃣  Dica de marketing" icon="💡" bg="#fffbeb" border="#fde68a" labelColor="#b45309">
-              <p style={{ fontSize: 13, color: "#78350f", lineHeight: 1.7, margin: 0 }}>
+            <ResultSection label="7️⃣  Dica de marketing" icon="💡" bg="rgba(245,158,11,0.08)" border="rgba(245,158,11,0.25)" labelColor="#fbbf24">
+              <p style={{ fontSize: 13, color: "#fde68a", lineHeight: 1.7, margin: 0 }}>
                 {resultado.dica_marketing}
               </p>
             </ResultSection>
@@ -453,8 +465,8 @@ export default function Conteudo() {
             {/* 9 — Próxima Ideia */}
             {resultado.proxima_ideia && (
               <div style={{
-                background: "linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%)",
-                border: "1px solid #ddd6fe", borderRadius: 12, padding: "18px 20px",
+                background: "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(59,130,246,0.08) 100%)",
+                border: "1px solid rgba(124,58,237,0.25)", borderRadius: 12, padding: "18px 20px",
                 display: "flex", alignItems: "flex-start", gap: 14,
               }}>
                 <div style={{
@@ -463,10 +475,10 @@ export default function Conteudo() {
                   fontSize: 18, flexShrink: 0,
                 }}>💡</div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#7c3aed", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 5 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 5 }}>
                     Próxima sugestão de conteúdo
                   </div>
-                  <p style={{ fontSize: 13, color: "#3b0764", lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
+                  <p style={{ fontSize: 13, color: "#e9d5ff", lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
                     {resultado.proxima_ideia}
                   </p>
                 </div>

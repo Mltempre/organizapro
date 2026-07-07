@@ -96,7 +96,8 @@ export default function ReputacaoPage() {
   ]
 
   return (
-    <AdminShell title="Reputação" subtitle="Avaliações enviadas e respondidas pelos pacientes">
+    <AdminShell title="Reputação" subtitle="Avaliações enviadas e respondidas pelos clientes">
+      <style>{`.rep-btn-atualizar:hover:not(:disabled) { background: rgba(148,163,184,0.08) !important; border-color: #3d4360 !important; }`}</style>
       <div style={{ maxWidth: 1100 }}>
 
         {/* Cards de métricas */}
@@ -134,7 +135,7 @@ export default function ReputacaoPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#161827' }}>
-                    {['Paciente', 'Telefone', 'Enviado em', 'Status'].map(h => (
+                    {['Cliente', 'Telefone', 'Enviado em', 'Status'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #2d3148', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                         {h}
                       </th>
@@ -175,9 +176,10 @@ export default function ReputacaoPage() {
         {/* Botão atualizar */}
         <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
           <button
+            className="rep-btn-atualizar"
             onClick={() => clinicaId && carregarDados(clinicaId)}
             disabled={carregando}
-            style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#64748b', fontSize: 13, cursor: 'pointer', opacity: carregando ? 0.5 : 1 }}
+            style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#64748b', fontSize: 13, cursor: 'pointer', opacity: carregando ? 0.5 : 1, transition: 'background 0.15s, border-color 0.15s' }}
           >
             {carregando ? 'Atualizando...' : '🔄 Atualizar'}
           </button>

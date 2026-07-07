@@ -87,6 +87,8 @@ export default function AdminShell({
         }
         .ash-hamburger { display: none; }
         .ash-close-btn { display: none; }
+        .ash-action-btn { transition: filter 0.15s; }
+        .ash-action-btn:hover { filter: brightness(1.12); }
         .ash-backdrop {
           display: none;
           position: fixed;
@@ -283,6 +285,7 @@ export default function AdminShell({
 
           {actionLabel && actionOnClick && (
             <button
+              className="ash-action-btn"
               onClick={actionOnClick}
               style={{
                 padding: "10px 20px",

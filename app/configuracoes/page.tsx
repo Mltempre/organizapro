@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
+import PageLoader from '../components/PageLoader';
 
 type Config = {
   nome_clinica: string;
@@ -192,13 +193,17 @@ export default function ConfiguracoesPage() {
   };
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#0f1117', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-      Carregando...
-    </div>
+    <AdminShell title="Configurações" subtitle="Personalize as informações do seu negócio">
+      <PageLoader title="Carregando configurações..." />
+    </AdminShell>
   );
 
   return (
     <AdminShell title="Configurações" subtitle="Personalize as informações do seu negócio">
+      <style>{`
+        .cfg-btn-salvar:hover:not(:disabled) { filter: brightness(1.1); }
+        .cfg-btn-testar:hover:not(:disabled) { background: rgba(79,70,229,0.2) !important; }
+      `}</style>
       <div style={{ width: '100%', maxWidth: 960 }}>
 
         {/* Header */}
@@ -207,7 +212,7 @@ export default function ConfiguracoesPage() {
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Configurações</h1>
             <p style={{ fontSize: 13, color: '#64748b', margin: '8px 0 0' }}>Personalize as informações do seu negócio</p>
           </div>
-          <button onClick={salvar} disabled={salvando} style={{ padding: '12px 22px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
+          <button className="cfg-btn-salvar" onClick={salvar} disabled={salvando} style={{ padding: '12px 22px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1, transition: 'filter 0.15s' }}>
             {salvando ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
@@ -266,13 +271,14 @@ export default function ConfiguracoesPage() {
                   style={{ ...inp, flex: '1 1 260px' }}
                 />
                 <button
+                  className="cfg-btn-testar"
                   type="button"
                   onClick={testarLinkGoogle}
                   style={{
                     padding: '10px 16px', borderRadius: 8,
                     border: '1px solid #4f46e5', background: 'rgba(79,70,229,0.12)',
                     color: '#a78bfa', fontSize: 13, fontWeight: 600,
-                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background 0.15s',
                   }}
                 >
                   🔗 Testar Link
@@ -346,9 +352,10 @@ export default function ConfiguracoesPage() {
           {/* Botão de teste */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <button
+              className="cfg-btn-testar"
               onClick={testarWhatsapp}
               disabled={testando || !config.zapi_instance || !config.zapi_token || !config.zapi_client_token}
-              style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #4f46e5', background: 'rgba(79,70,229,0.12)', color: '#a78bfa', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (testando || !config.zapi_instance || !config.zapi_token || !config.zapi_client_token) ? 0.5 : 1 }}
+              style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #4f46e5', background: 'rgba(79,70,229,0.12)', color: '#a78bfa', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (testando || !config.zapi_instance || !config.zapi_token || !config.zapi_client_token) ? 0.5 : 1, transition: 'background 0.15s' }}
             >
               {testando ? '⏳ Enviando...' : '🧪 Enviar mensagem de teste'}
             </button>
@@ -366,7 +373,7 @@ export default function ConfiguracoesPage() {
 
         {/* Botão salvar rodapé */}
         <div style={{ textAlign: 'center', paddingBottom: 32 }}>
-          <button onClick={salvar} disabled={salvando} style={{ padding: '12px 40px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
+          <button className="cfg-btn-salvar" onClick={salvar} disabled={salvando} style={{ padding: '12px 40px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1, transition: 'filter 0.15s' }}>
             {salvando ? 'Salvando...' : 'Salvar todas as alterações'}
           </button>
         </div>

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
+import PageLoader from '../components/PageLoader';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ export default function PacientesPage() {
   const [excluindo, setExcluindo]         = useState<string | null>(null);
   const [carregando, setCarregando]       = useState(true);
   const [erro, setErro]                   = useState('');
+  const [sucesso, setSucesso]             = useState('');
   const [clinicaId, setClinicaId]         = useState('');
   const [detalhe, setDetalhe]             = useState<Paciente | null>(null);
   const [historico, setHistorico]         = useState<AgHistorico[]>([]);
@@ -255,6 +257,8 @@ export default function PacientesPage() {
           await sincronizarAgendamento(user?.id, form.nome, telefoneSalvo, form.proxima_consulta, telefoneAnterior);
         }
         setModal(false); carregar();
+        setSucesso(editando ? 'Cliente atualizado.' : 'Cliente cadastrado com sucesso.');
+        setTimeout(() => setSucesso(''), 3500);
       }
     } catch (e) {
       setErro('Erro inesperado: ' + (e instanceof Error ? e.message : String(e)));
@@ -286,6 +290,8 @@ export default function PacientesPage() {
       const { error } = await supabase.from('pacientes').delete().eq('id', id).eq('clinica_id', clinicaId);
       if (error) { setErro('Erro ao excluir: ' + error.message); return; }
       carregar();
+      setSucesso('Cliente removido.');
+      setTimeout(() => setSucesso(''), 3500);
     } catch (e) {
       setErro('Erro ao excluir: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -327,14 +333,23 @@ export default function PacientesPage() {
         @keyframes slideInRight { from { opacity:0; transform:translateX(32px) } to { opacity:1; transform:translateX(0) } }
         .cli-card { transition: background 0.15s, border-color 0.15s; }
         .cli-card:hover { background: #222540 !important; border-color: rgba(31,78,95,0.45) !important; }
+        .cli-btn-ver:hover { background: rgba(31,78,95,0.22) !important; }
+        .cli-btn-editar:hover { background: rgba(148,163,184,0.1) !important; border-color: #3d4360 !important; color:#cbd5e1 !important; }
+        .cli-btn-excluir:hover:not(:disabled) { background: rgba(248,113,113,0.1) !important; }
+        .cli-btn-cancelar:hover { background: rgba(148,163,184,0.08) !important; border-color: #3d4360 !important; }
+        .cli-btn-salvar:hover:not(:disabled) { filter: brightness(1.1); }
+        .cli-ord-pill:hover { border-color: #3d4360 !important; color: #94a3b8 !important; }
       `}</style>
 
-      {carregando && (
-        <div style={{ textAlign:'center', padding:'60px', color:'#64748b' }}>Carregando clientes...</div>
-      )}
+      {carregando && <PageLoader title="Carregando clientes..." />}
       {!carregando && erro && (
         <div style={{ background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:8, padding:16, marginBottom:20, color:'#fca5a5' }}>
           <strong>Erro:</strong> {erro}
+        </div>
+      )}
+      {!carregando && sucesso && (
+        <div style={{ background:'#14532d', border:'1px solid #16a34a', borderRadius:10, padding:'14px 20px', marginBottom:20, color:'#4ade80', fontSize:13, fontWeight:600 }}>
+          ✅ {sucesso}
         </div>
       )}
 
@@ -355,12 +370,13 @@ export default function PacientesPage() {
             ] as const).map(({ key, label }) => {
               const ativo = ordenacao === key;
               return (
-                <button key={key} onClick={() => setOrdenacao(key)} style={{
+                <button key={key} className={ativo ? undefined : 'cli-ord-pill'} onClick={() => setOrdenacao(key)} style={{
                   padding:'8px 14px', borderRadius:8, cursor:'pointer', fontSize:12,
                   border:`1px solid ${ativo ? '#1F4E5F' : '#2d3148'}`,
                   background: ativo ? 'rgba(31,78,95,0.2)' : 'transparent',
                   color: ativo ? '#4a9bb0' : '#64748b',
                   fontWeight: ativo ? 600 : 400, whiteSpace:'nowrap',
+                  transition:'border-color 0.15s, color 0.15s',
                 }}>
                   {label}
                 </button>
@@ -395,7 +411,13 @@ export default function PacientesPage() {
       {!carregando && pacientes.length > 0 && ordenados.length === 0 && (
         <div style={{ textAlign:'center', padding:'60px 24px', color:'#475569' }}>
           <div style={{ fontSize:36, marginBottom:12 }}>🔍</div>
-          <div style={{ fontSize:15, fontWeight:600 }}>Nenhum cliente encontrado para a busca.</div>
+          <div style={{ fontSize:15, fontWeight:600, marginBottom:16 }}>Nenhum cliente encontrado para a busca.</div>
+          <button
+            onClick={() => setBusca('')}
+            style={{ padding:'8px 18px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:13, cursor:'pointer' }}
+          >
+            Limpar busca
+          </button>
         </div>
       )}
 
@@ -443,21 +465,24 @@ export default function PacientesPage() {
                       {st.label}
                     </span>
                     <button
+                      className="cli-btn-ver"
                       onClick={() => abrirDetalhe(p)}
-                      style={{ padding:'6px 14px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:12, cursor:'pointer', fontWeight:600 }}
+                      style={{ padding:'6px 14px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:12, cursor:'pointer', fontWeight:600, transition:'background 0.15s' }}
                     >
                       Ver
                     </button>
                     <button
+                      className="cli-btn-editar"
                       onClick={() => abrirEdicao(p)}
-                      style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:12, cursor:'pointer' }}
+                      style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:12, cursor:'pointer', transition:'background 0.15s, border-color 0.15s, color 0.15s' }}
                     >
                       Editar
                     </button>
                     <button
+                      className="cli-btn-excluir"
                       onClick={() => excluir(p.id)}
                       disabled={excluindo === p.id}
-                      style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #450a0a', background:'transparent', color:'#f87171', fontSize:12, cursor:'pointer' }}
+                      style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #450a0a', background:'transparent', color:'#f87171', fontSize:12, cursor:'pointer', transition:'background 0.15s' }}
                     >
                       {excluindo === p.id ? '...' : 'Excluir'}
                     </button>
@@ -590,15 +615,17 @@ export default function PacientesPage() {
               {/* Ações */}
               <div style={{ display:'flex', gap:10 }}>
                 <button
+                  className="cli-btn-ver"
                   onClick={editarDeDetalhe}
-                  style={{ flex:1, padding:'11px', borderRadius:9, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor:'pointer' }}
+                  style={{ flex:1, padding:'11px', borderRadius:9, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor:'pointer', transition:'background 0.15s' }}
                 >
                   ✏️ Editar
                 </button>
                 <button
+                  className="cli-btn-excluir"
                   onClick={() => excluir(detalhe.id)}
                   disabled={excluindo === detalhe.id}
-                  style={{ flex:1, padding:'11px', borderRadius:9, border:'1px solid #450a0a', background:'transparent', color:'#f87171', fontSize:13, fontWeight:600, cursor:'pointer' }}
+                  style={{ flex:1, padding:'11px', borderRadius:9, border:'1px solid #450a0a', background:'transparent', color:'#f87171', fontSize:13, fontWeight:600, cursor:'pointer', transition:'background 0.15s' }}
                 >
                   {excluindo === detalhe.id ? '...' : '🗑️ Excluir'}
                 </button>
@@ -664,15 +691,17 @@ export default function PacientesPage() {
             {erro && <p style={{ color:'#f87171', fontSize:12, marginTop:8 }}>{erro}</p>}
             <div style={{ display:'flex', gap:10, marginTop:24 }}>
               <button
+                className="cli-btn-cancelar"
                 onClick={() => setModal(false)}
-                style={{ flex:1, padding:'10px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:13, cursor:'pointer' }}
+                style={{ flex:1, padding:'10px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:13, cursor:'pointer', transition:'background 0.15s, border-color 0.15s' }}
               >
                 Cancelar
               </button>
               <button
+                className="cli-btn-salvar"
                 onClick={salvar}
                 disabled={salvando}
-                style={{ flex:2, padding:'10px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1F4E5F,#0d3547)', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', opacity:salvando ? 0.7 : 1 }}
+                style={{ flex:2, padding:'10px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1F4E5F,#0d3547)', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', opacity:salvando ? 0.7 : 1, transition:'filter 0.15s' }}
               >
                 {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Adicionar cliente'}
               </button>

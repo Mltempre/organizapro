@@ -218,7 +218,7 @@ export default function AutomacaoPage() {
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por paciente ou telefone..."
+            placeholder="Buscar por cliente ou telefone..."
             style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: '1px solid #2d3148', background: '#1e2130', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
           />
 
@@ -229,6 +229,7 @@ export default function AutomacaoPage() {
               </span>
             )}
             <button
+              className="aut-btn-atualizar"
               onClick={carregar}
               disabled={carregando}
               style={{
@@ -381,7 +382,7 @@ export default function AutomacaoPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#161827' }}>
-                      {['Paciente', 'Telefone', 'Enviado em', 'Respondeu'].map(h => (
+                      {['Cliente', 'Telefone', 'Enviado em', 'Respondeu'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
@@ -434,14 +435,14 @@ export default function AutomacaoPage() {
                 <div style={{ fontSize: 14, fontWeight: 600 }}>
                   {busca ? 'Nenhum resultado para esta busca' : 'Nenhuma confirmação enviada ainda'}
                 </div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>As respostas dos pacientes aparecerão aqui</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>As respostas dos clientes aparecerão aqui</div>
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#161827' }}>
-                      {['Paciente', 'Data', 'Hora', 'Status', 'Resposta', 'Respondido em'].map(h => (
+                      {['Cliente', 'Data', 'Hora', 'Status', 'Resposta', 'Respondido em'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
@@ -487,6 +488,7 @@ export default function AutomacaoPage() {
 
         <style>{`
           @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          .aut-btn-atualizar:hover:not(:disabled) { background: rgba(148,163,184,0.08) !important; border-color: #3d4360 !important; }
         `}</style>
 
       </div>
