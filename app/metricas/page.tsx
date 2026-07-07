@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminShell from '../components/AdminShell'
 import PageLoader from '../components/PageLoader'
+import EmptyState from '../components/EmptyState'
 import { supabase } from '../../lib/supabase'
 
 export default function Metricas() {
@@ -100,21 +101,31 @@ export default function Metricas() {
           {erro}
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
-        {[
-          { label: 'Total de Clientes', value: dados.totalPacientes, color: '#00e5b4' },
-          { label: 'Total Agendamentos', value: dados.totalAgendamentos, color: '#6366f1' },
-          { label: 'Confirmados', value: dados.confirmados, color: '#22c55e' },
-          { label: 'Pendentes',   value: dados.pendentes,  color: '#f59e0b' },
-          { label: 'Concluídos', value: dados.concluidos, color: '#7c3aed' },
-          { label: 'Cancelados', value: dados.cancelados, color: '#ef4444' },
-        ].map((card) => (
-          <div key={card.label} className="panel">
-            <div style={{ color: card.color, fontSize: 36, fontWeight: 700, margin: '8px 0' }}>{card.value}</div>
-            <div style={{ color: '#94a3b8', fontSize: 13 }}>{card.label}</div>
-          </div>
-        ))}
-      </div>
+      {!erro && dados.totalPacientes === 0 && dados.totalAgendamentos === 0 ? (
+        <EmptyState
+          icon="📊"
+          title="Ainda não há dados suficientes para gerar métricas."
+          description="Cadastre clientes e compromissos para ver o desempenho do seu negócio aqui."
+          actionLabel="➕ Cadastrar cliente"
+          onAction={() => router.push('/pacientes')}
+        />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
+          {[
+            { label: 'Total de Clientes', value: dados.totalPacientes, color: '#00e5b4' },
+            { label: 'Total Agendamentos', value: dados.totalAgendamentos, color: '#6366f1' },
+            { label: 'Confirmados', value: dados.confirmados, color: '#22c55e' },
+            { label: 'Pendentes',   value: dados.pendentes,  color: '#f59e0b' },
+            { label: 'Concluídos', value: dados.concluidos, color: '#7c3aed' },
+            { label: 'Cancelados', value: dados.cancelados, color: '#ef4444' },
+          ].map((card) => (
+            <div key={card.label} className="panel">
+              <div style={{ color: card.color, fontSize: 36, fontWeight: 700, margin: '8px 0' }}>{card.value}</div>
+              <div style={{ color: '#94a3b8', fontSize: 13 }}>{card.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </AdminShell>
   )
 }

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
+import EmptyState from '../components/EmptyState';
 
 interface WhatsappLog {
   id: string;
@@ -311,13 +312,12 @@ export default function AutomacaoPage() {
             {carregando ? (
               <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>Carregando...</div>
             ) : logsFiltrados.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>💬</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
-                  {busca || filtroPeriodo !== 'todos' ? 'Nenhum resultado para este filtro' : 'Nenhuma mensagem enviada ainda'}
-                </div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>Os envios automáticos aparecerão aqui</div>
-              </div>
+              <EmptyState
+                compact
+                icon="💬"
+                title={busca || filtroPeriodo !== 'todos' ? 'Nenhum resultado para este filtro' : 'Nenhuma mensagem enviada ainda'}
+                description="Os envios automáticos aparecerão aqui assim que forem disparados."
+              />
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -370,13 +370,12 @@ export default function AutomacaoPage() {
             {carregando ? (
               <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>Carregando...</div>
             ) : avFiltradas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>⭐</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
-                  {busca ? 'Nenhum resultado para esta busca' : 'Nenhuma avaliação solicitada ainda'}
-                </div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>Marque uma consulta como concluída para disparar o pedido</div>
-              </div>
+              <EmptyState
+                compact
+                icon="⭐"
+                title={busca ? 'Nenhum resultado para esta busca' : 'Nenhuma avaliação solicitada ainda'}
+                description="Marque um compromisso como concluído para disparar o pedido de avaliação."
+              />
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -430,13 +429,12 @@ export default function AutomacaoPage() {
             {carregando ? (
               <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>Carregando...</div>
             ) : confFiltradas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
-                  {busca ? 'Nenhum resultado para esta busca' : 'Nenhuma confirmação enviada ainda'}
-                </div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>As respostas dos clientes aparecerão aqui</div>
-              </div>
+              <EmptyState
+                compact
+                icon="📅"
+                title={busca ? 'Nenhum resultado para esta busca' : 'Nenhuma confirmação enviada ainda'}
+                description="As respostas dos clientes aparecerão aqui assim que chegarem."
+              />
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>

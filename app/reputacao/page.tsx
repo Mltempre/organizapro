@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import AdminShell from '../components/AdminShell'
+import EmptyState from '../components/EmptyState'
 
 interface Avaliacao {
   id: string
@@ -125,11 +126,12 @@ export default function ReputacaoPage() {
           {carregando ? (
             <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>Carregando...</div>
           ) : avaliacoes.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 20px', color: '#475569' }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>⭐</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Nenhuma avaliação enviada ainda</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>As avaliações aparecem aqui após o envio automático via WhatsApp</div>
-            </div>
+            <EmptyState
+              compact
+              icon="⭐"
+              title="Nenhuma avaliação enviada ainda"
+              description="As solicitações de avaliação aparecem aqui após o envio automático via WhatsApp."
+            />
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
+import EmptyState from '../components/EmptyState';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -388,37 +389,25 @@ export default function PacientesPage() {
 
       {/* ── ESTADO VAZIO ──────────────────────────────────────────────────── */}
       {!carregando && pacientes.length === 0 && (
-        <div style={{ textAlign:'center', padding:'80px 24px' }}>
-          <div style={{ fontSize:64, marginBottom:20, opacity:0.35 }}>👥</div>
-          <div style={{ fontSize:18, fontWeight:600, color:'#64748b', marginBottom:8 }}>
-            Nenhum cliente cadastrado.
-          </div>
-          <div style={{ fontSize:13, color:'#475569', marginBottom:28 }}>
-            Cadastre seu primeiro cliente para começar a organizar.
-          </div>
-          <button onClick={abrirNovo} style={{
-            display:'inline-flex', alignItems:'center', gap:8,
-            padding:'12px 28px', borderRadius:10, border:'none',
-            background:'linear-gradient(135deg,#1F4E5F,#0d3547)',
-            color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer',
-          }}>
-            ➕ Novo Cliente
-          </button>
-        </div>
+        <EmptyState
+          icon="👥"
+          title="Ainda não há clientes cadastrados."
+          description="Cadastre seu primeiro cliente para começar a organizar seu negócio."
+          actionLabel="➕ Cadastrar cliente"
+          onAction={abrirNovo}
+        />
       )}
 
       {/* ── ESTADO BUSCA VAZIA ────────────────────────────────────────────── */}
       {!carregando && pacientes.length > 0 && ordenados.length === 0 && (
-        <div style={{ textAlign:'center', padding:'60px 24px', color:'#475569' }}>
-          <div style={{ fontSize:36, marginBottom:12 }}>🔍</div>
-          <div style={{ fontSize:15, fontWeight:600, marginBottom:16 }}>Nenhum cliente encontrado para a busca.</div>
-          <button
-            onClick={() => setBusca('')}
-            style={{ padding:'8px 18px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:13, cursor:'pointer' }}
-          >
-            Limpar busca
-          </button>
-        </div>
+        <EmptyState
+          compact
+          icon="🔍"
+          title="Nenhum cliente encontrado para a busca."
+          description="Tente outro termo ou limpe a busca para ver todos os clientes."
+          actionLabel="Limpar busca"
+          onAction={() => setBusca('')}
+        />
       )}
 
       {/* ── LISTA DE CLIENTES ─────────────────────────────────────────────── */}

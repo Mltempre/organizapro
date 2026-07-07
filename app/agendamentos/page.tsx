@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
+import EmptyState from '../components/EmptyState';
 
 interface Agendamento {
   id: string;
@@ -446,7 +447,6 @@ export default function AgendamentosPage() {
       actionOnClick={abrirNovo}
     >
       <style>{`
-        .ag-btn-novo:hover { filter: brightness(1.1); }
         .ag-btn-pdf:hover:not(:disabled) { background: rgba(31,78,95,0.22) !important; }
         .ag-tab-pill:hover { border-color: #3d4360 !important; color: #94a3b8 !important; }
         .ag-btn-wa:hover:not(:disabled) { filter: brightness(1.15); }
@@ -542,24 +542,24 @@ export default function AgendamentosPage() {
       {/* TABELA */}
       <div style={{ background:'#1e2130', borderRadius:12, border:'1px solid #2d3148', overflow:'hidden' }}>
         {exibidos.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'60px 20px', color:'#475569' }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>📅</div>
-            <div style={{ fontSize:15, fontWeight:600, marginBottom:6 }}>
-              {agendamentos.length === 0 ? 'Ainda não há compromissos cadastrados.' : 'Nenhum compromisso encontrado.'}
-            </div>
-            <div style={{ fontSize:13, marginBottom:20 }}>
-              {agendamentos.length === 0
-                ? 'Cadastre seu primeiro compromisso para começar a organizar sua agenda.'
-                : 'Ajuste a busca ou o filtro para ver outros resultados.'}
-            </div>
-            <button
-              className="ag-btn-novo"
-              onClick={abrirNovo}
-              style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'12px 28px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#1F4E5F,#0d3547)', color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', transition:'filter 0.15s' }}
-            >
-              ➕ Novo Compromisso
-            </button>
-          </div>
+          agendamentos.length === 0 ? (
+            <EmptyState
+              icon="📅"
+              title="Ainda não há compromissos cadastrados."
+              description="Cadastre seu primeiro compromisso para começar a organizar sua agenda."
+              actionLabel="➕ Novo Compromisso"
+              onAction={abrirNovo}
+            />
+          ) : (
+            <EmptyState
+              compact
+              icon="🔍"
+              title="Nenhum compromisso encontrado."
+              description="Ajuste a busca ou o filtro para ver outros resultados."
+              actionLabel="Limpar filtros"
+              onAction={() => { setBusca(''); setFiltroData('proximos'); }}
+            />
+          )
         ) : (
           <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
             <table style={{ width:'100%', minWidth:680, borderCollapse:'collapse' }}>
