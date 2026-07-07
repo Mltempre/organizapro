@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
+import OnboardingCard from "../components/onboarding/OnboardingCard";
 
 type AgItem = {
   id: string;
@@ -23,11 +24,13 @@ type DashData = {
   atrasadosList:    AgItem[];
   totalPacientes:   number;
   clientesParaReativar: number;
+  totalAgendamentos: number;
   nomeNegocio:      string;
   temLogo:          boolean;
   temEmail:         boolean;
   temTelefone:      boolean;
   temEndereco:      boolean;
+  temWhatsapp:      boolean;
 };
 
 type IdeiaDodia = {
@@ -265,11 +268,12 @@ const stTom: Record<"critico" | "positivo" | "neutro" | "atencao", { bg: string;
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [clinicaId, setClinicaId] = useState("");
   const [dash, setDash] = useState<DashData>({
     compromissosHoje: 0, pendentes: 0, atrasados: 0,
     agendaHoje: [], proximos: [], atrasadosList: [],
-    totalPacientes: 0, clientesParaReativar: 0, nomeNegocio: "",
-    temLogo: false, temEmail: false, temTelefone: false, temEndereco: false,
+    totalPacientes: 0, clientesParaReativar: 0, totalAgendamentos: 0, nomeNegocio: "",
+    temLogo: false, temEmail: false, temTelefone: false, temEndereco: false, temWhatsapp: false,
   });
 
   const carregarDados = useCallback(async () => {
@@ -282,6 +286,7 @@ export default function Dashboard() {
         .eq("usuario_id", user.id).maybeSingle();
       const cid = cu?.clinica_id;
       if (!cid) { setLoading(false); return; }
+      setClinicaId(cid);
 
       const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       const [ano, mes, dia] = hoje.split("-").map(Number);
@@ -294,6 +299,7 @@ export default function Dashboard() {
         { data: atrasados },
         { count: pacCount },
         { count: reativarCount },
+        { count: agTotalCount },
         { data: cfg },
       ] = await Promise.all([
         supabase.from("agendamentos")
@@ -320,8 +326,12 @@ export default function Dashboard() {
           .select("id", { count: "exact", head: true })
           .eq("clinica_id", cid)
           .or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`),
+        // Onboarding: já existe algum compromisso cadastrado (qualquer status/data)?
+        supabase.from("agendamentos")
+          .select("id", { count: "exact", head: true })
+          .eq("clinica_id", cid),
         supabase.from("clinica_config")
-          .select("logo_url, email, telefone, endereco, nome_clinica")
+          .select("logo_url, email, telefone, endereco, nome_clinica, zapi_instance, zapi_token")
           .eq("clinica_id", cid)
           .maybeSingle(),
       ]);
@@ -340,11 +350,13 @@ export default function Dashboard() {
         atrasadosList,
         totalPacientes:   pacCount ?? 0,
         clientesParaReativar: reativarCount ?? 0,
+        totalAgendamentos: agTotalCount ?? 0,
         nomeNegocio:      cfg?.nome_clinica || "",
         temLogo:          !!cfg?.logo_url,
         temEmail:         !!cfg?.email,
         temTelefone:      !!cfg?.telefone,
         temEndereco:      !!cfg?.endereco,
+        temWhatsapp:      !!cfg?.zapi_instance && !!cfg?.zapi_token,
       });
     } catch (err) {
       console.error(err);
@@ -439,6 +451,16 @@ export default function Dashboard() {
         @media (max-width: 860px) { .insights-grid { grid-template-columns: 1fr; } }
         .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
       `}</style>
+
+      {/* ── ONBOARDING ────────────────────────────────────────────────────────── */}
+      <OnboardingCard
+        clinicaId={clinicaId}
+        temEmpresa={dash.temEmail && dash.temTelefone && dash.temEndereco}
+        temWhatsapp={dash.temWhatsapp}
+        temCliente={dash.totalPacientes > 0}
+        temCompromisso={dash.totalAgendamentos > 0}
+        onNavigate={(path) => router.push(path)}
+      />
 
       {/* ── SEU PLANO PARA HOJE ──────────────────────────────────────────────── */}
       <div className="dc" style={{
