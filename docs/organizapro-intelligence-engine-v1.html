@@ -1,0 +1,520 @@
+<title>O Diretor Digital — OrganizaPro Intelligence Engine v1.0</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #12151f;
+    --surface-2: #171b28;
+    --border: #232838;
+    --text: #e7ecf3;
+    --text-muted: #8b95a7;
+    --text-faint: #5c6478;
+    --accent: #4a9bb0;
+    --accent-bright: #7dd3e0;
+    --accent-tint: rgba(74,155,176,0.12);
+    --violet: #8b5cf6;
+    --violet-tint: rgba(139,92,246,0.12);
+    --amber: #d9a441;
+    --amber-tint: rgba(217,164,65,0.12);
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --sans: "Seravek", "Gill Sans Nova", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --surface-2: #f1efe8;
+    --border: #e2ded4;
+    --text: #1c2430;
+    --text-muted: #5b6472;
+    --text-faint: #8a8f9c;
+    --accent: #1F4E5F;
+    --accent-bright: #0d3547;
+    --accent-tint: rgba(31,78,95,0.08);
+    --violet: #6d28d9;
+    --violet-tint: rgba(109,40,217,0.08);
+    --amber: #92640d;
+    --amber-tint: rgba(146,100,13,0.1);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f5f0;
+      --surface: #ffffff;
+      --surface-2: #f1efe8;
+      --border: #e2ded4;
+      --text: #1c2430;
+      --text-muted: #5b6472;
+      --text-faint: #8a8f9c;
+      --accent: #1F4E5F;
+      --accent-bright: #0d3547;
+      --accent-tint: rgba(31,78,95,0.08);
+      --violet: #6d28d9;
+      --violet-tint: rgba(109,40,217,0.08);
+      --amber: #92640d;
+      --amber-tint: rgba(146,100,13,0.1);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.65;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-tint); color: var(--text); }
+
+  .page {
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 96px 28px 140px;
+  }
+  .wide {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* ── Cover ─────────────────────────────────────────── */
+  .cover { max-width: 740px; margin: 0 auto; padding: 96px 28px 64px; text-align: left; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent-bright); margin: 0 0 28px; display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--accent-bright); display: inline-block; }
+  h1.title {
+    font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 7vw, 64px);
+    line-height: 1.05; margin: 0 0 22px; text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .lede {
+    font-size: 19px; color: var(--text-muted); max-width: 58ch; margin: 0 0 36px; line-height: 1.6;
+    text-wrap: pretty;
+  }
+  .cover-meta {
+    display: flex; gap: 28px; flex-wrap: wrap; padding-top: 28px; border-top: 1px solid var(--border);
+    font-family: var(--mono); font-size: 12px; color: var(--text-faint);
+  }
+  .cover-meta strong { color: var(--text-muted); font-weight: 500; }
+
+  /* ── Section rhythm ────────────────────────────────── */
+  section { max-width: 740px; margin: 0 auto; padding: 64px 28px; }
+  section.exhibit { max-width: 1040px; padding: 56px 28px; }
+  section + section { border-top: 1px solid var(--border); }
+
+  .num {
+    font-family: var(--mono); font-size: 12.5px; color: var(--accent-bright); letter-spacing: 0.05em;
+  }
+  h2 {
+    font-family: var(--serif); font-weight: 400; font-size: clamp(26px, 4vw, 34px);
+    margin: 8px 0 6px; text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .section-kicker { font-size: 14.5px; color: var(--text-muted); margin: 0 0 32px; max-width: 56ch; }
+
+  p { margin: 0 0 18px; font-size: 16px; }
+  p.lead { font-size: 17.5px; color: var(--text); }
+  .prose p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; color: var(--text); }
+  em.name { font-style: normal; font-family: var(--serif); color: var(--accent-bright); }
+
+  a { color: var(--accent-bright); text-decoration-color: var(--border); text-underline-offset: 3px; }
+
+  /* ── Quote / voice sample ──────────────────────────── */
+  .voice-compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 28px 0;
+  }
+  @media (max-width: 620px) { .voice-compare { grid-template-columns: 1fr; } }
+  .voice-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .voice-card .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    margin: 0 0 10px; display: block;
+  }
+  .voice-card.no .tag { color: var(--text-faint); }
+  .voice-card.yes .tag { color: var(--accent-bright); }
+  .voice-card p { font-size: 14.5px; margin: 0; font-style: italic; color: var(--text-muted); }
+  .voice-card.yes p { color: var(--text); font-style: normal; }
+  .voice-card.yes { border-color: var(--accent); background: var(--accent-tint); }
+
+  /* ── Principles grid ───────────────────────────────── */
+  .principles { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 28px 0; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  @media (max-width: 560px) { .principles { grid-template-columns: 1fr; } }
+  .principle { background: var(--surface); padding: 20px 22px; }
+  .principle .mark { color: var(--accent-bright); font-family: var(--mono); font-size: 15px; margin-right: 8px; }
+  .principle .word { font-family: var(--serif); font-size: 18px; }
+  .principle p { font-size: 13.5px; color: var(--text-muted); margin: 8px 0 0; }
+
+  /* ── Not-list ──────────────────────────────────────── */
+  .not-list { list-style: none; margin: 28px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .not-list li {
+    display: flex; gap: 14px; align-items: baseline; padding: 14px 18px;
+    background: var(--amber-tint); border: 1px solid rgba(217,164,65,0.28); border-radius: 10px;
+    font-size: 15px;
+  }
+  .not-list .x { font-family: var(--mono); color: var(--amber); flex-shrink: 0; font-size: 13px; }
+
+  /* ══════════ EXHIBIT: Routine flowchart ══════════ */
+  .exhibit-label {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-faint); margin: 0 0 6px;
+  }
+  .exhibit-title { font-family: var(--serif); font-size: 24px; margin: 0 0 32px; }
+
+  .routine {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; position: relative; margin-top: 8px;
+  }
+  @media (max-width: 860px) { .routine { grid-template-columns: 1fr; gap: 20px; } }
+  .routine::before {
+    content: ""; position: absolute; top: 19px; left: 8%; right: 8%; height: 1px; background: var(--border);
+  }
+  @media (max-width: 860px) { .routine::before { display: none; } }
+  .routine-node { position: relative; padding: 0 14px 0 0; }
+  .routine-node:last-child { padding-right: 0; }
+  .routine-dot {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--surface); border: 1px solid var(--accent);
+    color: var(--accent-bright); font-family: var(--mono); font-size: 13px; display: flex; align-items: center;
+    justify-content: center; position: relative; z-index: 1; margin-bottom: 16px;
+  }
+  .routine-when { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+  .routine-what { font-size: 13.5px; color: var(--text-muted); margin: 0; line-height: 1.55; }
+
+  /* ══════════ EXHIBIT: Concept map ══════════ */
+  .conceptmap {
+    display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 28px; align-items: center; margin-top: 8px;
+  }
+  @media (max-width: 780px) { .conceptmap { grid-template-columns: 1fr; } }
+  .cm-col { display: flex; flex-direction: column; gap: 8px; }
+  .cm-col-title { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 6px; }
+  .chip {
+    font-size: 13px; padding: 9px 13px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .cm-col.out .chip { color: var(--text); border-color: var(--border); }
+  .cm-core {
+    background: linear-gradient(160deg, var(--accent-tint), var(--violet-tint));
+    border: 1px solid var(--accent); border-radius: 16px; padding: 30px 24px; text-align: center;
+  }
+  .cm-core .core-name { font-family: var(--serif); font-size: 22px; margin: 0 0 8px; }
+  .cm-core p { font-size: 13px; color: var(--text-muted); margin: 0; }
+  .cm-arrow { text-align: center; color: var(--text-faint); font-size: 20px; display: none; }
+  @media (max-width: 780px) { .cm-arrow { display: block; } }
+
+  /* ══════════ EXHIBIT: Segment matrix ══════════ */
+  .matrix-wrap { overflow-x: auto; margin-top: 8px; }
+  table.matrix { width: 100%; border-collapse: collapse; min-width: 720px; }
+  table.matrix th {
+    text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-faint); padding: 0 16px 12px; border-bottom: 1px solid var(--border); font-weight: 500;
+  }
+  table.matrix td {
+    padding: 16px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: top;
+  }
+  table.matrix td.segname { font-family: var(--serif); font-size: 16px; color: var(--text); white-space: nowrap; }
+  table.matrix td.metric { color: var(--accent-bright); font-family: var(--mono); font-size: 12.5px; }
+  table.matrix td.rec { color: var(--text-muted); }
+  table.matrix tr:last-child td { border-bottom: none; }
+
+  .architecture-note {
+    margin-top: 24px; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; font-size: 14px; color: var(--text-muted);
+  }
+
+  /* ══════════ EXHIBIT: Roadmap ══════════ */
+  .roadmap { display: flex; flex-direction: column; margin-top: 8px; }
+  .roadmap-item {
+    display: grid; grid-template-columns: 100px 1fr; gap: 24px; padding: 26px 0; position: relative;
+  }
+  .roadmap-item + .roadmap-item { border-top: 1px solid var(--border); }
+  .roadmap-version {
+    font-family: var(--mono); font-size: 20px; color: var(--text-faint); padding-top: 2px;
+  }
+  .roadmap-item.now .roadmap-version { color: var(--accent-bright); }
+  .roadmap-body h3 { font-family: var(--serif); font-size: 19px; margin: 0 0 8px; font-weight: 400; }
+  .roadmap-body p { font-size: 14px; color: var(--text-muted); margin: 0 0 10px; max-width: 62ch; }
+  .status {
+    display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.04em; padding: 4px 10px; border-radius: 999px;
+  }
+  .status .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status.live { background: var(--accent-tint); color: var(--accent-bright); }
+  .status.live .dot { background: var(--accent-bright); }
+  .status.partial { background: var(--amber-tint); color: var(--amber); }
+  .status.partial .dot { background: var(--amber); }
+  .status.planned { background: var(--surface-2); color: var(--text-faint); border: 1px solid var(--border); }
+  .status.planned .dot { background: var(--text-faint); }
+
+  /* ── Closing ───────────────────────────────────────── */
+  .closing {
+    max-width: 740px; margin: 0 auto; padding: 72px 28px 120px; text-align: left;
+  }
+  .closing blockquote {
+    font-family: var(--serif); font-size: clamp(22px, 3.4vw, 30px); line-height: 1.4; margin: 0 0 28px;
+    color: var(--text); text-wrap: balance; border: none; padding: 0;
+  }
+  .closing .attribution { font-size: 13px; color: var(--text-faint); font-family: var(--mono); }
+
+  footer.doc-footer {
+    max-width: 740px; margin: 0 auto; padding: 0 28px 64px; font-size: 12.5px; color: var(--text-faint);
+    font-family: var(--mono); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<article>
+
+<div class="cover">
+  <p class="eyebrow">Documento estratégico · OrganizaPro Intelligence Engine · Visão 1.0</p>
+  <h1 class="title">O Diretor Digital</h1>
+  <p class="lede">Por que o OrganizaPro deixa de ser um sistema de gestão e passa a ser o colaborador que trabalha pelo negócio do cliente — antes, durante e depois do expediente.</p>
+  <div class="cover-meta">
+    <span><strong>Fase</strong> — 2 · Inteligência</span>
+    <span><strong>Status</strong> — Visão aprovada, sem implementação</span>
+    <span><strong>Escopo</strong> — Arquitetura, não código</span>
+  </div>
+</div>
+
+<section class="prose">
+  <p class="lead">Até aqui, construímos uma plataforma de gestão excelente: clientes, agenda, configurações, métricas, reputação. Cada peça funciona. Mas gestão sozinha não é mais suficiente — qualquer concorrente também organiza uma agenda.</p>
+  <p>O que nenhum concorrente tem é alguém <em>olhando</em> para os dados todos os dias e dizendo ao empresário exatamente o que fazer a seguir. É isso que este documento define: não uma funcionalidade nova, mas a identidade que vai guiar toda funcionalidade futura do OrganizaPro.</p>
+  <p>A regra que resume tudo abaixo: <strong>a IA não é o produto — ela é o motor invisível.</strong> O empresário nunca deve sentir que está conversando com um robô. Ele deve sentir que existe alguém cuidando do negócio dele em segundo plano, o tempo todo.</p>
+</section>
+
+<section class="prose">
+  <p class="num">01 · Identidade</p>
+  <h2>Quem é o Diretor Digital</h2>
+  <p class="section-kicker">Não é um assistente que espera comando. É um colaborador sênior que já chegou com o trabalho adiantado.</p>
+
+  <p>O Diretor Digital tem a postura de alguém que já revisou os números antes da reunião começar: <strong>direto, calmo, nunca alarmista, nunca bajulador</strong>. Ele não pergunta "como posso ajudar?" — ele já sabe, porque olhou os dados antes de o usuário abrir o sistema.</p>
+
+  <div class="voice-compare">
+    <div class="voice-card no">
+      <span class="tag">Chatbot genérico</span>
+      <p>"Olá! 👋 Como posso ajudar você hoje? Digite sua dúvida."</p>
+    </div>
+    <div class="voice-card yes">
+      <span class="tag">Diretor Digital</span>
+      <p>"3 clientes estão sem retorno há mais de 15 dias. Preparei as mensagens — quer revisar antes de enviar?"</p>
+    </div>
+  </div>
+
+  <p>Três traços não-negociáveis de linguagem: fala em <strong>números e nomes reais</strong>, nunca em generalidades ("melhore seu atendimento"); sempre termina com uma <strong>ação concreta</strong>, nunca só um diagnóstico; e assume o tom de quem <strong>já é dono do problema</strong> junto com o empresário, não de quem está terceirizado a ele.</p>
+</section>
+
+<section class="exhibit">
+  <div class="wide">
+    <p class="exhibit-label">02 · Rotina — Exhibit A</p>
+    <h2 class="exhibit-title">O que ele faz, hora a hora</h2>
+    <p class="section-kicker">O Diretor Digital nunca fica só esperando uma pergunta. Ele trabalha nos cinco momentos abaixo — inclusive quando ninguém está olhando.</p>
+
+    <div class="routine">
+      <div class="routine-node">
+        <div class="routine-dot">1</div>
+        <p class="routine-when">Abertura do sistema</p>
+        <p class="routine-what">O resumo do dia já está pronto quando a tela carrega. Nada de "carregando dados" — o trabalho de análise já aconteceu de madrugada.</p>
+      </div>
+      <div class="routine-node">
+        <div class="routine-dot">2</div>
+        <p class="routine-when">Durante o expediente</p>
+        <p class="routine-what">Observa a agenda em tempo real e sinaliza urgência assim que ela aparece: um atraso, uma confirmação pendente, um horário livre que podia virar receita.</p>
+      </div>
+      <div class="routine-node">
+        <div class="routine-dot">3</div>
+        <p class="routine-when">Enquanto o usuário trabalha</p>
+        <p class="routine-what">Continua observando fora da tela: uma resposta chegou no WhatsApp, um cliente marcou horário pelo site — tudo já entra na próxima leitura do painel.</p>
+      </div>
+      <div class="routine-node">
+        <div class="routine-dot">4</div>
+        <p class="routine-when">Ausente</p>
+        <p class="routine-what">Detecta o que ficaria esquecido sem ele: avaliação sem resposta, cliente que sumiu, compromisso sem confirmação — e já deixa a sugestão pronta.</p>
+      </div>
+      <div class="routine-node">
+        <div class="routine-dot">5</div>
+        <p class="routine-when">Durante a noite</p>
+        <p class="routine-what">Consolida o dia inteiro, recalcula tendências e prepara o resumo de amanhã. O ciclo recomeça sozinho.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="exhibit">
+  <div class="wide">
+    <p class="exhibit-label">03–04 · Fontes e entregas — Exhibit B</p>
+    <h2 class="exhibit-title">De onde vem a inteligência, para onde ela vai</h2>
+    <p class="section-kicker">Mesma arquitetura de sempre: dados de um lado, entregas do outro. O que muda com o tempo é só o que acontece no meio.</p>
+
+    <div class="conceptmap">
+      <div class="cm-col in">
+        <div class="cm-col-title">Fontes de dados</div>
+        <div class="chip">Clientes</div>
+        <div class="chip">Agenda &amp; compromissos</div>
+        <div class="chip">Configurações da empresa</div>
+        <div class="chip">WhatsApp</div>
+        <div class="chip">Avaliações &amp; reputação</div>
+        <div class="chip">Conteúdo publicado</div>
+        <div class="chip">Histórico de atendimentos</div>
+        <div class="chip">Métricas operacionais</div>
+        <div class="chip" style="opacity:.6">+ futuras integrações</div>
+      </div>
+
+      <div class="cm-arrow">↓</div>
+      <div class="cm-core">
+        <p class="core-name">Diretor Digital</p>
+        <p>Hoje: motor de regras de negócio.<br>Amanhã: IA generativa por trás da mesma interface.</p>
+      </div>
+      <div class="cm-arrow">↓</div>
+
+      <div class="cm-col out">
+        <div class="cm-col-title">O que ele entrega</div>
+        <div class="chip">Resumo do dia</div>
+        <div class="chip">Prioridades</div>
+        <div class="chip">Oportunidades</div>
+        <div class="chip">Riscos</div>
+        <div class="chip">Pendências</div>
+        <div class="chip">Sugestões</div>
+        <div class="chip">Produtividade</div>
+        <div class="chip">Relacionamento</div>
+        <div class="chip">Crescimento</div>
+        <div class="chip">Organização</div>
+      </div>
+    </div>
+
+    <div class="architecture-note">
+      Este mapa já existe em miniatura no produto: o card <strong>"Seu Plano para Hoje"</strong> do Dashboard já lê compromissos, pendências e clientes inativos para gerar prioridades, agenda e oportunidades. A "Consultoria do Dia" já gera recomendação a partir do mesmo tipo de dado. O Intelligence Engine não troca essa arquitetura — ele a expande.
+    </div>
+  </div>
+</section>
+
+<section class="exhibit">
+  <div class="wide">
+    <p class="num">05 · Segmentação</p>
+    <h2 class="exhibit-title" style="margin-bottom:10px;">Um motor, várias vozes</h2>
+    <p class="section-kicker">A arquitetura do Diretor Digital é única para todo cliente OrganizaPro. O que muda por segmento é a camada de configuração por cima dela — nunca o motor em si.</p>
+    <p class="exhibit-label">Exhibit C — Matriz de segmentos</p>
+    <div class="matrix-wrap">
+      <table class="matrix">
+        <thead>
+          <tr><th>Segmento</th><th>Indicador-chave</th><th>Exemplo de recomendação</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="segname">Advogado</td><td class="metric">prazos processuais</td><td class="rec">"O prazo do processo de {cliente} vence em 3 dias — nenhuma tarefa foi criada ainda."</td></tr>
+          <tr><td class="segname">Corretor de imóveis</td><td class="metric">visitas agendadas</td><td class="rec">"Esse imóvel está há 20 dias sem visita marcada. Que tal reativar o anúncio?"</td></tr>
+          <tr><td class="segname">Arquiteto</td><td class="metric">etapas de projeto</td><td class="rec">"A entrega do projeto de {cliente} está na etapa 'aprovação' há 12 dias — vale um follow-up."</td></tr>
+          <tr><td class="segname">Barbearia</td><td class="metric">recorrência de corte</td><td class="rec">"7 clientes que cortam a cada 20 dias não voltam há mais de 30. Envie um lembrete."</td></tr>
+          <tr><td class="segname">Consultor</td><td class="metric">horas vendidas vs. livres</td><td class="rec">"Terça e quinta estão com 40% da agenda livre essa semana — bom momento para prospectar."</td></tr>
+          <tr><td class="segname">Contador</td><td class="metric">obrigações por competência</td><td class="rec">"5 clientes têm entrega no dia 20. Nenhum documento foi recebido ainda."</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="architecture-note">
+      Precedente já em produção: o módulo de Conteúdo IA já troca linguagem e indicadores por "especialidade" (hoje travado em três nichos de saúde). É o mesmo mecanismo — generalizado para qualquer segmento — que sustenta esta tabela.
+    </div>
+  </div>
+</section>
+
+<section class="exhibit">
+  <div class="wide">
+    <p class="exhibit-label">06 · Roadmap — Exhibit D</p>
+    <h2 class="exhibit-title">Intelligence Roadmap</h2>
+    <p class="section-kicker">Cada versão adiciona uma camada de raciocínio. Nenhuma troca a interface que o cliente já conhece.</p>
+
+    <div class="roadmap">
+      <div class="roadmap-item now">
+        <div class="roadmap-version">1.0</div>
+        <div class="roadmap-body">
+          <h3>Resumo Inteligente</h3>
+          <p>O sistema lê os dados do dia e apresenta um panorama pronto, sem o usuário precisar perguntar nada.</p>
+          <span class="status live"><span class="dot"></span>em produção</span>
+        </div>
+      </div>
+      <div class="roadmap-item now">
+        <div class="roadmap-version">1.5</div>
+        <div class="roadmap-body">
+          <h3>Recomendações Inteligentes</h3>
+          <p>Cada situação vem com uma ação sugerida, não apenas um dado. Falta profundidade histórica e ajuste por segmento.</p>
+          <span class="status partial"><span class="dot"></span>parcialmente implementado</span>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-version">2.0</div>
+        <div class="roadmap-body">
+          <h3>Missão do Dia</h3>
+          <p>As recomendações deixam de ser uma lista e viram uma única missão priorizada — a coisa mais importante a fazer agora.</p>
+          <span class="status planned"><span class="dot"></span>planejado</span>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-version">3.0</div>
+        <div class="roadmap-body">
+          <h3>Diretor Digital</h3>
+          <p>IA generativa substitui o motor de regras por trás da mesma interface. O raciocínio ganha profundidade; a experiência do usuário não muda.</p>
+          <span class="status planned"><span class="dot"></span>planejado</span>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-version">4.0</div>
+        <div class="roadmap-body">
+          <h3>Automação Inteligente</h3>
+          <p>O Diretor Digital passa a agir — sempre com autorização prévia do usuário, nunca por conta própria.</p>
+          <span class="status planned"><span class="dot"></span>visão de longo prazo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="prose">
+  <p class="num">07 · Princípios</p>
+  <h2>Sete verbos que o definem</h2>
+  <p class="section-kicker">Toda funcionalidade nova precisa se encaixar em pelo menos um destes verbos. Nenhuma se encaixa em "responder".</p>
+
+  <div class="principles">
+    <div class="principle"><span class="mark">✓</span><span class="word">Trabalha</span><p>Age continuamente, não apenas quando chamado.</p></div>
+    <div class="principle"><span class="mark">✓</span><span class="word">Observa</span><p>Lê os dados antes de qualquer pergunta existir.</p></div>
+    <div class="principle"><span class="mark">✓</span><span class="word">Aprende</span><p>O padrão de cada negócio refina a próxima recomendação.</p></div>
+    <div class="principle"><span class="mark">✓</span><span class="word">Organiza</span><p>Transforma dado disperso em prioridade clara.</p></div>
+    <div class="principle"><span class="mark">✓</span><span class="word">Recomenda</span><p>Nunca entrega um número sem uma ação ao lado.</p></div>
+    <div class="principle"><span class="mark">✓</span><span class="word">Prioriza</span><p>Diz o que importa primeiro — não lista tudo igual.</p></div>
+    <div class="principle"><span class="mark">✓</span><span class="word">Antecipa</span><p>Sinaliza o problema antes de virar prejuízo.</p></div>
+  </div>
+</section>
+
+<section class="prose">
+  <p class="num">08 · Limites</p>
+  <h2>O que ele nunca faz</h2>
+  <p class="section-kicker">O limite é o que protege a confiança. Sem ele, "inteligente" vira "arriscado".</p>
+
+  <ul class="not-list">
+    <li><span class="x">✕</span> Não é um chatbot — não existe uma caixa de "digite sua pergunta" como produto principal.</li>
+    <li><span class="x">✕</span> Não substitui decisão humana — recomenda, quem decide é o empresário.</li>
+    <li><span class="x">✕</span> Não responde como advogado, contador ou qualquer profissional regulamentado — orienta gestão, não dá parecer técnico.</li>
+    <li><span class="x">✕</span> Não envia nada automaticamente sem autorização prévia do usuário.</li>
+    <li><span class="x">✕</span> Não inventa informação — se o dado não existe, ele diz que não existe.</li>
+  </ul>
+</section>
+
+<section class="prose">
+  <p class="num">09 · Diferencial</p>
+  <h2>Por que escolher o OrganizaPro</h2>
+  <p class="lead">Não é a resposta que cabe numa lista de funcionalidades. Sistema de agenda, todo concorrente tem. O que nenhum tem é alguém olhando para o negócio todos os dias e dizendo, antes de ser perguntado, o que fazer a seguir.</p>
+  <p>Um empresário não compra "um CRM com IA". Ele compra a sensação de que parou de administrar sozinho — que agora existe um colaborador que nunca tira férias, nunca esquece um cliente e nunca deixa uma oportunidade esfriar. O produto não é o software. É a tranquilidade de saber que alguém está de olho.</p>
+</section>
+
+<div class="closing">
+  <p class="num">10 · Conclusão</p>
+  <blockquote>"O OrganizaPro não organiza dados. Ele cuida do negócio enquanto o dono cuida do cliente."</blockquote>
+  <p class="attribution">— Objetivo final deste documento</p>
+  <footer style="margin-top:32px; font-size:14.5px; color:var(--text-muted); max-width:60ch;">
+    A partir de hoje, qualquer funcionalidade nova do OrganizaPro deve responder a uma pergunta antes de entrar em roadmap: <strong>isso faz o Diretor Digital trabalhar, observar, aprender, organizar, recomendar, priorizar ou antecipar?</strong> Se a resposta for não, não é Fase 2.
+  </footer>
+</div>
+
+<footer class="doc-footer">
+  <span>OrganizaPro Intelligence Engine</span>
+  <span>Documento de Visão · v1.0</span>
+</footer>
+
+</article>
