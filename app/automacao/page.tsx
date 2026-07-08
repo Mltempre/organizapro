@@ -130,8 +130,6 @@ export default function AutomacaoPage() {
   }
 
   // ── Filtros client-side ───────────────────────────────────────────────────
-  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-
   const cutoff: Date | null = (() => {
     if (filtroPeriodo === 'hoje') {
       const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -417,7 +415,7 @@ export default function AutomacaoPage() {
         {abaSelecionada === 'confirmacoes' && (
           <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid #2d3148', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9' }}>Confirmações de Consulta</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9' }}>Confirmações de Atendimento</div>
               <div style={{ fontSize: 12, color: '#64748b' }}>{confFiltradas.length} registro{confFiltradas.length !== 1 ? 's' : ''}</div>
             </div>
 

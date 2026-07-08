@@ -137,7 +137,7 @@ export default function RaioX() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 380, gap: 18 }}>
           <div style={{ width: 56, height: 56, border: "3px solid rgba(124,58,237,0.15)", borderTopColor: "#7c3aed", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
           <p style={{ color: "#7c3aed", fontSize: 15, fontWeight: 600, margin: 0 }}>Gerando sua análise executiva...</p>
-          <p style={{ color: "#334155", fontSize: 12, margin: 0 }}>O consultor inteligente está analisando os dados da sua clínica</p>
+          <p style={{ color: "#334155", fontSize: 12, margin: 0 }}>O consultor inteligente está analisando os dados do seu negócio</p>
         </div>
       </AdminShell>
     );
@@ -181,7 +181,7 @@ export default function RaioX() {
       trend: metricas.gestao.tendencia_confirmacao, color: "#22c55e",
     },
     {
-      icon: "👤", label: "Total de Pacientes", sub: "cadastrados",
+      icon: "👤", label: "Total de Clientes", sub: "cadastrados",
       value: metricas.pacientes.total.toString(),
       trend: null as number | null, color: "#00c896",
     },

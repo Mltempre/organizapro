@@ -13,8 +13,8 @@ const NAV = [
   { l:"Equipe",        h:"/site/equipe",       i:"👥", a:true },
   { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🦷"  },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏥"  },
+  { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
+  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
 ];
 
 const initials = (nome: string) => nome.trim().split(" ").filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join("");
@@ -33,14 +33,17 @@ export default function EquipeAdmin() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-    const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
-    if (!cu?.clinica_id) { setLoading(false); return; }
-    setClinicaId(cu.clinica_id);
-    const { data } = await supabase.from("clinica_equipe").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
-    setItens(data ?? []);
-    setLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
+      if (!cu?.clinica_id) { return; }
+      setClinicaId(cu.clinica_id);
+      const { data } = await supabase.from("clinica_equipe").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
+      setItens(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -133,7 +136,7 @@ export default function EquipeAdmin() {
               <div style={{ padding:"12px 14px" }}>
                 <div style={{ fontSize:14, fontWeight:700, color:"#f1f5f9", marginBottom:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{item.nome}</div>
                 {item.especialidade && <div style={{ fontSize:12, color:"#00c896", marginBottom:4 }}>{item.especialidade}</div>}
-                {item.cro && <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>CRO: {item.cro}</div>}
+                {item.cro && <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>{item.cro}</div>}
                 <div style={{ display:"flex", gap:5 }}>
                   <button onClick={() => mover(item,-1)} disabled={idx===0} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↑</button>
                   <button onClick={() => mover(item, 1)} disabled={idx===sorted.length-1} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↓</button>
@@ -166,9 +169,9 @@ export default function EquipeAdmin() {
             <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={e => e.target.files?.[0] && uploadFoto(e.target.files[0])} />
 
             {[
-              { label:"Nome *", key:"nome", placeholder:"Dr. João Silva" },
-              { label:"Especialidade", key:"especialidade", placeholder:"Ortodontia" },
-              { label:"CRO", key:"cro", placeholder:"CRO-SP 12345" },
+              { label:"Nome *", key:"nome", placeholder:"João Silva" },
+              { label:"Especialidade ou cargo", key:"especialidade", placeholder:"Ex: Direito Trabalhista, Corte Masculino..." },
+              { label:"Registro profissional (opcional)", key:"cro", placeholder:"Ex: OAB, CRP, CRC..." },
             ].map(f => (
               <div key={f.key} style={{ marginBottom:12 }}>
                 <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>{f.label}</label>
@@ -178,7 +181,7 @@ export default function EquipeAdmin() {
 
             <div style={{ marginBottom:22 }}>
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Mini descricao</label>
-              <textarea value={form.descricao} onChange={e => setForm(p => ({...p, descricao:e.target.value}))} placeholder="Especialista com 10 anos de experiencia..." className="input-field" style={{ resize:"vertical", minHeight:70 }} />
+              <textarea value={form.descricao} onChange={e => setForm(p => ({...p, descricao:e.target.value}))} placeholder="Profissional com 10 anos de experiencia..." className="input-field" style={{ resize:"vertical", minHeight:70 }} />
             </div>
 
             <div style={{ display:"flex", gap:10 }}>

@@ -1,15 +1,21 @@
 "use client";
 
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
 const nav = [
-  { l: "Central de Gestão", h: "/dashboard",  i: "⚡" },
-  { l: "Clientes",       h: "/pacientes",     i: "👤" },
-  { l: "Agenda",         h: "/agendamentos",  i: "📅" },
-  { l: "Raio-X",         h: "/raio-x",        i: "📊" },
-  { l: "Configurações",  h: "/configuracoes", i: "⚙️" },
+  { l: "Central de Gestão", h: "/dashboard",     i: "⚡" },
+  { l: "Clientes",          h: "/pacientes",     i: "👤" },
+  { l: "Agenda",            h: "/agendamentos",  i: "📅" },
+  { l: "Site",              h: "/site",          i: "🌐" },
+  { l: "Conteúdo IA",       h: "/conteudo",      i: "✍️" },
+  { l: "Chatbot",           h: "/chatbot",       i: "💬" },
+  { l: "Automação",         h: "/automacao",     i: "🤖" },
+  { l: "Reputação",         h: "/reputacao",     i: "⭐" },
+  { l: "Métricas",          h: "/metricas",      i: "📈" },
+  { l: "Raio-X",            h: "/raio-x",        i: "📊" },
+  { l: "Configurações",     h: "/configuracoes", i: "⚙️" },
 ];
 
 interface AdminShellProps {
@@ -31,9 +37,14 @@ export default function AdminShell({
   const router   = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
+  // Fecha o menu mobile ao trocar de rota — ajuste de estado durante o
+  // render (padrão recomendado pelo React para "resetar estado quando uma
+  // prop muda"), evitando o re-render extra de um useEffect.
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setSidebarOpen(false);
-  }, [pathname]);
+  }
 
   const navigate = (path: string) => {
     router.push(path);
@@ -168,7 +179,7 @@ export default function AdminShell({
         {/* Nav */}
         <nav style={{ flex: 1, padding: "12px 10px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
           {nav.map((item) => {
-            const active = pathname === item.h;
+            const active = pathname === item.h || pathname.startsWith(item.h + "/");
             return (
               <div
                 key={item.h}

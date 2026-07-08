@@ -6,15 +6,15 @@ import AdminShell from "../../components/AdminShell";
 
 type Item = { id: string; url: string; categoria: string; titulo: string | null; ordem: number; };
 
-const CATS = ["Fachada","Recepcao","Sala de Espera","Consultorio","Equipamentos","Equipe","Outros"];
+const CATS = ["Fachada","Recepcao","Sala de Espera","Espaco de Atendimento","Equipamentos","Equipe","Outros"];
 const NAV  = [
   { l:"Configuracoes", h:"/site",              i:"⚙️"  },
   { l:"Galeria",       h:"/site/galeria",      i:"📸", a:true },
   { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
   { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🦷"  },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏥"  },
+  { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
+  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
 ];
 
 export default function GaleriaAdmin() {
@@ -23,21 +23,24 @@ export default function GaleriaAdmin() {
   const [itens, setItens]         = useState<Item[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modal, setModal]         = useState<{ mode:"add"|"edit"; item?: Item }|null>(null);
-  const [form, setForm]           = useState({ url:"", categoria:"Consultorio", titulo:"" });
+  const [form, setForm]           = useState({ url:"", categoria:"Espaco de Atendimento", titulo:"" });
   const [uploading, setUploading] = useState(false);
   const [salvando, setSalvando]   = useState(false);
   const [erro, setErro]           = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-    const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
-    if (!cu?.clinica_id) { setLoading(false); return; }
-    setClinicaId(cu.clinica_id);
-    const { data } = await supabase.from("clinica_galeria").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
-    setItens(data ?? []);
-    setLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
+      if (!cu?.clinica_id) { return; }
+      setClinicaId(cu.clinica_id);
+      const { data } = await supabase.from("clinica_galeria").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
+      setItens(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -90,7 +93,7 @@ export default function GaleriaAdmin() {
   const sorted = [...itens].sort((a,b) => a.ordem - b.ordem);
 
   return (
-    <AdminShell title="Galeria de Fotos" subtitle="Fotos da clinica exibidas no site publico" actionLabel="+ Adicionar Foto" actionOnClick={() => { setForm({ url:"", categoria:"Consultorio", titulo:"" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Galeria de Fotos" subtitle="Fotos do negocio exibidas no site publico" actionLabel="+ Adicionar Foto" actionOnClick={() => { setForm({ url:"", categoria:"Espaco de Atendimento", titulo:"" }); setModal({ mode:"add" }); setErro(""); }}>
 
       {/* MODULE NAV */}
       <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
@@ -106,7 +109,7 @@ export default function GaleriaAdmin() {
       {!loading && itens.length === 0 && (
         <div className="panel" style={{ textAlign:"center", padding:"52px 20px" }}>
           <div style={{ fontSize:44, marginBottom:14 }}>📸</div>
-          <p style={{ color:"var(--muted)", margin:0, fontSize:15 }}>Nenhuma foto cadastrada ainda. Clique em "+ Adicionar Foto" para comecar.</p>
+          <p style={{ color:"var(--muted)", margin:0, fontSize:15 }}>Nenhuma foto cadastrada ainda. Clique em &ldquo;+ Adicionar Foto&rdquo; para comecar.</p>
         </div>
       )}
 

@@ -96,7 +96,6 @@ export default function ConfiguracoesPage() {
     setLoading(false);
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { carregar(); }, []);
 
   async function salvar() {
@@ -229,7 +228,7 @@ export default function ConfiguracoesPage() {
           <Feedback type="erro" message={erro} onClose={() => setErro('')} />
         )}
 
-        {/* Card — Informações da Clínica */}
+        {/* Card — Informações do Negócio */}
         <div style={card}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Informações do Negócio</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
@@ -308,7 +307,7 @@ export default function ConfiguracoesPage() {
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {[
-              { k: 'msg_lembrete',       l: 'Lembrete de Consulta'     },
+              { k: 'msg_lembrete',       l: 'Lembrete de Atendimento'  },
               { k: 'msg_confirmacao',    l: 'Confirmação de Presença'   },
               { k: 'msg_avaliacao',      l: 'Solicitação de Avaliação'  },
               { k: 'msg_reagendamento',  l: 'Reagendamento'             },

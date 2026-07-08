@@ -117,7 +117,7 @@ export function calcularIndice(inp: IndiceInput): IndiceResult {
     15
   );
 
-  // Atividade (0-15): volume de pacientes + histórico + tendência positiva
+  // Atividade (0-15): volume de clientes + histórico + tendência positiva
   let atividade = 0;
   if      (inp.totalPacientes >= 50) atividade += 8;
   else if (inp.totalPacientes >= 20) atividade += 5;

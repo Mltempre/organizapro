@@ -80,11 +80,11 @@ function montarResposta(topico: Topico, config: Config): string {
   switch (topico) {
     case "saudacao":
       return (
-        `Olá! Sou o Assistente Virtual da ClínicaFlow. 👋\n\n` +
-        `Ajudamos clínicas a:\n• Reduzir faltas com confirmações automáticas\n` +
+        `Olá! Sou o Assistente Virtual do OrganizaPro. 👋\n\n` +
+        `Ajudamos pequenos negócios a:\n• Reduzir faltas com confirmações automáticas\n` +
         `• Automatizar atendimentos via WhatsApp\n• Aumentar avaliações no Google\n\n` +
         `Posso te ajudar com:\n• Valores e planos\n• Demonstração gratuita\n` +
-        `• WhatsApp automático\n• Avaliações Google\n• Sites para clínicas\n\n` +
+        `• WhatsApp automático\n• Avaliações Google\n• Sites profissionais\n\n` +
         `Como posso te ajudar hoje?`
       );
     case "horario":
@@ -125,7 +125,7 @@ function montarResposta(topico: Topico, config: Config): string {
       return (
         `Posso ajudar com:\n\n` +
         `• Valores\n• Demonstração\n• WhatsApp automático\n` +
-        `• Avaliações Google\n• Sites para clínicas\n\n` +
+        `• Avaliações Google\n• Sites profissionais\n\n` +
         `Qual assunto você gostaria de conhecer?`
       );
   }
@@ -184,11 +184,11 @@ function perguntaSDR(lead: Lead): string | null {
   if (!lead.nome)
     return "\n\nPara personalizar melhor o atendimento: qual é o seu nome?";
   if (!lead.cidade)
-    return `\n\n${lead.nome}, em qual cidade sua clínica está?`;
+    return `\n\n${lead.nome}, em qual cidade seu negócio está?`;
   if (!lead.especialidade)
-    return `\n\nE qual é a especialidade da sua clínica, ${lead.nome}?`;
+    return `\n\nE qual é o segmento do seu negócio, ${lead.nome}?`;
   if (!lead.pacientes_mes)
-    return `\n\nQuantos pacientes sua clínica atende por mês, ${lead.nome}?`;
+    return `\n\nQuantos clientes seu negócio atende por mês, ${lead.nome}?`;
   if (!lead.sistema_atual)
     return (
       `\n\n${lead.nome}, você já utiliza algum sistema atualmente?\n\n` +
@@ -198,7 +198,7 @@ function perguntaSDR(lead: Lead): string | null {
     return (
       `\n\nÚltima pergunta, ${lead.nome}: o que você gostaria de melhorar hoje?\n\n` +
       `• Reduzir faltas\n• Organizar WhatsApp\n• Mais avaliações Google\n` +
-      `• Site profissional\n• Atrair mais pacientes\n• Melhorar Instagram`
+      `• Site profissional\n• Atrair mais clientes\n• Melhorar Instagram`
     );
   return null;
 }
@@ -220,7 +220,7 @@ function normalizarDorPrincipal(dor: string): string {
   if (/whatsapp|automatiz|mensagem auto/.test(d))                              return "whatsapp";
   if (/avalia|google|estrela|reputac|nota|maps/.test(d))                       return "google";
   if (/site|land|pagina|web/.test(d))                                          return "site";
-  if (/instagram|post|social|conteudo|marketing|atrair|novo paciente/.test(d)) return "marketing";
+  if (/instagram|post|social|conteudo|marketing|atrair|novo cliente|novo paciente/.test(d)) return "marketing";
   if (/organiz|gestao|controle|sistema|caos/.test(d))                          return "organizacao";
   return "outro";
 }
@@ -232,19 +232,19 @@ function respostaPorDor(dor: string, lead: Lead): string {
 
   let solucao = "";
   if (/falta|confirma|lembrete|ocupa|agenda/.test(d)) {
-    solucao = "A ClínicaFlow envia confirmações e lembretes automáticos pelo WhatsApp — reduzindo faltas e mantendo a agenda ocupada sem esforço da equipe.";
+    solucao = "O OrganizaPro envia confirmações e lembretes automáticos pelo WhatsApp — reduzindo faltas e mantendo a agenda ocupada sem esforço da equipe.";
   } else if (/whatsapp|automatiz|mensagem/.test(d)) {
-    solucao = "O WhatsApp automático da ClínicaFlow organiza confirmações, lembretes e conta com chatbot IA que responde pacientes 24h.";
+    solucao = "O WhatsApp automático do OrganizaPro organiza confirmações, lembretes e conta com chatbot IA que responde clientes 24h.";
   } else if (/avalia|google|estrela|reputac|nota|maps/.test(d)) {
-    solucao = "A ClínicaFlow solicita avaliações Google automaticamente após cada atendimento — via WhatsApp, com 1 clique para o paciente.";
+    solucao = "O OrganizaPro solicita avaliações Google automaticamente após cada atendimento — via WhatsApp, com 1 clique para o cliente.";
   } else if (/site|land|pagina|web/.test(d)) {
-    solucao = "Temos Site Premium (R$ 999) e Landing Page Express (R$ 497) criados especificamente para clínicas — com WhatsApp integrado e SEO local.";
-  } else if (/paciente|atrair|marketing|novo|crescer/.test(d)) {
-    solucao = "A Presença Digital Premium (a partir de R$ 697/mês) combina Google, Instagram e site para atrair novos pacientes continuamente.";
+    solucao = "Temos Site Premium (R$ 999) e Landing Page Express (R$ 497) criados para qualquer negócio — com WhatsApp integrado e SEO local.";
+  } else if (/cliente|paciente|atrair|marketing|novo|crescer/.test(d)) {
+    solucao = "A Presença Digital Premium (a partir de R$ 697/mês) combina Google, Instagram e site para atrair novos clientes continuamente.";
   } else if (/instagram|post|social|conteudo/.test(d)) {
-    solucao = "O Instagram IA (R$ 197 a R$ 397/mês) cria 12 posts mensais profissionais para clínicas — sem você precisar criar nada.";
+    solucao = "O Instagram IA (R$ 197 a R$ 397/mês) cria 12 posts mensais profissionais para o seu negócio — sem você precisar criar nada.";
   } else {
-    solucao = "A ClínicaFlow tem a solução certa para a sua necessidade!";
+    solucao = "O OrganizaPro tem a solução certa para a sua necessidade!";
   }
 
   // Resumo do lead qualificado
@@ -252,8 +252,8 @@ function respostaPorDor(dor: string, lead: Lead): string {
   const linhas: string[] = [];
   if (lead.nome)          linhas.push(`👤 Nome: ${lead.nome}`);
   if (lead.cidade)        linhas.push(`📍 Cidade: ${lead.cidade}`);
-  if (lead.especialidade) linhas.push(`🏥 Especialidade: ${lead.especialidade}`);
-  if (lead.pacientes_mes) linhas.push(`👥 Pacientes/mês: ${lead.pacientes_mes}`);
+  if (lead.especialidade) linhas.push(`🏢 Segmento: ${lead.especialidade}`);
+  if (lead.pacientes_mes) linhas.push(`👥 Clientes/mês: ${lead.pacientes_mes}`);
   if (lead.sistema_atual) linhas.push(`💻 Sistema atual: ${lead.sistema_atual}`);
   linhas.push(`🎯 Necessidade: ${dorLabel}`);
 
@@ -264,7 +264,7 @@ function respostaPorDor(dor: string, lead: Lead): string {
     `Perfeito${nome ? `, ${nome}` : ""}! Com base no que você me contou:\n\n` +
     `${resumo}\n\n` +
     `${solucao}\n\n` +
-    `Acredito que a ClínicaFlow pode ajudar bastante sua clínica.\n\n` +
+    `Acredito que o OrganizaPro pode ajudar bastante o seu negócio.\n\n` +
     `Deseja agendar uma demonstração gratuita com nosso time?\n\n` +
     `📱 WhatsApp: 41 98837-9119\n\n` +
     `Em 30 minutos você vê tudo funcionando na prática — sem compromisso!`
@@ -302,21 +302,21 @@ function processarColetaSDR(etapa: Etapa, mensagem: string, lead: Lead): ColetaR
       console.log("[CHATBOT] próxima etapa", proximaEtapa);
       return {
         updates:      { nome },
-        resposta:     `Prazer, ${nome}! 😊\n\nEm qual cidade sua clínica está?`,
+        resposta:     `Prazer, ${nome}! 😊\n\nEm qual cidade seu negócio está?`,
         proximaEtapa,
       };
     }
     case "qualificacao_cidade":
       return {
         updates:      { cidade: valor },
-        resposta:     `Ótimo! E qual é a especialidade da sua clínica?\n\n(dentista, médico, fisioterapeuta, psicólogo, nutricionista, estética...)`,
+        resposta:     `Ótimo! E qual é o segmento do seu negócio?\n\n(advogado, barbearia, psicólogo, fisioterapeuta, contador, estética, consultoria...)`,
         proximaEtapa: "qualificacao_especialidade",
       };
     case "qualificacao_especialidade": {
       const nome = lead.nome ? `, ${lead.nome}` : "";
       return {
         updates:      { especialidade: valor },
-        resposta:     `Perfeito${nome}! Atendemos muitas clínicas de ${valor}. 🏥\n\nQuantos pacientes sua clínica atende por mês, aproximadamente?`,
+        resposta:     `Perfeito${nome}! Atendemos muitos negócios de ${valor}. 🏢\n\nQuantos clientes seu negócio atende por mês, aproximadamente?`,
         proximaEtapa: "qualificacao_pacientes",
       };
     }
@@ -326,7 +326,7 @@ function processarColetaSDR(etapa: Etapa, mensagem: string, lead: Lead): ColetaR
       return {
         updates: { pacientes_mes: valor, porte_clinica: porte },
         resposta: (
-          `Com esse volume de pacientes${nome}, a ClínicaFlow pode gerar impacto real. 📈\n\n` +
+          `Com esse volume de clientes${nome}, o OrganizaPro pode gerar impacto real. 📈\n\n` +
           `Você já utiliza algum sistema atualmente?\n\n` +
           `• Planilha\n• Agenda de papel\n• Outro sistema\n• Nenhum`
         ),
@@ -337,17 +337,17 @@ function processarColetaSDR(etapa: Etapa, mensagem: string, lead: Lead): ColetaR
       const nome = lead.nome ? `, ${lead.nome}` : "";
       const s    = normalizar(valor);
       let contexto = "";
-      if (/planilha|excel|sheets/.test(s))     contexto = "Com planilhas, a confirmação de consultas precisa ser feita manualmente. A ClínicaFlow automatiza exatamente isso.";
-      else if (/papel|caderno|anotac/.test(s)) contexto = "Migrar de papel para digital com a ClínicaFlow é simples — nossa equipe cuida de tudo na implantação.";
-      else if (/outro|sistema|software/.test(s)) contexto = "A ClínicaFlow pode complementar o que você já usa, adicionando WhatsApp automático e avaliações Google.";
-      else                                      contexto = "Perfeito! Começar do zero com a ClínicaFlow é ainda mais simples — sem migração de dados necessária.";
+      if (/planilha|excel|sheets/.test(s))     contexto = "Com planilhas, a confirmação de atendimentos precisa ser feita manualmente. O OrganizaPro automatiza exatamente isso.";
+      else if (/papel|caderno|anotac/.test(s)) contexto = "Migrar de papel para digital com o OrganizaPro é simples — nossa equipe cuida de tudo na implantação.";
+      else if (/outro|sistema|software/.test(s)) contexto = "O OrganizaPro pode complementar o que você já usa, adicionando WhatsApp automático e avaliações Google.";
+      else                                      contexto = "Perfeito! Começar do zero com o OrganizaPro é ainda mais simples — sem migração de dados necessária.";
       return {
         updates:  { sistema_atual: valor },
         resposta: (
           `Entendi${nome}! ${contexto}\n\n` +
           `O que você gostaria de melhorar hoje?\n\n` +
           `• Reduzir faltas\n• Organizar WhatsApp\n• Mais avaliações Google\n` +
-          `• Ter um site profissional\n• Atrair mais pacientes\n• Melhorar Instagram`
+          `• Ter um site profissional\n• Atrair mais clientes\n• Melhorar Instagram`
         ),
         proximaEtapa: "descoberta_dor",
       };

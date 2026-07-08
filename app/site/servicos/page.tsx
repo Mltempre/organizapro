@@ -13,19 +13,19 @@ const NAV = [
   { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
   { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🦷", a:true },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏥"  },
+  { l:"Servicos",      h:"/site/servicos",     i:"🛠️", a:true },
+  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
 ];
 
 const ICONS = [
-  { key:"tooth",       emoji:"🦷", label:"Dente"      },
-  { key:"smile",       emoji:"😊", label:"Sorriso"    },
-  { key:"gem",         emoji:"💎", label:"Estetica"   },
-  { key:"microscope",  emoji:"🔬", label:"Implante"   },
-  { key:"shield",      emoji:"🛡️", label:"Protese"    },
-  { key:"sparkle",     emoji:"✨", label:"Limpeza"    },
-  { key:"heart",       emoji:"❤️", label:"Cuidado"    },
-  { key:"clinic",      emoji:"🏥", label:"Clinica"    },
+  { key:"tooth",       emoji:"⭐", label:"Destaque"    },
+  { key:"smile",       emoji:"😊", label:"Atendimento" },
+  { key:"gem",         emoji:"💎", label:"Premium"     },
+  { key:"microscope",  emoji:"🔍", label:"Detalhes"    },
+  { key:"shield",      emoji:"🛡️", label:"Garantia"    },
+  { key:"sparkle",     emoji:"✨", label:"Especial"    },
+  { key:"heart",       emoji:"❤️", label:"Cuidado"     },
+  { key:"clinic",      emoji:"🏢", label:"Negocio"     },
 ];
 
 const ICON_COLORS: Record<string, string> = {
@@ -47,14 +47,17 @@ export default function ServicosAdmin() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-    const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
-    if (!cu?.clinica_id) { setLoading(false); return; }
-    setClinicaId(cu.clinica_id);
-    const { data } = await supabase.from("clinica_servicos").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
-    setItens(data ?? []);
-    setLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
+      if (!cu?.clinica_id) { return; }
+      setClinicaId(cu.clinica_id);
+      const { data } = await supabase.from("clinica_servicos").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
+      setItens(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -109,7 +112,7 @@ export default function ServicosAdmin() {
   const cor = (icone: string) => ICON_COLORS[icone] ?? "#00c896";
 
   return (
-    <AdminShell title="Servicos" subtitle="Tratamentos e servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Servicos" subtitle="Servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"" }); setModal({ mode:"add" }); setErro(""); }}>
 
       <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
         {NAV.map(m => (
@@ -123,8 +126,8 @@ export default function ServicosAdmin() {
 
       {!loading && itens.length === 0 && (
         <div className="panel" style={{ textAlign:"center", padding:"52px 20px" }}>
-          <div style={{ fontSize:44, marginBottom:14 }}>🦷</div>
-          <p style={{ color:"var(--muted)", margin:0, fontSize:15 }}>Nenhum servico cadastrado. Adicione seus tratamentos para exibir no site.</p>
+          <div style={{ fontSize:44, marginBottom:14 }}>🛠️</div>
+          <p style={{ color:"var(--muted)", margin:0, fontSize:15 }}>Nenhum servico cadastrado. Adicione seus servicos para exibir no site.</p>
         </div>
       )}
 
@@ -140,7 +143,7 @@ export default function ServicosAdmin() {
               <div style={{ padding:"14px 14px 10px" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
                   <div style={{ width:38, height:38, borderRadius:10, background:`${cor(item.icone)}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
-                    {ICONS.find(i => i.key === item.icone)?.emoji ?? "🦷"}
+                    {ICONS.find(i => i.key === item.icone)?.emoji ?? "🛠️"}
                   </div>
                   <div style={{ fontSize:14, fontWeight:700, color:"#f1f5f9" }}>{item.nome}</div>
                 </div>
@@ -189,11 +192,11 @@ export default function ServicosAdmin() {
 
             <div style={{ marginBottom:12 }}>
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Nome do servico *</label>
-              <input value={form.nome} onChange={e => setForm(p => ({...p, nome:e.target.value}))} placeholder="Ex: Clareamento Dental" className="input-field" />
+              <input value={form.nome} onChange={e => setForm(p => ({...p, nome:e.target.value}))} placeholder="Ex: Corte de Cabelo, Consultoria Financeira..." className="input-field" />
             </div>
             <div style={{ marginBottom:22 }}>
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Descricao</label>
-              <textarea value={form.descricao} onChange={e => setForm(p => ({...p, descricao:e.target.value}))} placeholder="Resultados visíveis em até 2 sessões..." className="input-field" style={{ resize:"vertical", minHeight:70 }} />
+              <textarea value={form.descricao} onChange={e => setForm(p => ({...p, descricao:e.target.value}))} placeholder="Descreva o que torna esse servico especial..." className="input-field" style={{ resize:"vertical", minHeight:70 }} />
             </div>
 
             <div style={{ display:"flex", gap:10 }}>

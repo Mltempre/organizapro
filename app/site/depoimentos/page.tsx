@@ -13,8 +13,8 @@ const NAV = [
   { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
   { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬", a:true },
-  { l:"Servicos",      h:"/site/servicos",     i:"🦷"  },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏥"  },
+  { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
+  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
 ];
 
 const AVATAR_COLORS = ["#00c896","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#06b6d4"];
@@ -33,14 +33,17 @@ export default function DepoimentosAdmin() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-    const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
-    if (!cu?.clinica_id) { setLoading(false); return; }
-    setClinicaId(cu.clinica_id);
-    const { data } = await supabase.from("clinica_depoimentos").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
-    setItens(data ?? []);
-    setLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
+      if (!cu?.clinica_id) { return; }
+      setClinicaId(cu.clinica_id);
+      const { data } = await supabase.from("clinica_depoimentos").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
+      setItens(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -59,7 +62,7 @@ export default function DepoimentosAdmin() {
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { setErro("Informe o nome do paciente."); return; }
+    if (!form.nome.trim()) { setErro("Informe o nome do cliente."); return; }
     if (!form.comentario.trim()) { setErro("Informe o comentario."); return; }
     setSalvando(true); setErro("");
     const payload = { clinica_id:clinicaId, nome:form.nome.trim(), cidade:form.cidade.trim()||null, comentario:form.comentario.trim(), nota:form.nota, foto_url:form.foto_url||null };
@@ -95,7 +98,7 @@ export default function DepoimentosAdmin() {
   const sorted = [...itens].sort((a,b) => a.ordem - b.ordem);
 
   return (
-    <AdminShell title="Depoimentos" subtitle="Avaliacoes de pacientes exibidas no site" actionLabel="+ Adicionar Depoimento" actionOnClick={() => { setForm({ nome:"", cidade:"", comentario:"", nota:5, foto_url:"" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Depoimentos" subtitle="Avaliacoes de clientes exibidas no site" actionLabel="+ Adicionar Depoimento" actionOnClick={() => { setForm({ nome:"", cidade:"", comentario:"", nota:5, foto_url:"" }); setModal({ mode:"add" }); setErro(""); }}>
 
       <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
         {NAV.map(m => (
@@ -123,7 +126,7 @@ export default function DepoimentosAdmin() {
                 <span style={{ fontSize:11, color:"#64748b", marginLeft:4 }}>{item.nota}/5</span>
               </div>
               <p style={{ fontSize:13, color:"rgba(255,255,255,0.65)", lineHeight:1.65, margin:"0 0 14px", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical" as const, overflow:"hidden", fontStyle:"italic" }}>
-                "{item.comentario}"
+                &ldquo;{item.comentario}&rdquo;
               </p>
               <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                 {item.foto_url
@@ -168,7 +171,7 @@ export default function DepoimentosAdmin() {
 
             {/* Foto (opcional) */}
             <div style={{ marginBottom:16 }}>
-              <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Foto do paciente (opcional)</label>
+              <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Foto do cliente (opcional)</label>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div onClick={() => fileRef.current?.click()} style={{ width:56, height:56, borderRadius:"50%", border:"2px dashed rgba(255,255,255,0.12)", cursor:"pointer", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(255,255,255,0.02)", position:"relative", flexShrink:0 }}>
                   {form.foto_url ? <img src={form.foto_url} alt="avatar" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : <span style={{ fontSize:20, color:"#334155" }}>👤</span>}
@@ -180,7 +183,7 @@ export default function DepoimentosAdmin() {
             </div>
 
             {[
-              { label:"Nome do paciente *", key:"nome", placeholder:"Ana Carolina" },
+              { label:"Nome do cliente *", key:"nome", placeholder:"Ana Carolina" },
               { label:"Cidade", key:"cidade", placeholder:"Sao Paulo, SP" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom:12 }}>

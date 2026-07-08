@@ -13,9 +13,25 @@ const NAV = [
   { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
   { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨", a:true },
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🦷"  },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏥"  },
+  { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
+  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
 ];
+
+function ImgSlot({ url, loading: isLoading, label, onClick, color }: { url:string; loading:boolean; label:string; onClick:()=>void; color:string }) {
+  return (
+    <div onClick={onClick} style={{ flex:1, border:"2px dashed rgba(255,255,255,0.10)", borderRadius:10, overflow:"hidden", cursor:"pointer", position:"relative", height:140, display:"flex", alignItems:"center", justifyContent:"center", background: url ? "transparent" : "rgba(255,255,255,0.02)" }}>
+      {url ? <img src={url} alt={label} style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : (
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, color:"#475569", padding:8, textAlign:"center" }}>
+          <span style={{ fontSize:24, filter:`hue-rotate(${color === "green" ? "0" : "180"}deg)` }}>{label === "Antes" ? "🙁" : "😊"}</span>
+          <span style={{ fontSize:11, fontWeight:700, color: color === "green" ? "#00c896" : "#94a3b8", textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</span>
+          <span style={{ fontSize:10, color:"#334155" }}>Clique para enviar</span>
+        </div>
+      )}
+      {isLoading && <div style={{ position:"absolute", inset:0, background:"rgba(10,13,20,0.82)", display:"flex", alignItems:"center", justifyContent:"center", color:"#c4b5fd", fontSize:13 }}>Enviando...</div>}
+      <div style={{ position:"absolute", top:6, left:6, background:color === "green" ? "rgba(0,200,150,0.15)" : "rgba(255,255,255,0.10)", borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700, color: color === "green" ? "#00c896" : "rgba(255,255,255,0.5)", textTransform:"uppercase" }}>{label}</div>
+    </div>
+  );
+}
 
 export default function AntesDepoisAdmin() {
   const router = useRouter();
@@ -32,14 +48,17 @@ export default function AntesDepoisAdmin() {
   const depoisRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-    const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
-    if (!cu?.clinica_id) { setLoading(false); return; }
-    setClinicaId(cu.clinica_id);
-    const { data } = await supabase.from("clinica_antes_depois").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
-    setItens(data ?? []);
-    setLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
+      if (!cu?.clinica_id) { return; }
+      setClinicaId(cu.clinica_id);
+      const { data } = await supabase.from("clinica_antes_depois").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
+      setItens(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -92,20 +111,6 @@ export default function AntesDepoisAdmin() {
   }
 
   const sorted = [...itens].sort((a,b) => a.ordem - b.ordem);
-
-  const ImgSlot = ({ url, loading: isLoading, label, onClick, color }: { url:string; loading:boolean; label:string; onClick:()=>void; color:string }) => (
-    <div onClick={onClick} style={{ flex:1, border:"2px dashed rgba(255,255,255,0.10)", borderRadius:10, overflow:"hidden", cursor:"pointer", position:"relative", height:140, display:"flex", alignItems:"center", justifyContent:"center", background: url ? "transparent" : "rgba(255,255,255,0.02)" }}>
-      {url ? <img src={url} alt={label} style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : (
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, color:"#475569", padding:8, textAlign:"center" }}>
-          <span style={{ fontSize:24, filter:`hue-rotate(${color === "green" ? "0" : "180"}deg)` }}>{label === "Antes" ? "🙁" : "😊"}</span>
-          <span style={{ fontSize:11, fontWeight:700, color: color === "green" ? "#00c896" : "#94a3b8", textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</span>
-          <span style={{ fontSize:10, color:"#334155" }}>Clique para enviar</span>
-        </div>
-      )}
-      {isLoading && <div style={{ position:"absolute", inset:0, background:"rgba(10,13,20,0.82)", display:"flex", alignItems:"center", justifyContent:"center", color:"#c4b5fd", fontSize:13 }}>Enviando...</div>}
-      <div style={{ position:"absolute", top:6, left:6, background:color === "green" ? "rgba(0,200,150,0.15)" : "rgba(255,255,255,0.10)", borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:700, color: color === "green" ? "#00c896" : "rgba(255,255,255,0.5)", textTransform:"uppercase" }}>{label}</div>
-    </div>
-  );
 
   return (
     <AdminShell title="Antes e Depois" subtitle="Casos de transformacao exibidos no site" actionLabel="+ Adicionar Caso" actionOnClick={() => { setForm({ antes_url:"", depois_url:"", titulo:"", descricao:"" }); setModal({ mode:"add" }); setErro(""); }}>
@@ -169,7 +174,7 @@ export default function AntesDepoisAdmin() {
 
             <div style={{ marginBottom:12 }}>
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Titulo do caso *</label>
-              <input value={form.titulo} onChange={e => setForm(p => ({...p, titulo:e.target.value}))} placeholder="Ex: Clareamento Dental" className="input-field" />
+              <input value={form.titulo} onChange={e => setForm(p => ({...p, titulo:e.target.value}))} placeholder="Ex: Organizacao Financeira" className="input-field" />
             </div>
             <div style={{ marginBottom:22 }}>
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Descricao (opcional)</label>

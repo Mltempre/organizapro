@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
           messages: [
             {
               role: "system",
-              content: "Você é um especialista em marketing para clínicas. Crie conteúdos em português do Brasil, com linguagem persuasiva, profissional e pronta para Instagram.",
+              content: "Você é um especialista em marketing para pequenos e médios negócios. Crie conteúdos em português do Brasil, com linguagem persuasiva, profissional e pronta para Instagram.",
             },
             { role: "user", content: prompt },
           ],

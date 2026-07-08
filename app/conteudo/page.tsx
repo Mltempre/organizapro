@@ -18,34 +18,23 @@ const OBJETIVOS = [
   { id: "servico",    icon: "📢", label: "Promover um serviço" },
 ];
 
-const ESPECIALIDADES = [
-  {
-    id: "dentista",
-    icon: "🦷",
-    label: "Dentista",
-    chips: ["Implantes", "Lentes", "Ortodontia", "Clareamento", "Limpeza", "Harmonização", "Próteses", "Odontologia Estética"],
-    procedimentosPrompt: "Implantes Dentários, Lentes de Contato Dental, Ortodontia, Clareamento Dental, Limpeza Profissional, Harmonização Facial, Próteses Dentárias, Odontologia Estética",
-  },
-  {
-    id: "estetica",
-    icon: "✨",
-    label: "Estética",
-    chips: ["Botox", "Bioestimuladores", "Laser", "Peeling", "Limpeza de Pele", "Preenchimento", "Emagrecimento", "Harmonização"],
-    procedimentosPrompt: "Botox, Bioestimuladores de Colágeno, Laser Facial, Peeling Químico, Limpeza de Pele Profunda, Preenchimento Labial e Facial, Emagrecimento, Harmonização Facial",
-  },
-  {
-    id: "dermatologista",
-    icon: "🩺",
-    label: "Dermatologista",
-    chips: ["Acne", "Melasma", "Toxina Botulínica", "Laser", "Rejuvenescimento", "Queda de cabelo", "Câncer de pele", "Doenças da pele"],
-    procedimentosPrompt: "Tratamento de Acne, Melasma, Toxina Botulínica Dermatológica, Laser Dermatológico, Rejuvenescimento Facial, Queda de Cabelo, Prevenção ao Câncer de Pele, Doenças da Pele",
-  },
+const CATEGORIAS = [
+  { id: "venda",          icon: "💰", label: "Venda",          chips: ["Conversão", "Oferta", "Fechamento"] },
+  { id: "atendimento",    icon: "🤝", label: "Atendimento",    chips: ["Cuidado", "Suporte", "Experiência"] },
+  { id: "relacionamento", icon: "❤️", label: "Relacionamento", chips: ["Fidelização", "Proximidade", "Confiança"] },
+  { id: "promocao",       icon: "🎉", label: "Promoção",       chips: ["Oferta especial", "Tempo limitado", "Desconto"] },
+  { id: "dicas",          icon: "💡", label: "Dicas",          chips: ["Educativo", "Útil", "Prático"] },
+  { id: "autoridade",     icon: "🏆", label: "Autoridade",     chips: ["Experiência", "Expertise", "Credibilidade"] },
+  { id: "redes",          icon: "📱", label: "Redes Sociais",  chips: ["Engajamento", "Alcance", "Instagram"] },
+  { id: "campanhas",      icon: "📣", label: "Campanhas",      chips: ["Data especial", "Sazonal", "Tema"] },
+  { id: "google",         icon: "⭐", label: "Google",         chips: ["Avaliações", "Reputação", "Prova social"] },
+  { id: "whatsapp",       icon: "💬", label: "WhatsApp",       chips: ["Contato direto", "Agendamento", "Conversa"] },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Objetivo      = typeof OBJETIVOS[number];
-type Especialidade = typeof ESPECIALIDADES[number];
+type Objetivo  = typeof OBJETIVOS[number];
+type Categoria = typeof CATEGORIAS[number];
 
 type ConteudoResult = {
   gancho:           string;
@@ -64,16 +53,18 @@ type ConteudoResult = {
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-function buildPrompt(obj: Objetivo, esp: Especialidade): string {
-  return `Você é um consultor especializado em marketing digital para clínicas de ${esp.label}, contratado pelo OrganizaPro. Crie conteúdos de alta conversão para Instagram de clínicas premium.
+function buildPrompt(obj: Objetivo, cat: Categoria, oferta: string): string {
+  const contexto = oferta.trim()
+    ? `\nO que este negócio oferece: ${oferta.trim()}`
+    : "";
+  return `Você é um consultor especializado em marketing digital para pequenos e médios negócios, contratado pelo OrganizaPro. Crie conteúdos de alta conversão para Instagram.
 
 Objetivo deste post: ${obj.label}
-Especialidade: ${esp.label}
-Procedimentos: ${esp.procedimentosPrompt}
+Tipo de conteúdo: ${cat.label}${contexto}
 
 Retorne SOMENTE JSON puro, sem markdown, sem texto adicional:
 
-{"gancho":"frase de abertura que paralisa o scroll (máximo 12 palavras, sem emojis, afirmativa e forte)","legenda":"corpo da legenda entre 130 e 180 palavras — linguagem consultiva, cite ao menos 1 procedimento específico, autoridade, máximo 3 emojis, SEM gancho e SEM CTA, termine com ponto final","cta_whatsapp":"CTA elegante para WhatsApp em 1 frase direta e convertedora","sugestao_imagem":"descreva exatamente a foto ou vídeo ideal: o que mostrar, ângulo, iluminação, ambiente e expressões — nunca genérico","hashtags_grandes":["8 hashtags reais acima de 100k seguidores como #odontologia #dentes #saude"],"hashtags_medias":["9 hashtags entre 10k e 100k como #clareamentodental #implantesdentarios"],"hashtags_nicho":["8 hashtags de micro-nicho abaixo de 10k como #implantesdentariossp #ortodontiaestetica"],"melhor_horario":"dia da semana, horário ideal e justificativa curta em 1 frase","objetivo_post":"Alcance, Engajamento, Conversão ou Autoridade — explique em 1 frase por que este post atende esse objetivo","tom":"descreva em até 6 palavras ex: Educativo com autoridade clínica","dica_marketing":"1 dica não óbvia para aumentar o desempenho deste post — algo que profissionais de marketing premium de clínicas fazem","proxima_ideia":"qual seria o próximo post estratégico para esta clínica — diga o formato e o tema específico em 1 frase inspiradora"}
+{"gancho":"frase de abertura que paralisa o scroll (máximo 12 palavras, sem emojis, afirmativa e forte)","legenda":"corpo da legenda entre 130 e 180 palavras — linguagem consultiva, autoridade, máximo 3 emojis, SEM gancho e SEM CTA, termine com ponto final","cta_whatsapp":"CTA elegante para WhatsApp em 1 frase direta e convertedora","sugestao_imagem":"descreva exatamente a foto ou vídeo ideal: o que mostrar, ângulo, iluminação, ambiente e expressões — nunca genérico","hashtags_grandes":["8 hashtags reais e populares no segmento deste negócio, acima de 100k publicações"],"hashtags_medias":["9 hashtags de nicho do segmento, entre 10k e 100k publicações"],"hashtags_nicho":["8 hashtags de micro-nicho bem específicas do negócio, abaixo de 10k publicações"],"melhor_horario":"dia da semana, horário ideal e justificativa curta em 1 frase","objetivo_post":"Alcance, Engajamento, Conversão ou Autoridade — explique em 1 frase por que este post atende esse objetivo","tom":"descreva em até 6 palavras ex: Educativo com autoridade","dica_marketing":"1 dica não óbvia para aumentar o desempenho deste post","proxima_ideia":"qual seria o próximo post estratégico para este negócio — diga o formato e o tema específico em 1 frase inspiradora"}
 
 Regras: português do Brasil, nunca genérico, foco em autoridade e conversão, nunca mencione preços.`;
 }
@@ -170,12 +161,13 @@ function ResultSection({
 
 export default function Conteudo() {
   const router = useRouter();
-  const [objetivo,      setObjetivo]      = useState<Objetivo | null>(null);
-  const [especialidade, setEspecialidade] = useState<Especialidade | null>(null);
-  const [resultado,     setResultado]     = useState<ConteudoResult | null>(null);
-  const [rawError,      setRawError]      = useState("");
-  const [loading,       setLoading]       = useState(false);
-  const [copiado,       setCopiado]       = useState<"idle" | "ok" | "erro">("idle");
+  const [objetivo,   setObjetivo]   = useState<Objetivo | null>(null);
+  const [categoria,  setCategoria]  = useState<Categoria | null>(null);
+  const [oferta,     setOferta]     = useState("");
+  const [resultado,  setResultado]  = useState<ConteudoResult | null>(null);
+  const [rawError,   setRawError]   = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [copiado,    setCopiado]    = useState<"idle" | "ok" | "erro">("idle");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -183,7 +175,7 @@ export default function Conteudo() {
     });
   }, [router]);
 
-  const pronto = !!objetivo && !!especialidade;
+  const pronto = !!objetivo && !!categoria;
 
   async function gerar() {
     if (!pronto || loading) return;
@@ -199,7 +191,7 @@ export default function Conteudo() {
       const res = await fetch("/api/ia", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-        body: JSON.stringify({ prompt: buildPrompt(objetivo!, especialidade!), max_tokens: 1500 }),
+        body: JSON.stringify({ prompt: buildPrompt(objetivo!, categoria!, oferta), max_tokens: 1500 }),
       });
 
       const data = await res.json();
@@ -289,14 +281,14 @@ export default function Conteudo() {
           </div>
         </div>
 
-        {/* ── Etapa 2: Especialidade ── */}
+        {/* ── Etapa 2: Categoria ── */}
         <div style={{ background: "#1e2130", border: "1px solid #2d3148", borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
-          <StepLabel n={2} label="Escolha sua especialidade" done={!!especialidade} />
+          <StepLabel n={2} label="Que tipo de conteúdo?" done={!!categoria} />
           <div className="ct-especialidades-grid">
-            {ESPECIALIDADES.map(e => {
-              const sel = especialidade?.id === e.id;
+            {CATEGORIAS.map(c => {
+              const sel = categoria?.id === c.id;
               return (
-                <div key={e.id} onClick={() => { setEspecialidade(e); setResultado(null); }}
+                <div key={c.id} onClick={() => { setCategoria(c); setResultado(null); }}
                   className={`ct-esp-card${sel ? " ct-sel" : ""}`}
                   style={{
                     background:   sel ? "rgba(124,58,237,0.12)" : "#0f1117",
@@ -306,12 +298,12 @@ export default function Conteudo() {
                     boxShadow:    sel ? "0 6px 20px rgba(124,58,237,0.15)" : "none",
                     transform:    sel ? "scale(1.02)" : "scale(1)",
                   }}>
-                  <div style={{ fontSize: sel ? 40 : 32, marginBottom: 10, transition: "font-size 0.2s" }}>{e.icon}</div>
+                  <div style={{ fontSize: sel ? 40 : 32, marginBottom: 10, transition: "font-size 0.2s" }}>{c.icon}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: sel ? "#c4b5fd" : "#f1f5f9", marginBottom: 12, transition: "color 0.2s" }}>
-                    {e.label}
+                    {c.label}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "center" }}>
-                    {e.chips.map((chip, i) => (
+                    {c.chips.map((chip, i) => (
                       <span key={i} style={{
                         background: sel ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.04)",
                         color:      sel ? "#c4b5fd" : "#94a3b8",
@@ -325,6 +317,21 @@ export default function Conteudo() {
               );
             })}
           </div>
+          <div style={{ marginTop: 16 }}>
+            <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 6 }}>
+              O que seu negócio oferece? (opcional — ajuda a IA a ser mais específica)
+            </label>
+            <input
+              value={oferta}
+              onChange={e => setOferta(e.target.value)}
+              placeholder="Ex: corte de cabelo e barba, consultoria financeira, serviços jurídicos trabalhistas..."
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 8,
+                border: "1px solid #2d3148", background: "#0f1117", color: "#f1f5f9",
+                fontSize: 13, fontFamily: "inherit",
+              }}
+            />
+          </div>
         </div>
 
         {/* ── Etapa 3: Gerar ── */}
@@ -332,13 +339,13 @@ export default function Conteudo() {
           <StepLabel n={3} label="Gerar conteúdo" done={false} />
           {!pronto ? (
             <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 14px" }}>
-              Selecione o objetivo e a especialidade para liberar a geração.
+              Selecione o objetivo e o tipo de conteúdo para liberar a geração.
             </p>
           ) : (
             <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 14px" }}>
               <span style={{ color: "#a78bfa", fontWeight: 600 }}>{objetivo!.icon} {objetivo!.label}</span>
               {" · "}
-              <span style={{ color: "#a78bfa", fontWeight: 600 }}>{especialidade!.icon} {especialidade!.label}</span>
+              <span style={{ color: "#a78bfa", fontWeight: 600 }}>{categoria!.icon} {categoria!.label}</span>
             </p>
           )}
           <button className="ct-btn-gerar" onClick={gerar} disabled={!pronto || loading}
@@ -368,7 +375,7 @@ export default function Conteudo() {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>✅ Conteúdo gerado</div>
                 <div style={{ fontSize: 11, color: "#64748b" }}>
-                  {objetivo!.icon} {objetivo!.label} · {especialidade!.icon} {especialidade!.label}
+                  {objetivo!.icon} {objetivo!.label} · {categoria!.icon} {categoria!.label}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
@@ -428,7 +435,7 @@ export default function Conteudo() {
                 chipBg="rgba(255,255,255,0.04)" chipColor="#cbd5e1" chipBorder="#2d3148"
               />
               <HashGroup
-                label="Nicho da especialidade (10k–100k)"
+                label="Nicho do negócio (10k–100k)"
                 tags={resultado.hashtags_medias ?? []}
                 chipBg="rgba(124,58,237,0.1)" chipColor="#c4b5fd" chipBorder="rgba(124,58,237,0.3)"
               />

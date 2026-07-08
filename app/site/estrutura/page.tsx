@@ -13,11 +13,11 @@ const NAV = [
   { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
   { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🦷"  },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏥", a:true },
+  { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
+  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢", a:true },
 ];
 
-const CATS = ["Recepcao","Consultorio","Equipamentos","Equipe","Sala de Espera","Outros"];
+const CATS = ["Recepcao","Espaco de Atendimento","Equipamentos","Equipe","Sala de Espera","Outros"];
 
 export default function EstruturaAdmin() {
   const router = useRouter();
@@ -25,21 +25,24 @@ export default function EstruturaAdmin() {
   const [itens, setItens]         = useState<Item[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modal, setModal]         = useState<{ mode:"add"|"edit"; item?: Item }|null>(null);
-  const [form, setForm]           = useState<Form>({ imagem_url:"", titulo:"", descricao:"", categoria:"Consultorio" });
+  const [form, setForm]           = useState<Form>({ imagem_url:"", titulo:"", descricao:"", categoria:"Espaco de Atendimento" });
   const [uploading, setUploading] = useState(false);
   const [salvando, setSalvando]   = useState(false);
   const [erro, setErro]           = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-    const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
-    if (!cu?.clinica_id) { setLoading(false); return; }
-    setClinicaId(cu.clinica_id);
-    const { data } = await supabase.from("clinica_estrutura").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
-    setItens(data ?? []);
-    setLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
+      if (!cu?.clinica_id) { return; }
+      setClinicaId(cu.clinica_id);
+      const { data } = await supabase.from("clinica_estrutura").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
+      setItens(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -94,7 +97,7 @@ export default function EstruturaAdmin() {
   const sorted = [...itens].sort((a,b) => a.ordem - b.ordem);
 
   return (
-    <AdminShell title="Estrutura da Clinica" subtitle="Ambientes e instalacoes exibidos no site" actionLabel="+ Adicionar Ambiente" actionOnClick={() => { setForm({ imagem_url:"", titulo:"", descricao:"", categoria:"Consultorio" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Estrutura do Negocio" subtitle="Ambientes e instalacoes exibidos no site" actionLabel="+ Adicionar Ambiente" actionOnClick={() => { setForm({ imagem_url:"", titulo:"", descricao:"", categoria:"Espaco de Atendimento" }); setModal({ mode:"add" }); setErro(""); }}>
 
       <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
         {NAV.map(m => (
@@ -108,8 +111,8 @@ export default function EstruturaAdmin() {
 
       {!loading && itens.length === 0 && (
         <div className="panel" style={{ textAlign:"center", padding:"52px 20px" }}>
-          <div style={{ fontSize:44, marginBottom:14 }}>🏥</div>
-          <p style={{ color:"var(--muted)", margin:0, fontSize:15 }}>Nenhum ambiente cadastrado. Mostre sua estrutura para conquistar a confianca dos pacientes.</p>
+          <div style={{ fontSize:44, marginBottom:14 }}>🏢</div>
+          <p style={{ color:"var(--muted)", margin:0, fontSize:15 }}>Nenhum ambiente cadastrado. Mostre sua estrutura para conquistar a confianca dos clientes.</p>
         </div>
       )}
 
@@ -147,7 +150,7 @@ export default function EstruturaAdmin() {
             <div style={{ marginBottom:16, cursor:"pointer", border:"2px dashed rgba(255,255,255,0.12)", borderRadius:12, overflow:"hidden", position:"relative", height:160 }} onClick={() => fileRef.current?.click()}>
               {form.imagem_url ? <img src={form.imagem_url} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : (
                 <div style={{ height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:8, color:"#475569" }}>
-                  <span style={{ fontSize:30 }}>🏥</span>
+                  <span style={{ fontSize:30 }}>🏢</span>
                   <span style={{ fontSize:13 }}>Clique para enviar foto do ambiente</span>
                   <span style={{ fontSize:11, color:"#334155" }}>PNG, JPG, até 5 MB</span>
                 </div>

@@ -255,7 +255,7 @@ export default function ChatbotPage() {
   ]
 
   return (
-    <AdminShell title="Chatbot IA" subtitle="Configure respostas automáticas para dúvidas frequentes da clínica">
+    <AdminShell title="Chatbot IA" subtitle="Configure respostas automáticas para dúvidas frequentes do seu negócio">
       <style>{`
         @media (max-width:640px){
           .cb-stats{flex-direction:column!important}
@@ -314,7 +314,7 @@ export default function ChatbotPage() {
                 <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }}>🤖</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Nenhuma conversa registrada ainda</div>
                 <div style={{ fontSize: 13, color: C.textMuted, maxWidth: 380, margin: '0 auto', lineHeight: 1.6 }}>
-                  Assim que o chatbot responder pacientes, o histórico aparecerá aqui.
+                  Assim que o chatbot responder clientes, o histórico aparecerá aqui.
                 </div>
               </div>
             )}
@@ -329,7 +329,7 @@ export default function ChatbotPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' as const }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{log.nome_paciente || 'Paciente'}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{log.nome_paciente || 'Cliente'}</span>
                         <span style={{ fontSize: 11, color: C.textMuted, fontFamily: 'monospace' }}>{log.telefone}</span>
                         {processadoPorBadge(log.processado_por)}
                       </div>
@@ -373,16 +373,16 @@ export default function ChatbotPage() {
               </div>
               <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-                <Field label="Pergunta de Exemplo" hint="Como o paciente pode perguntar isso">
-                  <input style={inp} value={form.pergunta} onChange={e => setForm(f => ({ ...f, pergunta: e.target.value }))} placeholder='Ex: Quanto custa a limpeza dental?' />
+                <Field label="Pergunta de Exemplo" hint="Como o cliente pode perguntar isso">
+                  <input style={inp} value={form.pergunta} onChange={e => setForm(f => ({ ...f, pergunta: e.target.value }))} placeholder='Ex: Quanto custa o atendimento?' />
                 </Field>
 
                 <Field label="Palavras-chave" hint="Separadas por vírgula — o chatbot detecta qualquer uma delas na mensagem">
-                  <input style={inp} value={form.palavras_chave} onChange={e => setForm(f => ({ ...f, palavras_chave: e.target.value }))} placeholder='limpeza, profilaxia, valor limpeza, preço limpeza' />
+                  <input style={inp} value={form.palavras_chave} onChange={e => setForm(f => ({ ...f, palavras_chave: e.target.value }))} placeholder='valor, preço, quanto custa, orçamento' />
                 </Field>
 
-                <Field label="Resposta do Chatbot" hint="Texto exato que será enviado ao paciente">
-                  <textarea style={ta(100)} value={form.resposta} onChange={e => setForm(f => ({ ...f, resposta: e.target.value }))} placeholder={'A limpeza dental começa a partir de R$ 150.\nPara confirmar o valor exato, nossa equipe pode te atender pelo WhatsApp.'} />
+                <Field label="Resposta do Chatbot" hint="Texto exato que será enviado ao cliente">
+                  <textarea style={ta(100)} value={form.resposta} onChange={e => setForm(f => ({ ...f, resposta: e.target.value }))} placeholder={'O atendimento começa a partir de R$ 150.\nPara confirmar o valor exato, nossa equipe pode te atender pelo WhatsApp.'} />
                 </Field>
 
                 {msgT && (
@@ -475,7 +475,7 @@ export default function ChatbotPage() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Chatbot Ativo</div>
                 <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-                  {config.ativo ? 'Respondendo automaticamente mensagens dos pacientes.' : 'Desativado. Mensagens chegam mas sem resposta automática.'}
+                  {config.ativo ? 'Respondendo automaticamente mensagens dos clientes.' : 'Desativado. Mensagens chegam mas sem resposta automática.'}
                 </div>
               </div>
               <button onClick={() => setConfig(c => ({ ...c, ativo: !c.ativo }))} aria-label="toggle chatbot" style={{ width: 56, height: 30, borderRadius: 15, border: 'none', cursor: 'pointer', flexShrink: 0, position: 'relative', transition: 'background 0.25s', background: config.ativo ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : '#2d3148', boxShadow: config.ativo ? '0 0 12px rgba(124,58,237,0.4)' : 'none' }}>
@@ -483,12 +483,12 @@ export default function ChatbotPage() {
               </button>
             </div>
 
-            <SectionCard title="Informações da Clínica" icon="🏥">
+            <SectionCard title="Informações do Negócio" icon="🏢">
               <div className="cb-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <Field label="Nome da Clínica" hint="Usado na saudação automática">
-                  <input style={inp} value={config.nome_clinica ?? ''} onChange={e => setConfig(c => ({ ...c, nome_clinica: e.target.value }))} placeholder="Ex: Clínica Odontológica Sorrisos" />
+                <Field label="Nome do Negócio" hint="Usado na saudação automática">
+                  <input style={inp} value={config.nome_clinica ?? ''} onChange={e => setConfig(c => ({ ...c, nome_clinica: e.target.value }))} placeholder="Ex: Studio Bella" />
                 </Field>
-                <Field label="Link WhatsApp Humano" hint="Enviado quando paciente pede atendente">
+                <Field label="Link WhatsApp Humano" hint="Enviado quando cliente pede atendente">
                   <input style={inp} value={config.link_humano ?? ''} onChange={e => setConfig(c => ({ ...c, link_humano: e.target.value }))} placeholder="https://wa.me/5541999999999" />
                 </Field>
               </div>
@@ -505,20 +505,20 @@ export default function ChatbotPage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Convênios e Procedimentos" icon="🩺">
+            <SectionCard title="Convênios e Serviços" icon="💳">
               <div className="cb-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <Field label="Convênios Aceitos" hint="Um por linha">
-                  <textarea style={ta(110)} value={config.convenios ?? ''} onChange={e => setConfig(c => ({ ...c, convenios: e.target.value }))} placeholder={'Unimed\nBradesco Saúde\nAmil\nParticular'} />
+                <Field label="Convênios ou Parcerias" hint="Um por linha">
+                  <textarea style={ta(110)} value={config.convenios ?? ''} onChange={e => setConfig(c => ({ ...c, convenios: e.target.value }))} placeholder={'Empresa Parceira X\nDesconto para associados\nParticular'} />
                 </Field>
-                <Field label="Procedimentos Realizados" hint="Um por linha">
-                  <textarea style={ta(110)} value={config.procedimentos ?? ''} onChange={e => setConfig(c => ({ ...c, procedimentos: e.target.value }))} placeholder={'Consulta Clínica\nOrtodontia\nImplantes'} />
+                <Field label="Serviços Oferecidos" hint="Um por linha">
+                  <textarea style={ta(110)} value={config.procedimentos ?? ''} onChange={e => setConfig(c => ({ ...c, procedimentos: e.target.value }))} placeholder={'Atendimento inicial\nConsultoria\nManutenção'} />
                 </Field>
               </div>
             </SectionCard>
 
             <SectionCard title="FAQ e Encaminhamento" icon="❓">
               <Field label="Perguntas Frequentes / Valores">
-                <textarea style={ta(110)} value={config.faq ?? ''} onChange={e => setConfig(c => ({ ...c, faq: e.target.value }))} placeholder={'Consulta particular: R$ 150\nOrtodontia: a partir de R$ 180/mês'} />
+                <textarea style={ta(110)} value={config.faq ?? ''} onChange={e => setConfig(c => ({ ...c, faq: e.target.value }))} placeholder={'Atendimento avulso: R$ 150\nPlano mensal: a partir de R$ 180/mês'} />
               </Field>
             </SectionCard>
 

@@ -130,7 +130,7 @@ export default function Site() {
   }, []);
 
   const computedSlug = form.slug || generateSlug(form.nome);
-  const siteUrl = computedSlug ? `${origin}/clinica/${computedSlug}` : "";
+  const siteUrl = computedSlug ? `${origin}/empresa/${computedSlug}` : "";
 
   // ── PROGRESS BAR ─────────────────────────────────────────────────────────────
   const progressItems = [
