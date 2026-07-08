@@ -22,7 +22,6 @@ export default function robots(): MetadataRoute.Robots {
           "/pacientes",
           "/reputacao",
           "/site",
-          "/empresa/",
           "/chatbot",
           "/raio-x",
           "/landing",
