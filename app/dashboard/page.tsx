@@ -5,7 +5,7 @@ import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 import OnboardingCard from "../components/onboarding/OnboardingCard";
-import { gerarRecomendacoes, type CategoriaRecomendacao } from "../../lib/recomendacoes";
+import { gerarPrioridadeDoDia, type CategoriaRecomendacao, type Recomendacao } from "../../lib/recomendacoes";
 
 type AgItem = {
   id: string;
@@ -228,21 +228,17 @@ function gerarSaudacaoCard(ctx: { nomeNegocio: string; ambienteProducao: boolean
   return { linha1: `👋 ${saudacao()}!`, linha2: "Bem-vindo ao OrganizaPro.", subtitulo };
 }
 
-// Intelligence 1.6 · "O Nascimento do Diretor Digital" — a fala do briefing
-// que abre o bloco de recomendações. Puramente apresentação: não decide
-// nada, só narra em primeira pessoa o que `gerarRecomendacoes` já apurou.
-// Preparado para a Intelligence 2.0 (uma única "Prioridade do Diretor"):
-// quando isso existir, basta um novo branch aqui — o restante do componente
-// (avatar, nome, badge) não precisa mudar.
-function gerarBriefingDiretor(qtdRecomendacoes: number, temDados: boolean): string {
+// Intelligence 2.0 · "Prioridade do Diretor" — a fala do briefing que abre
+// o bloco de recomendações. Puramente apresentação: não decide nada, só
+// narra em primeira pessoa o que `gerarPrioridadeDoDia` já escolheu.
+function gerarBriefingDiretor(temPrioridade: boolean, temDados: boolean): string {
   if (!temDados) {
     return `${saudacao()}. Ainda estou conhecendo o seu negócio — continue usando o OrganizaPro para que eu possa trazer recomendações cada vez mais precisas.`;
   }
-  if (qtdRecomendacoes === 0) {
+  if (!temPrioridade) {
     return `${saudacao()}. Revisei sua rotina com calma — está tudo em ordem por aqui.`;
   }
-  const pontos = qtdRecomendacoes === 1 ? "um ponto que merece" : `${qtdRecomendacoes} pontos que merecem`;
-  return `${saudacao()}. Enquanto você administrava seu negócio, analisei sua rotina — encontrei ${pontos} sua atenção hoje.`;
+  return `${saudacao()}. Enquanto você cuidava do seu negócio, analisei sua rotina. Se eu estivesse administrando sua empresa hoje, começaria exatamente por esta ação.`;
 }
 
 function formatarDataBR(d: string): string {
@@ -446,11 +442,12 @@ export default function Dashboard() {
     clientesParaReativar: dash.clientesParaReativar,
   });
 
-  // Intelligence 1.5 — primeiro módulo oficial do Diretor Digital
-  // (docs/organizapro-intelligence-engine-v1.html). Regras de negócio
-  // determinísticas, sem IA generativa; usa só dados já carregados acima.
-  const recomendacoes = insights.temDados
-    ? gerarRecomendacoes({
+  // Intelligence 2.0 — o Diretor Digital não só percebe, decide: escolhe UMA
+  // prioridade principal para o dia (docs/organizapro-intelligence-engine-
+  // v1.html). Regras determinísticas, sem IA generativa; usa só dados já
+  // carregados acima.
+  const { prioridade, demais: outrasRecomendacoes }: { prioridade: Recomendacao | null; demais: Recomendacao[] } = insights.temDados
+    ? gerarPrioridadeDoDia({
         totalPacientes:       dash.totalPacientes,
         totalAgendamentos:    dash.totalAgendamentos,
         compromissosHoje:     dash.compromissosHoje,
@@ -463,7 +460,7 @@ export default function Dashboard() {
         temEndereco:          dash.temEndereco,
         temWhatsapp:          dash.temWhatsapp,
       })
-    : [];
+    : { prioridade: null, demais: [] };
 
   // V2: ambienteProducao virá de um sinal real de conta/ambiente. Mantido
   // desligado em V1 para nunca personalizar em contas de demonstração.
@@ -564,7 +561,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
-                {gerarBriefingDiretor(0, false)}
+                {gerarBriefingDiretor(false, false)}
               </p>
             </div>
           </div>
@@ -659,52 +656,95 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: "0 0 16px" }}>
-                  {gerarBriefingDiretor(recomendacoes.length, true)}
+                  {gerarBriefingDiretor(!!prioridade, true)}
                 </p>
 
-                {/* Corpo do briefing — hoje é a lista de recomendações; na Intelligence
-                    2.0 este bloco poderá virar uma única "🎯 Prioridade do Diretor"
-                    sem precisar alterar o cabeçalho (avatar, nome, badge, saudação) acima. */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {recomendacoes.map(r => {
-                    const cat = stCategoria[r.categoria];
-                    const cor = stTom[cat.tom];
-                    return (
-                      <div key={r.id} style={{
-                        background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
-                        borderRadius: 12, padding: "14px 16px",
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 13 }}>{cat.emoji}</span>
-                          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: cor.color }}>
-                            {cat.label}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
-                          {r.titulo}
-                        </div>
-                        <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 6px" }}>
-                          {r.explicacao}
-                        </p>
-                        <p style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.4, margin: "0 0 12px", fontStyle: "italic" }}>
-                          Por quê: {r.motivo}
-                        </p>
-                        {r.destino ? (
-                          <button
-                            onClick={() => router.push(r.destino!)}
-                            style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${cor.border}`, background: cor.bg, color: cor.color, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                          >
-                            {r.acao} →
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
-                            ✓ {r.acao}
-                          </span>
-                        )}
+                {/* Intelligence 2.0 · Prioridade do Diretor — a escolha em si vem
+                    pronta de lib/recomendacoes.ts (escolherPrioridadePrincipal);
+                    aqui só desenhamos o resultado. Trocar a lógica de decisão no
+                    futuro (ex.: IA generativa) não exige mexer neste bloco. */}
+                {prioridade && (() => {
+                  const cat = stCategoria[prioridade.categoria];
+                  const cor = stTom[cat.tom];
+                  return (
+                    <div style={{
+                      background: cor.bg, border: `1px solid ${cor.border}`,
+                      borderRadius: 14, padding: "18px 20px",
+                      marginBottom: outrasRecomendacoes.length > 0 ? 16 : 0,
+                    }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: cor.color, marginBottom: 10 }}>
+                        🎯 Prioridade do Diretor
                       </div>
-                    );
-                  })}
-                </div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 6 }}>
+                        {prioridade.titulo}
+                      </div>
+                      <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, margin: "0 0 8px" }}>
+                        {prioridade.explicacao}
+                      </p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 14px", fontStyle: "italic" }}>
+                        Por quê: {prioridade.motivo}
+                      </p>
+                      {prioridade.destino ? (
+                        <button
+                          onClick={() => router.push(prioridade.destino!)}
+                          style={{ padding: "8px 18px", borderRadius: 9, border: "none", background: cor.color, color: "#0a0d14", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                        >
+                          Executar agora →
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: cor.color }}>
+                          ✓ {prioridade.acao}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Demais recomendações da Intelligence 1.5 — tudo que não virou
+                    a prioridade principal continua listado aqui, na mesma ordem
+                    de importância. */}
+                {outrasRecomendacoes.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {outrasRecomendacoes.map(r => {
+                      const cat = stCategoria[r.categoria];
+                      const cor = stTom[cat.tom];
+                      return (
+                        <div key={r.id} style={{
+                          background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
+                          borderRadius: 12, padding: "14px 16px",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 13 }}>{cat.emoji}</span>
+                            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: cor.color }}>
+                              {cat.label}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
+                            {r.titulo}
+                          </div>
+                          <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 6px" }}>
+                            {r.explicacao}
+                          </p>
+                          <p style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.4, margin: "0 0 12px", fontStyle: "italic" }}>
+                            Por quê: {r.motivo}
+                          </p>
+                          {r.destino ? (
+                            <button
+                              onClick={() => router.push(r.destino!)}
+                              style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${cor.border}`, background: cor.bg, color: cor.color, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                            >
+                              {r.acao} →
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
+                              ✓ {r.acao}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </>

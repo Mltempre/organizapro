@@ -249,3 +249,45 @@ export function gerarRecomendacoes(ctx: ContextoNegocio, limite = 3): Recomendac
   encontradas.sort((a, b) => PESO_CATEGORIA[a.categoria] - PESO_CATEGORIA[b.categoria]);
   return encontradas.slice(0, limite);
 }
+
+// ── OrganizaPro Intelligence 2.0 · Prioridade do Diretor ────────────────────
+//
+// Até aqui o Diretor Digital só listava o que percebeu. Aqui ele decide: das
+// recomendações aplicáveis, qual é A ação mais importante agora. Essa
+// escolha é o núcleo do Diretor Digital — o ponto exato que uma futura
+// evolução com IA generativa vai substituir (por um modelo, um score, o que
+// for). Por isso ela vive isolada nesta função, sem nenhum conhecimento de
+// como a interface vai desenhar o resultado.
+//
+// Hoje a decisão é simples porque REGRAS já nasce na ordem certa: dentro de
+// "atencao", compromissos atrasados (crítico) vêm antes de confirmação
+// pendente e clientes parados (cliente aguardando ação); dentro de
+// "oportunidade", agenda vazia/ociosa (compromissos) vem antes de
+// whatsapp/perfil. Combinado com PESO_CATEGORIA, isso já reproduz a ordem
+// de importância do Diretor: 1) atenção crítica, 2) cliente aguardando
+// ação, 3) compromissos, 4) organização, 5) sugestões. `gerarRecomendacoes`
+// entrega a lista nessa ordem — a prioridade principal é sempre a primeira.
+
+export type PrioridadeDoDia = {
+  prioridade: Recomendacao | null;
+  demais:     Recomendacao[];
+};
+
+/**
+ * Escolhe, entre as recomendações já ordenadas por importância, UMA
+ * prioridade principal — e devolve o restante separado para exibição
+ * secundária. Responsabilidade única: decidir. Não formata texto, não sabe
+ * de UI.
+ */
+export function escolherPrioridadePrincipal(recomendacoes: Recomendacao[]): PrioridadeDoDia {
+  const [prioridade, ...demais] = recomendacoes;
+  return { prioridade: prioridade ?? null, demais };
+}
+
+/**
+ * Atalho para o Dashboard: gera as recomendações aplicáveis e já devolve a
+ * prioridade do dia separada das demais recomendações.
+ */
+export function gerarPrioridadeDoDia(ctx: ContextoNegocio, limiteTotal = 4): PrioridadeDoDia {
+  return escolherPrioridadePrincipal(gerarRecomendacoes(ctx, limiteTotal));
+}
