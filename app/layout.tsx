@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OrganizaPro",
-  description: "O sistema mais simples para organizar o seu negócio.",
+  description: "O primeiro Diretor Digital para pequenas empresas de serviços.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
