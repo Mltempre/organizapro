@@ -15,18 +15,23 @@ import Link from "next/link";
 // `useReveal` dá o efeito de fade+slide ao entrar na viewport — a única
 // microinteração que precisa de JS (as demais são CSS puro). Cada seção
 // chama o hook uma vez; a observação para assim que revela, então não há
-// custo contínuo de scroll.
+// custo contínuo de scroll. Um timeout de segurança força a revelação
+// mesmo se o IntersectionObserver nunca disparar (ex.: navegação direta
+// por âncora, aba em segundo plano) — uma seção de venda nunca pode
+// ficar invisível por causa de uma microinteração.
 function useReveal<T extends HTMLElement>(): [React.RefObject<T | null>, string] {
   const elRef = useRef<T | null>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
+    const reveal = () => setVisible(true);
     const el = elRef.current;
-    if (!el) return;
+    if (!el) { reveal(); return; }
     const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) { setVisible(true); obs.disconnect(); }
+      if (entry.isIntersecting) { reveal(); obs.disconnect(); }
     }, { threshold: 0.15 });
     obs.observe(el);
-    return () => obs.disconnect();
+    const fallback = setTimeout(reveal, 1500);
+    return () => { obs.disconnect(); clearTimeout(fallback); };
   }, []);
   return [elRef, "reveal" + (visible ? " reveal-visible" : "")];
 }
@@ -133,7 +138,7 @@ export default function Page() {
           background: linear-gradient(135deg,#1F4E5F,#0d3547); color: #fff; border: none; border-radius: 10px;
           font-family: inherit; font-size: 16px; font-weight: 700; padding: 16px 32px;
           cursor: pointer; transition: all 0.22s; box-shadow: 0 4px 20px rgba(31,78,95,0.4);
-          text-decoration: none; white-space: nowrap; line-height: 1;
+          text-decoration: none; text-align: center; line-height: 1.3; max-width: 100%;
         }
         .btn-main:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(31,78,95,0.55); }
 
@@ -144,7 +149,7 @@ export default function Page() {
           background: transparent; color: rgba(255,255,255,0.8);
           border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
           font-family: inherit; font-size: 15px; font-weight: 600; padding: 14px 28px;
-          cursor: pointer; transition: all 0.22s; text-decoration: none; white-space: nowrap; line-height: 1;
+          cursor: pointer; transition: all 0.22s; text-decoration: none; text-align: center; line-height: 1.3; max-width: 100%;
         }
         .btn-outline:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.35); color: #fff; }
 
@@ -274,7 +279,7 @@ export default function Page() {
           gridTemplateColumns: isMobile ? "1fr" : "1.05fr 0.95fr",
           gap: isMobile ? 48 : 56, alignItems: "center",
         }}>
-          <div style={{ textAlign: isMobile ? "center" : "left" }}>
+          <div style={{ textAlign: isMobile ? "center" : "left", minWidth: 0 }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.3)",
@@ -300,13 +305,13 @@ export default function Page() {
               todos os dias, qual é a ação mais importante agora.
             </p>
 
-            <div style={{ display: "flex", gap: 14, justifyContent: isMobile ? "center" : "flex-start", flexWrap: "wrap" }}>
-              <button className="btn-main btn-hero" style={{ fontSize: isMobile ? 15 : 17, padding: isMobile ? "14px 24px" : "17px 36px" }}
+            <div style={{ display: "flex", gap: 14, justifyContent: isMobile ? "center" : "flex-start", flexWrap: "wrap", minWidth: 0 }}>
+              <button className="btn-main btn-hero" style={{ fontSize: isMobile ? 15 : 17, padding: isMobile ? "14px 24px" : "17px 36px", minWidth: 0, maxWidth: "100%" }}
                 onClick={() => wpp()}>
                 Quero um Diretor Digital no meu negócio
               </button>
               <a href="#como-funciona" className="btn-outline"
-                style={{ fontSize: isMobile ? 14 : 15, padding: isMobile ? "13px 22px" : "15px 28px" }}>
+                style={{ fontSize: isMobile ? 14 : 15, padding: isMobile ? "13px 22px" : "15px 28px", minWidth: 0, maxWidth: "100%" }}>
                 Ver como ele trabalha ↓
               </a>
             </div>
@@ -317,7 +322,7 @@ export default function Page() {
           </div>
 
           {/* PAINEL VIVO */}
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, justifyContent: isMobile ? "center" : "flex-start" }}>
               <span className="live-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />
               <span style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", letterSpacing: "0.04em", textTransform: "uppercase" }}>
