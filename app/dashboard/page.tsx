@@ -160,7 +160,7 @@ function gerarInsights(ctx: {
       prioridades:   { numero: 0, label: "", tom: "neutro" },
       agenda:        { numero: 0, label: "", tom: "neutro" },
       oportunidades: { numero: 0, label: "", tom: "neutro" },
-      situacao:      { emoji: "🟢", texto: "Tudo em ordem", tom: "positivo" },
+      situacao:      { emoji: "🟢", texto: "Tudo funcionando normalmente", tom: "positivo" },
     };
   }
 
@@ -196,7 +196,7 @@ function gerarInsights(ctx: {
     ? { emoji: "🔴", texto: "Prioridade Alta", tom: "critico" }
     : ctx.pendentes > 0
       ? { emoji: "🟡", texto: "Atenção", tom: "atencao" }
-      : { emoji: "🟢", texto: "Tudo em ordem", tom: "positivo" };
+      : { emoji: "🟢", texto: "Tudo funcionando normalmente", tom: "positivo" };
 
   return { temDados: true, prioridades, agenda, oportunidades, situacao };
 }
@@ -221,7 +221,7 @@ function saudacao(): string {
 type SaudacaoCard = { linha1: string; linha2?: string; subtitulo: string };
 
 function gerarSaudacaoCard(ctx: { nomeNegocio: string; ambienteProducao: boolean }): SaudacaoCard {
-  const subtitulo = "Confira seu plano para hoje e mantenha seu negócio organizado.";
+  const subtitulo = "Acompanhe suas prioridades e mantenha sua empresa organizada durante todo o dia.";
   if (ctx.ambienteProducao && ctx.nomeNegocio) {
     return { linha1: `Bem-vindo de volta, ${ctx.nomeNegocio}.`, subtitulo };
   }
@@ -270,6 +270,21 @@ const stTom: Record<"critico" | "positivo" | "neutro" | "atencao", { bg: string;
   positivo: { bg: "rgba(74,222,128,0.12)",  border: "rgba(74,222,128,0.3)",   color: "#4ade80" },
   neutro:   { bg: "rgba(74,155,176,0.12)",  border: "rgba(74,155,176,0.3)",   color: "#4a9bb0" },
 };
+
+// Lapidação comercial — reforço visual de que o OrganizaPro já entrega uma
+// plataforma completa (nenhuma dessas ferramentas é nova: todas já existem
+// e estão navegáveis pelo menu lateral). Puramente decorativo.
+const RECURSOS_INCLUIDOS = [
+  { icon: "👥", label: "Clientes"           },
+  { icon: "📅", label: "Agenda"             },
+  { icon: "🌐", label: "Site"               },
+  { icon: "✍️", label: "Conteúdo IA"        },
+  { icon: "💬", label: "Chatbot"            },
+  { icon: "🤖", label: "Automação"          },
+  { icon: "⭐", label: "Reputação"          },
+  { icon: "📈", label: "Métricas"           },
+  { icon: "📊", label: "Raio-X Inteligente" },
+];
 
 // Categoria da recomendação (lib/recomendacoes.ts) → estilo visual + emoji.
 // Reaproveita as mesmas cores de `stTom` já usadas nos tiles acima.
@@ -470,13 +485,13 @@ export default function Dashboard() {
   });
 
   if (loading) return (
-    <AdminShell title="Central de Gestão" subtitle={dataStr}>
+    <AdminShell title="Painel Executivo">
       <PageLoader title="Preparando seu painel..." />
     </AdminShell>
   );
 
   return (
-    <AdminShell title="Central de Gestão" subtitle={dataStr}>
+    <AdminShell title="Painel Executivo">
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         .dc  { animation: fadeUp 0.35s ease both; }
@@ -487,6 +502,23 @@ export default function Dashboard() {
         .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
       `}</style>
 
+      {/* ── DATA DE HOJE ──────────────────────────────────────────────────────── */}
+      <div className="dc" style={{
+        display: "inline-flex", alignItems: "center", gap: 10,
+        padding: "10px 16px", borderRadius: 12, marginBottom: 20,
+        background: "rgba(74,155,176,0.08)", border: "1px solid rgba(74,155,176,0.2)",
+      }}>
+        <span style={{ fontSize: 18 }}>📅</span>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Hoje
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
+            {dataStr}
+          </div>
+        </div>
+      </div>
+
       {/* ── ONBOARDING ────────────────────────────────────────────────────────── */}
       <OnboardingCard
         clinicaId={clinicaId}
@@ -496,6 +528,20 @@ export default function Dashboard() {
         temCompromisso={dash.totalAgendamentos > 0}
         onNavigate={(path) => router.push(path)}
       />
+
+      {/* ── RECURSOS INCLUÍDOS ───────────────────────────────────────────────── */}
+      <div className="dc" style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+        {RECURSOS_INCLUIDOS.map(r => (
+          <span key={r.label} style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "8px 16px", borderRadius: 999,
+            background: "rgba(74,155,176,0.07)", border: "1px solid rgba(74,155,176,0.18)",
+            color: "#cbd5e1", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+          }}>
+            <span style={{ color: "#4ade80" }}>✔</span> {r.icon} {r.label}
+          </span>
+        ))}
+      </div>
 
       {/* ── SEU PLANO PARA HOJE ──────────────────────────────────────────────── */}
       <div className="dc" style={{
@@ -519,16 +565,21 @@ export default function Dashboard() {
             </div>
           </div>
           {insights.temDados && (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "5px 12px", borderRadius: 999,
-              background: stTom[insights.situacao.tom].bg,
-              border: `1px solid ${stTom[insights.situacao.tom].border}`,
-              color: stTom[insights.situacao.tom].color,
-              fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-            }}>
-              {insights.situacao.emoji} {insights.situacao.texto}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#64748b", letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                Status Operacional
+              </span>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "5px 12px", borderRadius: 999,
+                background: stTom[insights.situacao.tom].bg,
+                border: `1px solid ${stTom[insights.situacao.tom].border}`,
+                color: stTom[insights.situacao.tom].color,
+                fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+              }}>
+                {insights.situacao.emoji} {insights.situacao.texto}
+              </span>
+            </div>
           )}
         </div>
 

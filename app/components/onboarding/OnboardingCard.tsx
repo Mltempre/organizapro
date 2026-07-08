@@ -99,10 +99,13 @@ export default function OnboardingCard({
       {completo ? (
         <>
           <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 6 }}>
-            🎉 Parabéns!
+            🚀 Bem-vindo ao OrganizaPro
           </div>
-          <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: 0, maxWidth: 460 }}>
-            Seu OrganizaPro está pronto para uso. Agora você pode aproveitar todos os recursos da plataforma.
+          <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: 0, maxWidth: 480 }}>
+            Organize clientes, agenda, atendimento, presença digital e produtividade em uma única plataforma.
+          </p>
+          <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: "8px 0 0", maxWidth: 480 }}>
+            Tenha tudo o que sua empresa precisa para trabalhar com mais organização, eficiência e crescimento.
           </p>
           <button
             className="ob-btn-continuar"
@@ -113,7 +116,7 @@ export default function OnboardingCard({
               fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "filter 0.15s",
             }}
           >
-            Continuar
+            Ver meu painel →
           </button>
         </>
       ) : (

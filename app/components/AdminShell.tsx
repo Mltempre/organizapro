@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
 const nav = [
-  { l: "Central de Gestão", h: "/dashboard",     i: "⚡" },
+  { l: "Painel Executivo",  h: "/dashboard",     i: "⚡" },
   { l: "Clientes",          h: "/pacientes",     i: "👤" },
   { l: "Agenda",            h: "/agendamentos",  i: "📅" },
   { l: "Site",              h: "/site",          i: "🌐" },
