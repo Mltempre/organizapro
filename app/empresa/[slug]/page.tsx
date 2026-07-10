@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { supabase } from "../../../lib/supabase";
 import SiteEmpresaClient from "./SiteEmpresaClient";
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 type Props = { params: Promise<{ slug: string }> };
 
