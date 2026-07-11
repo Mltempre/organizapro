@@ -192,7 +192,6 @@ export default function AgendamentosPage() {
   const [erro, setErro]                 = useState('');
   const [sucesso, setSucesso]           = useState('');
   const [clinicaId, setClinicaId]       = useState('');
-  const [userId, setUserId]             = useState('');
   const [enviando, setEnviando]         = useState<string | null>(null);
   const [filtroData, setFiltroData]     = useState<'proximos' | 'confirmados' | 'historico'>('proximos');
   const [gerandoPdf, setGerandoPdf]     = useState(false);
@@ -204,7 +203,6 @@ export default function AgendamentosPage() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) { router.push('/login'); return; }
-      setUserId(user.id);
       const { data: cu, error: cuError } = await supabase
         .from('clinica_usuarios').select('clinica_id')
         .eq('usuario_id', user.id).maybeSingle();
@@ -352,32 +350,18 @@ export default function AgendamentosPage() {
     }
   }
 
-  async function enviarWhatsapp(a: Agendamento) {
-    if (!a.telefone) return;
-    setEnviando(a.id); setErro(''); setSucesso('');
-    try {
-      const mensagem = `Olá ${a.paciente_nome}! Confirmando seu compromisso em ${formatarData(a.data)} às ${formatarHorario(a.hora)}. Por favor confirme sua presença.`;
-      const res = await fetch('/api/whatsapp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clinica_id: clinicaId, user_id: userId, telefone: a.telefone, mensagem }),
-      });
-      const json = await res.json();
-      if (json.sucesso) {
-        await supabase.from('agendamentos').update({ confirmacao_enviada: true }).eq('id', a.id).eq('clinica_id', clinicaId);
-        setSucesso('Mensagem enviada com sucesso.');
-        setTimeout(() => setSucesso(''), 4000);
-        carregar();
-      } else {
-        console.error(json);
-        setErro(MSG_ERRO_PADRAO);
-      }
-    } catch (err) {
-      console.error(err);
-      setErro(MSG_ERRO_PADRAO);
-    } finally {
-      setEnviando(null);
+  function enviarWhatsapp(a: Agendamento) {
+    const apenasNumeros = (a.telefone || '').replace(/\D/g, '');
+    if (!apenasNumeros) {
+      setErro('Este compromisso não possui telefone cadastrado para envio de WhatsApp.');
+      return;
     }
+    setEnviando(a.id); setErro(''); setSucesso('');
+    const numero = (apenasNumeros.length === 10 || apenasNumeros.length === 11) ? `55${apenasNumeros}` : apenasNumeros;
+    const mensagem = `Olá ${a.paciente_nome}! Confirmando seu compromisso em ${formatarData(a.data)} às ${formatarHorario(a.hora)}. Por favor confirme sua presença.`;
+    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setEnviando(null);
   }
 
   function formatarData(d: string)    { if (!d) return '-'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
