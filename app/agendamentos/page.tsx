@@ -76,7 +76,7 @@ function buildPdfHtml(ags: Agendamento[], empresa: EmpresaConfig | null, data: s
 
   const rodape = ([
     empresa?.telefone ? `📱 ${empresa.telefone}` : null,
-    empresa?.email    ? `📧 ${empresa.email}`    : null,
+    `📧 contato@organizaprooficial.com.br`,
     empresa?.endereco ? `📍 ${empresa.endereco}` : null,
   ] as (string | null)[]).filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
 
@@ -481,7 +481,7 @@ export default function AgendamentosPage() {
           disabled={gerandoPdf}
           style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor: gerandoPdf ? 'default' : 'pointer', whiteSpace:'nowrap', opacity: gerandoPdf ? 0.7 : 1, transition:'background 0.15s' }}
         >
-          {gerandoPdf ? '⏳ Gerando...' : '📄 Exportar PDF'}
+          {gerandoPdf ? '⏳ Gerando...' : '📄 PDF de Hoje'}
         </button>
       </div>
 
