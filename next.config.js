@@ -6,6 +6,9 @@ const nextConfig = {
       // ligado ao vertical de saude do produto anterior). Preserva links
       // ja publicados por clientes atuais.
       { source: "/clinica/:id", destination: "/empresa/:id", permanent: true },
+      // Rota antiga do modulo de clientes (era /pacientes, nome ligado ao
+      // vertical de saude do produto anterior). Preserva links ja publicados.
+      { source: "/pacientes", destination: "/clientes", permanent: true },
       // Landing pages de nicho aposentadas (OrganizaPro 1.0): o
       // posicionamento agora e universal, concentrado na home.
       { source: "/dentista", destination: "/", permanent: true },

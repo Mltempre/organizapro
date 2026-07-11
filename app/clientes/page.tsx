@@ -102,7 +102,7 @@ function formatarData(d: string) {
 
 // ── Page ──────────────────────────────────────────────────────────────
 
-export default function PacientesPage() {
+export default function ClientesPage() {
   const router = useRouter();
   const [pacientes, setPacientes]         = useState<Paciente[]>([]);
   const [busca, setBusca]                 = useState('');

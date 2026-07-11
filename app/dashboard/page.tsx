@@ -61,7 +61,7 @@ function gerarIdeia(ctx: {
     porQueImporta: "Uma base de clientes organizada facilita o relacionamento, revela oportunidades de venda e mostra a evolução do seu negócio.",
     impactoEsperado: "Uma operação mais completa, com o crescimento do negócio mais fácil de acompanhar.",
     tempoEstimado: "≈ 10 minutos",
-    destino: "/pacientes", destino_label: "Cadastrar clientes",
+    destino: "/clientes", destino_label: "Cadastrar clientes",
   };
   if (!ctx.temLogo) return {
     texto: "Sua empresa ainda não tem um logotipo cadastrado. Uma identidade visual forte transmite mais confiança à primeira vista.",
@@ -104,16 +104,16 @@ function gerarIdeia(ctx: {
     destino: "/agendamentos", destino_label: "Confirmar agora",
   };
   const gerais: IdeiaDodia[] = [
-    { texto: "Reative clientes que você não atende há mais de 30 dias — reconquistar custa menos do que conquistar um cliente novo.", icone: "📞", porQueImporta: "Reativar clientes antigos é uma forma simples de recuperar receita e fortalecer o relacionamento.", impactoEsperado: "Mais vendas recuperadas e um relacionamento mais forte com clientes antigos.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
-    { texto: "Revise sua base de clientes e complete os dados faltantes — ela é um dos ativos mais valiosos do seu negócio.", icone: "🗂️", porQueImporta: "Uma base bem organizada ajuda a vender melhor e a tomar decisões com mais confiança.", impactoEsperado: "Mais organização para o time e decisões mais acertadas.", tempoEstimado: "≈ 10 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Reative clientes que você não atende há mais de 30 dias — reconquistar custa menos do que conquistar um cliente novo.", icone: "📞", porQueImporta: "Reativar clientes antigos é uma forma simples de recuperar receita e fortalecer o relacionamento.", impactoEsperado: "Mais vendas recuperadas e um relacionamento mais forte com clientes antigos.", tempoEstimado: "≈ 5 minutos", destino: "/clientes", destino_label: "Ver clientes" },
+    { texto: "Revise sua base de clientes e complete os dados faltantes — ela é um dos ativos mais valiosos do seu negócio.", icone: "🗂️", porQueImporta: "Uma base bem organizada ajuda a vender melhor e a tomar decisões com mais confiança.", impactoEsperado: "Mais organização para o time e decisões mais acertadas.", tempoEstimado: "≈ 10 minutos", destino: "/clientes", destino_label: "Ver clientes" },
     { texto: "Peça avaliações aos clientes mais recentes — a reputação online cresce uma avaliação de cada vez.", icone: "⭐", porQueImporta: "Boas avaliações aumentam a confiança do cliente e ajudam a atrair novos negócios.", impactoEsperado: "Sua reputação fica mais forte e atrai mais clientes.", tempoEstimado: "≈ 3 minutos", },
     { texto: "Revise os compromissos da próxima semana com antecedência — empresas organizadas surpreendem positivamente seus clientes.", icone: "📆", porQueImporta: "Planejar com antecedência reduz imprevistos e melhora a experiência do cliente.", impactoEsperado: "Você evita atrasos e entrega um atendimento mais previsível.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Ver agenda" },
     { texto: "Faça backup dos seus documentos e registros importantes — empresas bem documentadas crescem com mais segurança.", icone: "💾", porQueImporta: "Manter documentos em ordem protege o negócio e facilita a operação no dia a dia.", impactoEsperado: "Seu negócio fica mais seguro e a rotina fica mais tranquila.", tempoEstimado: "≈ 15 minutos", },
     { texto: "Revise os serviços que você mais oferece — clareza sobre o que você entrega facilita a venda e fortalece o relacionamento com clientes.", icone: "📌", porQueImporta: "Mostrar com clareza o que sua empresa entrega facilita a venda e fortalece a percepção de valor.", impactoEsperado: "Seus clientes entendem melhor o que você oferece e compram com mais facilidade.", tempoEstimado: "≈ 10 minutos", },
-    { texto: "Envie uma mensagem para um cliente antigo hoje — um contato simples pode reativar o relacionamento e gerar nova receita.", icone: "💬", porQueImporta: "Um contato bem feito pode reabrir oportunidades e trazer nova receita sem grandes esforços.", impactoEsperado: "Você pode reacender oportunidades e gerar mais negócios.", tempoEstimado: "≈ 3 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Envie uma mensagem para um cliente antigo hoje — um contato simples pode reativar o relacionamento e gerar nova receita.", icone: "💬", porQueImporta: "Um contato bem feito pode reabrir oportunidades e trazer nova receita sem grandes esforços.", impactoEsperado: "Você pode reacender oportunidades e gerar mais negócios.", tempoEstimado: "≈ 3 minutos", destino: "/clientes", destino_label: "Ver clientes" },
     { texto: "Mantenha o horário de funcionamento sempre atualizado — clientes que sabem quando te encontrar chegam mais preparados.", icone: "🕐", porQueImporta: "Informações claras ajudam a atrair clientes certos e evitam frustrações.", impactoEsperado: "Clientes chegam mais preparados e sua comunicação fica mais eficiente.", tempoEstimado: "≈ 3 minutos", destino: "/configuracoes", destino_label: "Configurações" },
     { texto: "Planeje os compromissos da próxima semana com antecedência — uma agenda organizada reduz imprevistos e transmite profissionalismo.", icone: "🗓️", porQueImporta: "Uma agenda planejada reduz imprevistos e ajuda a empresa a entregar mais com menos estresse.", impactoEsperado: "Você ganha mais controle do tempo e melhora sua produtividade.", tempoEstimado: "≈ 5 minutos", destino: "/agendamentos", destino_label: "Agendar" },
-    { texto: "Clientes sem telefone cadastrado ficam fora do alcance dos lembretes automáticos — vale a pena completar esses dados.", icone: "📱", porQueImporta: "Dados completos melhoram o atendimento e aumentam as chances de gerar retorno recorrente.", impactoEsperado: "Você melhora o alcance dos contatos e fortalece a relação com os clientes.", tempoEstimado: "≈ 5 minutos", destino: "/pacientes", destino_label: "Ver clientes" },
+    { texto: "Clientes sem telefone cadastrado ficam fora do alcance dos lembretes automáticos — vale a pena completar esses dados.", icone: "📱", porQueImporta: "Dados completos melhoram o atendimento e aumentam as chances de gerar retorno recorrente.", impactoEsperado: "Você melhora o alcance dos contatos e fortalece a relação com os clientes.", tempoEstimado: "≈ 5 minutos", destino: "/clientes", destino_label: "Ver clientes" },
   ];
   const [y, m, d] = ctx.hoje.split("-").map(Number);
   return gerais[(y * 366 + m * 31 + d) % gerais.length];
@@ -188,7 +188,7 @@ function gerarInsights(ctx: {
         numero: ctx.clientesParaReativar,
         label: `cliente${ctx.clientesParaReativar > 1 ? "s" : ""} podem voltar a fazer negócio.`,
         tom: "positivo",
-        destino: "/pacientes", destino_label: "Ver Clientes",
+        destino: "/clientes", destino_label: "Ver Clientes",
       }
     : { numero: 0, label: "Nenhuma oportunidade no momento.", tom: "neutro" };
 
@@ -432,9 +432,9 @@ export default function Dashboard() {
   ];
 
   const botoesRapidos = [
-    { icon: "➕", label: "Novo Cliente",      action: () => router.push("/pacientes")    },
+    { icon: "➕", label: "Novo Cliente",      action: () => router.push("/clientes")    },
     { icon: "📅", label: "Novo Compromisso",  action: () => router.push("/agendamentos") },
-    { icon: "🔍", label: "Pesquisar Cliente", action: () => router.push("/pacientes")    },
+    { icon: "🔍", label: "Pesquisar Cliente", action: () => router.push("/clientes")    },
   ];
 
   const ideia = gerarIdeia({

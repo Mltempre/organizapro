@@ -103,7 +103,7 @@ const REGRAS: Regra[] = [
         explicacao: "Relacionamentos esfriam quando ficam tempo demais sem contato. Vale a pena retomar hoje.",
         motivo: `${ctx.clientesParaReativar} cliente${plural ? "s" : ""} sem próximo compromisso agendado.`,
         acao: "Entrar em contato hoje",
-        destino: "/pacientes", destinoLabel: "Ver clientes",
+        destino: "/clientes", destinoLabel: "Ver clientes",
       };
     },
   },
@@ -219,7 +219,7 @@ const REGRAS: Regra[] = [
         explicacao: "Uma base organizada é o ponto de partida para qualquer recomendação futura minha.",
         motivo: "Nenhum cliente foi cadastrado ainda.",
         acao: "Cadastrar cliente",
-        destino: "/pacientes", destinoLabel: "Cadastrar",
+        destino: "/clientes", destinoLabel: "Cadastrar",
       };
     },
   },

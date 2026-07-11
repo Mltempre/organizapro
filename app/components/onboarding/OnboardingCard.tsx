@@ -35,7 +35,7 @@ export default function OnboardingCard({
   const etapas = [
     { key: "empresa",     label: "Configurar dados da empresa",  done: temEmpresa,     path: "/configuracoes" },
     { key: "whatsapp",    label: "Configurar WhatsApp",          done: temWhatsapp,    path: "/configuracoes" },
-    { key: "cliente",     label: "Cadastrar primeiro cliente",   done: temCliente,     path: "/pacientes"     },
+    { key: "cliente",     label: "Cadastrar primeiro cliente",   done: temCliente,     path: "/clientes"      },
     { key: "compromisso", label: "Criar primeiro compromisso",   done: temCompromisso, path: "/agendamentos"  },
     { key: "dashboard",   label: "Conhecer o Dashboard",         done: dashboardVisto, path: null as string | null },
   ];

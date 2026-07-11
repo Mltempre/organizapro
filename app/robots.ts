@@ -19,7 +19,7 @@ export default function robots(): MetadataRoute.Robots {
           "/automacao",
           "/conteudo",
           "/metricas",
-          "/pacientes",
+          "/clientes",
           "/reputacao",
           "/site",
           "/chatbot",

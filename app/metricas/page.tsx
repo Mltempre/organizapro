@@ -106,7 +106,7 @@ export default function Metricas() {
           title="Ainda não há dados suficientes para gerar métricas."
           description="Cadastre clientes e compromissos para ver o desempenho do seu negócio aqui."
           actionLabel="➕ Cadastrar cliente"
-          onAction={() => router.push('/pacientes')}
+          onAction={() => router.push('/clientes')}
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
