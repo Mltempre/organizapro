@@ -1,6 +1,6 @@
 # Scripts OrganizaPro
 
-## implantar-cliente.js
+## implantar-cliente.mjs
 
 Script oficial para implantar novos clientes sem acesso manual ao Supabase.
 
@@ -20,10 +20,10 @@ NEXT_PUBLIC_APP_URL=https://app.organizapro.com.br
 
 ```bash
 # Testar se o ambiente está configurado (sem alterar nada no banco)
-node scripts/implantar-cliente.js --dry-run
+node scripts/implantar-cliente.mjs --dry-run
 
 # Implantar um novo cliente
-node scripts/implantar-cliente.js
+node scripts/implantar-cliente.mjs
 ```
 
 O script pedirá no terminal:

@@ -1,15 +1,16 @@
-'use strict';
-
 /**
  * Script de implantação de novo cliente OrganizaPro.
- * Uso: node scripts/implantar-cliente.js
- * Teste: node scripts/implantar-cliente.js --dry-run
+ * Uso: node scripts/implantar-cliente.mjs
+ * Teste: node scripts/implantar-cliente.mjs --dry-run
  */
 
-const fs       = require('fs');
-const path     = require('path');
-const readline = require('readline');
-const { createClient } = require('@supabase/supabase-js');
+import fs from 'fs';
+import path from 'path';
+import readline from 'readline';
+import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Utilitários ───────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ async function main() {
     console.log('  2. INSERT INTO clinicas (nome, whatsapp, slug)');
     console.log('  3. INSERT INTO clinica_usuarios (usuario_id, clinica_id)');
     console.log('  4. UPSERT INTO clinica_config (user_id, clinica_id, nome_clinica, ...)');
-    console.log('\nPara implantar de verdade: node scripts/implantar-cliente.js\n');
+    console.log('\nPara implantar de verdade: node scripts/implantar-cliente.mjs\n');
     process.exit(0);
   }
 
