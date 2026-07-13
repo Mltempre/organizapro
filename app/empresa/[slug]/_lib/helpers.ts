@@ -6,40 +6,99 @@ export const initials = (nome: string) =>
 export const safeData = <T,>(res: { data: T[] | null; error: { code?: string } | null }) =>
   res.error ? [] : (res.data ?? []);
 
-// Texto "Sobre a empresa" — gerado só a partir de dados reais cadastrados,
-// dividido em blocos curtos (parágrafos editoriais, não um bloco único).
-// Nunca é texto fixo genérico, nunca é informação inventada: cada frase só
-// existe se o campo correspondente existir no banco.
+// ── Copy gerada a partir de dados reais ─────────────────────────────────
+//
+// Regra de ouro de todo este arquivo: nunca inventar um fato sobre a
+// empresa (nenhuma estatística, nenhum elogio não verificável do tipo
+// "referência na região"). Cada frase só existe se o campo correspondente
+// existir no cadastro; quando falta dado, cai num fallback honesto — nunca
+// um fallback que soe como afirmação específica.
+//
+// Cuidado gramatical deliberado: nomes de empresa em português exigem
+// concordância de gênero (a/o, localizada/localizado) que não dá para
+// inferir de uma string arbitrária. Por isso as frases abaixo evitam
+// artigo + adjetivo flexionado junto ao nome — usam verbos e preposições,
+// que não flexionam por gênero.
+
+function tituloCase(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// Texto "Sobre a empresa" — parágrafos curtos, nunca um bloco genérico.
 export function gerarSobre(empresa: Empresa, qtdEquipe: number): string[] {
   const blocos: string[] = [];
   const local = [empresa.cidade, empresa.estado].filter(Boolean).join(", ");
-  if (empresa.especialidade && local) {
-    blocos.push(`A ${empresa.nome} atua em ${empresa.especialidade.toLowerCase()} e está localizada em ${local}.`);
-  } else if (empresa.especialidade) {
-    blocos.push(`A ${empresa.nome} atua em ${empresa.especialidade.toLowerCase()}.`);
+  const esp = empresa.especialidade?.toLowerCase();
+
+  if (esp && local) {
+    blocos.push(`${empresa.nome} atua em ${esp}, em ${local}.`);
+  } else if (esp) {
+    blocos.push(`${empresa.nome} atua em ${esp}.`);
   } else if (local) {
-    blocos.push(`A ${empresa.nome} está localizada em ${local}.`);
+    blocos.push(`${empresa.nome} está em ${local}.`);
   } else {
-    blocos.push(`A ${empresa.nome} é uma empresa comprometida em oferecer o melhor atendimento aos seus clientes.`);
+    blocos.push(`${empresa.nome} valoriza um atendimento próximo, do primeiro contato ao resultado final.`);
   }
+
   const segundo: string[] = [];
   if (qtdEquipe > 0) {
-    segundo.push(`Contamos com uma equipe de ${qtdEquipe} profissional${qtdEquipe > 1 ? "is" : ""} dedicada${qtdEquipe > 1 ? "s" : ""} a oferecer um atendimento próximo e de confiança.`);
+    segundo.push(`Uma equipe de ${qtdEquipe} ${qtdEquipe > 1 ? "profissionais dedicados" : "profissional dedicado"} cuida de cada atendimento pessoalmente.`);
   }
-  segundo.push("Cada atendimento é conduzido com organização e transparência, do primeiro contato ao resultado final.");
+  segundo.push("Organização e transparência guiam cada etapa, sem letras miúdas.");
   blocos.push(segundo.join(" "));
   return blocos;
 }
 
-// Headline do hero — curta e editorial, para quebrar bem em 2-3 linhas.
-// Não repete a especialidade (já aparece no selo acima) — foca em uma
-// promessa institucional universal.
-export function gerarTituloHero(): string {
-  return "Um padrão de atendimento acima da média.";
+// Hero — headline muda de fato conforme o dado real disponível, em vez de
+// uma frase institucional fixa repetida em todo site publicado.
+export function gerarTituloHero(empresa: Empresa): string {
+  if (empresa.especialidade) return `${tituloCase(empresa.especialidade)}, sem complicação.`;
+  if (empresa.nome) return `${empresa.nome}: atendimento que faz a diferença.`;
+  return "Um atendimento que faz a diferença.";
 }
 
-// Subtítulo comercial curto do hero — copy universal, não depende do nome
-// (evita frases como "Fale agora com Sua Empresa").
-export function gerarSubtituloHero(): string {
-  return "Atendimento ágil, personalizado e feito para gerar resultado.";
+export function gerarSubtituloHero(empresa: Empresa, local: string): string {
+  if (local) return `Atendimento ágil e transparente em ${local}.`;
+  return "Ágil, transparente e feito sob medida para o seu momento.";
+}
+
+// Indicadores de confiança do hero — só dado real cadastrado.
+export function gerarIndicadoresConfianca(empresa: Empresa, local: string): { icone: string; texto: string }[] {
+  const itens: { icone: string; texto: string }[] = [];
+  if (local) itens.push({ icone: "pin", texto: local });
+  if (empresa.especialidade) itens.push({ icone: "target", texto: empresa.especialidade });
+  if (empresa.nota_google) itens.push({ icone: "star", texto: `${empresa.nota_google} ${empresa.num_avaliacoes ? `(${empresa.num_avaliacoes} avaliações)` : "no Google"}` });
+  if (empresa.horario_funcionamento) itens.push({ icone: "clock", texto: empresa.horario_funcionamento });
+  return itens.slice(0, 4);
+}
+
+// Títulos de seção — cada um tenta usar especialidade/local reais antes de
+// cair num fallback genérico. Evita deliberadamente as frases template
+// ("Conheça um pouco mais", "Somos especialistas", "Empresa pensada para
+// você") e qualquer construção que exija concordância de gênero com o nome.
+export function gerarTituloSobre(empresa: Empresa): string {
+  if (empresa.especialidade) return `${tituloCase(empresa.especialidade)}, do jeito certo.`;
+  return "Quem cuida do seu atendimento";
+}
+
+export function gerarTituloServicos(empresa: Empresa): string {
+  if (empresa.especialidade) return `Serviços em ${empresa.especialidade.toLowerCase()}`;
+  return "O que oferecemos";
+}
+
+export function gerarTituloGaleria(empresa: Empresa): string {
+  if (empresa.especialidade) return `${tituloCase(empresa.especialidade)} em imagens`;
+  return "Nosso trabalho em imagens";
+}
+
+export function gerarTituloDepoimentos(): string {
+  return "O que dizem sobre o atendimento";
+}
+
+export function gerarTituloContato(local: string): string {
+  if (local) return `Fale com a gente em ${local}`;
+  return "Fale com a gente";
+}
+
+export function gerarTituloCtaFinal(empresa: Empresa): string {
+  if (empresa.especialidade) return `Pronto para tratar de ${empresa.especialidade.toLowerCase()}?`;
+  return "Vamos conversar sobre o que você precisa?";
 }

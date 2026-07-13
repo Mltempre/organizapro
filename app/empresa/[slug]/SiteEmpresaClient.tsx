@@ -3,12 +3,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../../lib/supabase";
 import Header from "./_components/Header";
 import Hero from "./_components/Hero";
-import Credibilidade from "./_components/Credibilidade";
+import Banner from "./_components/Banner";
 import Sobre from "./_components/Sobre";
 import Servicos from "./_components/Servicos";
 import Diferenciais from "./_components/Diferenciais";
 import Processo from "./_components/Processo";
 import Galeria from "./_components/Galeria";
+import Equipe from "./_components/Equipe";
 import Depoimentos from "./_components/Depoimentos";
 import Faq from "./_components/Faq";
 import Contato from "./_components/Contato";
@@ -16,7 +17,8 @@ import CtaFinal from "./_components/CtaFinal";
 import Footer from "./_components/Footer";
 import { IcWa } from "./_components/icons";
 import { gerarSobre, gerarTituloHero, gerarSubtituloHero, safeData } from "./_lib/helpers";
-import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura } from "./_lib/types";
+import { color, font, gradient, shadow } from "./_lib/theme";
+import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura, DBFaq } from "./_lib/types";
 
 // ── Site Institucional Universal — OrganizaPro ──────────────────────────────
 //
@@ -34,20 +36,31 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
   const [depoimentos, setDepoimentos] = useState<DBDepoimento[]>([]);
   const [servicos, setServicos] = useState<DBServico[]>([]);
   const [estrutura, setEstrutura] = useState<DBEstrutura[]>([]);
+  const [faqs, setFaqs] = useState<DBFaq[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!slug) return;
     async function carregar() {
-      let config: { clinica_id: string; logo_url?: string; hero_url?: string; nota_google?: number | null; num_avaliacoes?: number | null; horario_funcionamento?: string | null } | null = null;
+      type ConfigRow = {
+        clinica_id: string; logo_url?: string; hero_url?: string; banner_url?: string | null;
+        nota_google?: number | null; num_avaliacoes?: number | null; horario_funcionamento?: string | null;
+        instagram_url?: string | null; facebook_url?: string | null; linkedin_url?: string | null; tiktok_url?: string | null;
+        seo_titulo?: string | null; seo_descricao?: string | null; seo_imagem_url?: string | null;
+      };
+      let config: ConfigRow | null = null;
+      // Lê da view pública clinica_config_publica — a tabela base
+      // clinica_config não aceita mais leitura anônima (ver migração
+      // 20260713000002_fix_clinica_config_rls.sql), só as 14 colunas
+      // necessárias para o site institucional ficam expostas aqui.
       const { data: cfgFull, error: cfgErr } = await supabase
-        .from("clinica_config")
-        .select("clinica_id, logo_url, hero_url, nota_google, num_avaliacoes, horario_funcionamento")
+        .from("clinica_config_publica")
+        .select("clinica_id, logo_url, hero_url, banner_url, nota_google, num_avaliacoes, horario_funcionamento, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
         .eq("slug", slug)
         .maybeSingle();
 
       if (cfgErr?.code === "42703") {
-        const { data: cfgBasic } = await supabase.from("clinica_config").select("clinica_id, logo_url").eq("slug", slug).maybeSingle();
+        const { data: cfgBasic } = await supabase.from("clinica_config_publica").select("clinica_id, logo_url").eq("slug", slug).maybeSingle();
         config = cfgBasic ? { clinica_id: cfgBasic.clinica_id, logo_url: cfgBasic.logo_url } : null;
       } else if (!cfgErr) {
         config = cfgFull;
@@ -56,28 +69,38 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
       if (!config?.clinica_id) { setEmpresa(null); setLoading(false); return; }
       const cid = config.clinica_id;
 
-      const [empresaRes, galeriaRes, equipeRes, depRes, srvRes, estRes] = await Promise.all([
+      const [empresaRes, galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes] = await Promise.all([
         supabase.from("clinicas").select("*").eq("id", cid).maybeSingle(),
         supabase.from("clinica_galeria").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_equipe").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_depoimentos").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_servicos").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_estrutura").select("*").eq("clinica_id", cid).order("ordem"),
+        supabase.from("clinica_faq").select("*").eq("clinica_id", cid).order("ordem"),
       ]);
 
       setEmpresa({
         ...(empresaRes.data ?? {}),
         logo_url: config.logo_url ?? undefined,
         hero_url: config.hero_url ?? undefined,
+        banner_url: config.banner_url ?? null,
         nota_google: config.nota_google ?? null,
         num_avaliacoes: config.num_avaliacoes ?? null,
         horario_funcionamento: config.horario_funcionamento ?? null,
+        instagram_url: config.instagram_url ?? null,
+        facebook_url: config.facebook_url ?? null,
+        linkedin_url: config.linkedin_url ?? null,
+        tiktok_url: config.tiktok_url ?? null,
+        seo_titulo: config.seo_titulo ?? null,
+        seo_descricao: config.seo_descricao ?? null,
+        seo_imagem_url: config.seo_imagem_url ?? null,
       });
       setGaleria(safeData(galeriaRes as { data: DBGaleria[] | null; error: { code?: string } | null }));
       setEquipe(safeData(equipeRes as { data: DBEquipe[] | null; error: { code?: string } | null }));
       setDepoimentos(safeData(depRes as { data: DBDepoimento[] | null; error: { code?: string } | null }));
       setServicos(safeData(srvRes as { data: DBServico[] | null; error: { code?: string } | null }));
       setEstrutura(safeData(estRes as { data: DBEstrutura[] | null; error: { code?: string } | null }));
+      setFaqs(safeData(faqRes as { data: DBFaq[] | null; error: { code?: string } | null }));
       setLoading(false);
     }
     carregar();
@@ -109,42 +132,53 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
   const esp = empresa.especialidade || "";
   const local = [empresa.cidade, empresa.estado].filter(Boolean).join(", ");
   const sobre = gerarSobre(empresa, equipe.length);
-  const titulo = gerarTituloHero();
-  const subtitulo = gerarSubtituloHero();
+  const titulo = gerarTituloHero(empresa);
+  const subtitulo = gerarSubtituloHero(empresa, local);
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif", background: "#ffffff", color: "#14110D" }}>
+    <div style={{ fontFamily: font.family, background: color.ink, color: color.text }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,450;9..144,550;9..144,650&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         *{box-sizing:border-box}body{margin:0}
         html{scroll-behavior:smooth}
-        h1,h2{font-family:'Fraunces',Georgia,serif;font-optical-sizing:auto}
-        h1,h2,h3{text-wrap:balance}
-        #sobre,#servicos,#contato{scroll-margin-top:84px}
-        .servico-row:first-child{border-top:none}
+        h1,h2,h3{text-wrap:balance;font-family:${font.family}}
+        #sobre,#servicos,#depoimentos,#contato{scroll-margin-top:76px}
+
+        .nav-link-item{transition:opacity .18s}
+        .nav-link-item:hover{opacity:1!important}
+        .servico-card:hover{border-color:${color.accentBorder}!important;transform:translateY(-3px);background:${color.surfaceHover}!important}
+        .dif-card:hover{background:rgba(255,255,255,0.06)!important;border-color:rgba(255,255,255,0.22)!important;transform:translateY(-2px)}
+        .dep-card:hover{border-color:${color.accentBorder}!important;transform:translateY(-3px)}
+        .galeria-item:hover img{transform:scale(1.06)}
+        .btn-hero-glow{animation:ctaGlow 2.6s ease-in-out infinite}
+        @keyframes ctaGlow{0%,100%{box-shadow:${shadow.ctaGlow}}50%{box-shadow:${shadow.ctaGlowHover}}}
+        .live-dot-hero{animation:pulseDot 1.6s ease-in-out infinite}
+        @keyframes pulseDot{0%,100%{opacity:1}50%{opacity:0.35}}
+
+        @media(max-width:1024px){
+          .three-col{grid-template-columns:repeat(2,1fr)!important}
+          .dif-grid{grid-template-columns:repeat(2,1fr)!important}
+          .four-col{grid-template-columns:repeat(2,1fr)!important}
+        }
         @media(max-width:900px){
           .nav-links{display:none!important}
           .nav-burger{display:flex!important}
-          .hero-grid{grid-template-columns:1fr!important;padding-top:120px!important}
-          .hero-visual{order:-1;aspect-ratio:16/10!important;max-height:340px}
+          .hero-grid{grid-template-columns:1fr!important;padding-top:116px!important;gap:40px!important}
+          .hero-visual{order:-1;aspect-ratio:16/9!important;max-height:320px}
           .sobre-grid{grid-template-columns:1fr!important}
           .sobre-grid > div:last-child{aspect-ratio:16/9!important;order:-1}
         }
         @media(max-width:768px){
           .hero-ctas{flex-direction:column!important;align-items:stretch!important}
-          .two-col{grid-template-columns:1fr!important;gap:8px!important}
-          .dif-grid{grid-template-columns:1fr!important}
-          .three-col{grid-template-columns:1fr!important}
-          .four-col{grid-template-columns:1fr 1fr!important}
+          .two-col{grid-template-columns:1fr!important;gap:16px!important}
           .processo-grid{grid-template-columns:1fr!important;gap:32px!important}
           .processo-line{display:none!important}
-          .cred-bar{flex-direction:column!important}
-          .cred-bar > div{border-left:none!important;border-top:1px solid rgba(255,255,255,0.10);justify-content:flex-start!important;width:100%}
-          .cred-bar > div:first-child{border-top:none}
           .galeria-grid{grid-template-columns:1fr 1fr!important}
           .footer-cols{flex-direction:column!important;gap:24px!important}
         }
-        @media(max-width:480px){
+        @media(max-width:560px){
+          .three-col{grid-template-columns:1fr!important}
+          .dif-grid{grid-template-columns:1fr!important}
           .four-col{grid-template-columns:1fr!important}
           .galeria-grid{grid-template-columns:1fr!important}
           .galeria-grid > div{grid-row:auto!important}
@@ -153,21 +187,22 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
 
       <Header nome={nome} logoUrl={empresa.logo_url} waLink={waLink} whatsappNumber={whatsappNumber}/>
       <Hero empresa={empresa} esp={esp} local={local} titulo={titulo} subtitulo={subtitulo} waLink={waLink} whatsappNumber={whatsappNumber}/>
-      <Credibilidade empresa={empresa} local={local}/>
+      <Banner bannerUrl={empresa.banner_url} nome={nome}/>
       <Sobre empresa={empresa} nome={nome} sobre={sobre}/>
-      <Servicos servicos={servicos}/>
+      <Servicos servicos={servicos} empresa={empresa}/>
       <Diferenciais/>
       <Processo/>
-      <Galeria galeria={galeria} estrutura={estrutura}/>
+      <Galeria galeria={galeria} estrutura={estrutura} empresa={empresa}/>
+      <Equipe equipe={equipe}/>
       <Depoimentos depoimentos={depoimentos}/>
-      <Faq/>
+      <Faq faqs={faqs}/>
       <Contato empresa={empresa} waLink={waLink} whatsappNumber={whatsappNumber}/>
       <CtaFinal empresa={empresa} waLink={waLink} whatsappNumber={whatsappNumber}/>
 
       {whatsappNumber && (
         <a href={waLink} target="_blank" rel="noreferrer" title="Falar no WhatsApp"
-          style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, width: 58, height: 58, borderRadius: "50%", background: "#25D366", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 24px rgba(37,211,102,0.40)", textDecoration: "none", transition: "transform 0.2s" }}
-          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "scale(1.1)"; }}
+          style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, width: 56, height: 56, borderRadius: "50%", background: gradient, color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: shadow.ctaGlow, textDecoration: "none", transition: "transform 0.2s" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "scale(1.08)"; }}
           onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = ""; }}>
           <IcWa/>
         </a>

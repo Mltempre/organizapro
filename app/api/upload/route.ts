@@ -7,8 +7,8 @@ const supabase = createClient(
 );
 
 const BUCKET = "clinica-assets";
-const SINGLE_TIPOS = ["logo", "hero"] as const;
-const VALID_TIPOS  = ["logo", "hero", "galeria", "equipe", "antesdepois", "servico", "estrutura", "depoimento"] as const;
+const SINGLE_TIPOS = ["logo", "hero", "banner", "seo"] as const;
+const VALID_TIPOS  = ["logo", "hero", "banner", "seo", "galeria", "equipe", "antesdepois", "servico", "estrutura", "depoimento"] as const;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4"]);
 const ALLOWED_EXT  = new Set(["jpg", "jpeg", "png", "webp", "gif", "mp4"]);
 

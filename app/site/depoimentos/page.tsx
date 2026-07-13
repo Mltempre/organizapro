@@ -15,6 +15,7 @@ const NAV = [
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬", a:true },
   { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
   { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
+  { l:"FAQ",           h:"/site/faq",        i:"❓"  },
 ];
 
 const AVATAR_COLORS = ["#00c896","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#06b6d4"];

@@ -19,6 +19,14 @@ type SiteForm = {
   hero_url: string;
   nota_google: string;
   num_avaliacoes: string;
+  banner_url: string;
+  instagram_url: string;
+  facebook_url: string;
+  linkedin_url: string;
+  tiktok_url: string;
+  seo_titulo: string;
+  seo_descricao: string;
+  seo_imagem_url: string;
 };
 
 type ClinicaInfo = {
@@ -52,15 +60,21 @@ export default function Site() {
   const [origin, setOrigin]                     = useState("");
   const [uploadingLogo, setUploadingLogo]       = useState(false);
   const [uploadingHero, setUploadingHero]       = useState(false);
+  const [uploadingBanner, setUploadingBanner]   = useState(false);
+  const [uploadingSeoImg, setUploadingSeoImg]   = useState(false);
   const [migrationPending, setMigrationPending] = useState(false);
   const [feedbackModal, setFeedbackModal]       = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const heroInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef   = useRef<HTMLInputElement>(null);
+  const heroInputRef   = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const seoImgInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<SiteForm>({
     nome: "", especialidade: "", telefone: "", whatsapp: "",
     endereco: "", cidade: "", estado: "", google_maps_url: "", email: "", slug: "",
     logo_url: "", hero_url: "", nota_google: "", num_avaliacoes: "",
+    banner_url: "", instagram_url: "", facebook_url: "", linkedin_url: "", tiktok_url: "",
+    seo_titulo: "", seo_descricao: "", seo_imagem_url: "",
   });
 
   const carregar = useCallback(async () => {
@@ -93,7 +107,7 @@ export default function Site() {
 
     const { data: config, error: configError } = await supabase
       .from("clinica_config")
-      .select("slug, logo_url, hero_url, nota_google, num_avaliacoes")
+      .select("slug, logo_url, hero_url, nota_google, num_avaliacoes, banner_url, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -120,6 +134,14 @@ export default function Site() {
         hero_url:       config.hero_url                   || "",
         nota_google:    config.nota_google?.toString()    || "",
         num_avaliacoes: config.num_avaliacoes?.toString() || "",
+        banner_url:     config.banner_url                 || "",
+        instagram_url:  config.instagram_url              || "",
+        facebook_url:   config.facebook_url               || "",
+        linkedin_url:   config.linkedin_url               || "",
+        tiktok_url:     config.tiktok_url                 || "",
+        seo_titulo:     config.seo_titulo                 || "",
+        seo_descricao:  config.seo_descricao              || "",
+        seo_imagem_url: config.seo_imagem_url             || "",
       }));
     }
   }, [router]);
@@ -179,10 +201,17 @@ export default function Site() {
 
   const normalizePhone = (value: string) => value.replace(/\D/g, "");
 
-  async function uploadImagem(file: File, tipo: "logo" | "hero") {
+  const UPLOAD_INFO = {
+    logo:   { setUploading: setUploadingLogo,   field: "logo_url" as const,       label: "Logo" },
+    hero:   { setUploading: setUploadingHero,   field: "hero_url" as const,       label: "Imagem hero" },
+    banner: { setUploading: setUploadingBanner, field: "banner_url" as const,     label: "Banner" },
+    seo:    { setUploading: setUploadingSeoImg, field: "seo_imagem_url" as const, label: "Imagem de SEO" },
+  };
+
+  async function uploadImagem(file: File, tipo: keyof typeof UPLOAD_INFO) {
     if (!clinicaId) { setErro("Salve os dados básicos antes de enviar imagens."); return; }
     if (file.size > 5 * 1024 * 1024) { setErro("Arquivo muito grande. Máximo 5 MB."); return; }
-    const setUploading = tipo === "logo" ? setUploadingLogo : setUploadingHero;
+    const { setUploading, field, label } = UPLOAD_INFO[tipo];
     setUploading(true);
     setErro("");
     try {
@@ -202,12 +231,18 @@ export default function Site() {
       const data = await res.json();
       if (!res.ok) { setErro(data.error || "Erro no upload."); return; }
 
-      setForm(prev => ({ ...prev, [`${tipo}_url`]: data.url }));
-      setSucesso(`${tipo === "logo" ? "Logo" : "Imagem hero"} enviada! Clique em Salvar para publicar.`);
+      setForm(prev => ({ ...prev, [field]: data.url }));
+      setSucesso(`${label} enviada! Clique em Salvar para publicar.`);
       setTimeout(() => setSucesso(""), 4000);
     } finally {
       setUploading(false);
     }
+  }
+
+  function removerBanner() {
+    setForm(prev => ({ ...prev, banner_url: "" }));
+    setSucesso("Banner removido. Clique em Salvar para publicar.");
+    setTimeout(() => setSucesso(""), 4000);
   }
 
   async function salvar() {
@@ -258,11 +293,27 @@ export default function Site() {
     if (numAvaliacoes !== null && (isNaN(numAvaliacoes) || numAvaliacoes < 0)) {
       setErro("Número de avaliações inválido."); setSalvando(false); return;
     }
+    for (const [label, valor] of [
+      ["Instagram", form.instagram_url], ["Facebook", form.facebook_url],
+      ["LinkedIn", form.linkedin_url], ["TikTok", form.tiktok_url],
+    ] as const) {
+      if (valor && !/^https?:\/\//i.test(valor)) {
+        setErro(`Link do ${label} deve começar com http:// ou https://.`); setSalvando(false); return;
+      }
+    }
     const configFull = migrationPending ? configBase : {
       ...configBase,
       hero_url:       form.hero_url || null,
       nota_google:    notaGoogle,
       num_avaliacoes: numAvaliacoes,
+      banner_url:     form.banner_url || null,
+      instagram_url:  form.instagram_url || null,
+      facebook_url:   form.facebook_url || null,
+      linkedin_url:   form.linkedin_url || null,
+      tiktok_url:     form.tiktok_url || null,
+      seo_titulo:     form.seo_titulo || null,
+      seo_descricao:  form.seo_descricao || null,
+      seo_imagem_url: form.seo_imagem_url || null,
     };
 
     const { error: configError } = await supabase
@@ -349,6 +400,7 @@ export default function Site() {
           { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
           { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
           { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
+          { l:"FAQ",           h:"/site/faq",        i:"❓"  },
         ].map(m => (
           <button key={m.h} onClick={() => router.push(m.h)} style={{ padding:"7px 14px", borderRadius:8, border:`1px solid ${m.a ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.08)"}`, background:m.a ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.02)", color:m.a ? "#c4b5fd" : "#64748b", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontWeight:m.a ? 600 : 400, whiteSpace:"nowrap" }}>
             {m.i} {m.l}
@@ -589,6 +641,119 @@ export default function Site() {
               disabled={migrationPending}
             />
           </div>
+        </div>
+      </div>
+
+      {/* ── BANNER ───────────────────────────────────────────────────────────── */}
+      <div className="panel">
+        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🏳️ Banner</div>
+        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Faixa de imagem exibida logo abaixo do topo do site. Opcional — sem banner, essa faixa simplesmente não aparece.</div>
+        <div style={{ maxWidth:480 }}>
+          <div
+            style={{
+              ...uploadAreaStyle(!!form.banner_url),
+              backgroundImage: form.banner_url ? `url(${form.banner_url})` : undefined,
+              backgroundSize: "cover", backgroundPosition: "center",
+            }}
+            onClick={() => bannerInputRef.current?.click()}
+          >
+            {form.banner_url
+              ? <div style={{ background:"rgba(0,0,0,0.55)", color:"#fff", borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600 }}>Clique para trocar</div>
+              : <div style={{ color:"var(--muted)", fontSize:13, lineHeight:1.7 }}>
+                  <div style={{ fontSize:26, marginBottom:6 }}>🏳️</div>
+                  Clique para enviar um banner<br />
+                  <span style={{ fontSize:11, opacity:0.7 }}>JPG ou PNG, até 5 MB</span>
+                </div>
+            }
+            {uploadingBanner && (
+              <div style={{ position:"absolute", inset:0, background:"rgba(15,23,42,0.78)", display:"flex", alignItems:"center", justifyContent:"center", borderRadius:10, color:"#c4b5fd", fontSize:13, fontWeight:600 }}>
+                Enviando...
+              </div>
+            )}
+          </div>
+          {form.banner_url && (
+            <button type="button" onClick={removerBanner}
+              style={{ marginTop:8, fontSize:11, color:"#f87171", background:"none", border:"none", cursor:"pointer", padding:0 }}>
+              Remover banner
+            </button>
+          )}
+        </div>
+        <input ref={bannerInputRef} type="file" accept="image/*" style={{ display:"none" }}
+          onChange={(e) => e.target.files?.[0] && uploadImagem(e.target.files[0], "banner")} />
+      </div>
+
+      {/* ── REDES SOCIAIS ────────────────────────────────────────────────────── */}
+      <div className="panel">
+        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>📱 Redes Sociais</div>
+        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Só aparecem no site os ícones das redes preenchidas aqui.</div>
+        <div className="grid-cards">
+          {([
+            { label:"Instagram", key:"instagram_url", placeholder:"https://instagram.com/seu-negocio" },
+            { label:"Facebook",  key:"facebook_url",   placeholder:"https://facebook.com/seu-negocio"  },
+            { label:"LinkedIn",  key:"linkedin_url",   placeholder:"https://linkedin.com/company/seu-negocio" },
+            { label:"TikTok",    key:"tiktok_url",      placeholder:"https://tiktok.com/@seu-negocio"   },
+          ] as const).map(f => (
+            <div key={f.key}>
+              <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>{f.label}</label>
+              <input
+                value={form[f.key]}
+                onChange={(e) => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                className="input-field"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── SEO ──────────────────────────────────────────────────────────────── */}
+      <div className="panel">
+        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🔎 SEO</div>
+        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>
+          Controla o título e a prévia do site quando compartilhado (Google, WhatsApp, redes sociais). Deixe em branco para usar os valores gerados automaticamente a partir do nome e da especialidade.
+        </div>
+        <div style={{ marginBottom:14 }}>
+          <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>Título (aparece na aba do navegador e no Google)</label>
+          <input
+            value={form.seo_titulo}
+            onChange={(e) => setForm(prev => ({ ...prev, seo_titulo: e.target.value }))}
+            placeholder={form.nome ? `${form.nome}${form.especialidade ? ` — ${form.especialidade}` : ""}` : "Ex: Meu Negócio — Consultoria"}
+            className="input-field"
+            maxLength={70}
+          />
+        </div>
+        <div style={{ marginBottom:14 }}>
+          <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>Descrição (aparece abaixo do título nos resultados de busca)</label>
+          <textarea
+            value={form.seo_descricao}
+            onChange={(e) => setForm(prev => ({ ...prev, seo_descricao: e.target.value }))}
+            placeholder="Uma frase curta sobre o seu negócio, o que oferece e onde atende."
+            className="input-field"
+            style={{ resize:"vertical", minHeight:70 }}
+            maxLength={160}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>Imagem de compartilhamento (Open Graph)</label>
+          <div style={{ maxWidth:320 }}>
+            <div style={uploadAreaStyle(!!form.seo_imagem_url)} onClick={() => seoImgInputRef.current?.click()}>
+              {form.seo_imagem_url
+                ? <img src={form.seo_imagem_url} alt="Imagem de SEO" style={{ maxHeight:90, maxWidth:"100%", objectFit:"contain" }} />
+                : <div style={{ color:"var(--muted)", fontSize:13, lineHeight:1.7 }}>
+                    <div style={{ fontSize:26, marginBottom:6 }}>🔎</div>
+                    Clique para enviar uma imagem<br />
+                    <span style={{ fontSize:11, opacity:0.7 }}>Opcional — sem ela, usamos o Hero ou a Logo</span>
+                  </div>
+              }
+              {uploadingSeoImg && (
+                <div style={{ position:"absolute", inset:0, background:"rgba(15,23,42,0.78)", display:"flex", alignItems:"center", justifyContent:"center", borderRadius:10, color:"#c4b5fd", fontSize:13, fontWeight:600 }}>
+                  Enviando...
+                </div>
+              )}
+            </div>
+          </div>
+          <input ref={seoImgInputRef} type="file" accept="image/*" style={{ display:"none" }}
+            onChange={(e) => e.target.files?.[0] && uploadImagem(e.target.files[0], "seo")} />
         </div>
       </div>
 

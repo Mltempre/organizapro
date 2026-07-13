@@ -15,6 +15,7 @@ const NAV = [
   { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
   { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
   { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
+  { l:"FAQ",           h:"/site/faq",        i:"❓"  },
 ];
 
 const initials = (nome: string) => nome.trim().split(" ").filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join("");
