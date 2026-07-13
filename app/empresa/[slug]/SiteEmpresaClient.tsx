@@ -165,6 +165,7 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
           .nav-burger{display:flex!important}
           .hero-grid{grid-template-columns:1fr!important;padding-top:116px!important;gap:40px!important}
           .hero-visual{order:-1;aspect-ratio:16/9!important;max-height:320px}
+          .hero-visual-panel{aspect-ratio:auto!important;max-height:none!important}
           .sobre-grid{grid-template-columns:1fr!important}
           .sobre-grid > div:last-child{aspect-ratio:16/9!important;order:-1}
         }

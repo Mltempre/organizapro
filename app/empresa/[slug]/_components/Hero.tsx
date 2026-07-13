@@ -64,7 +64,7 @@ export default function Hero({ empresa, esp, local, titulo, subtitulo, waLink, w
           // a mesma linguagem do painel "ao vivo" do Diretor Digital na
           // Landing Oficial, elevada a selo de marca. Nunca inventa número
           // ou estatística: cada linha só existe se o dado for real.
-          <div className="hero-visual" style={{ position: "relative" }}>
+          <div className="hero-visual hero-visual-panel" style={{ position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
               <span className="live-dot-hero" style={{ width: 8, height: 8, borderRadius: "50%", background: color.live, display: "inline-block" }}/>
               <span style={{ fontSize: 12, fontWeight: 700, color: color.live, letterSpacing: "0.04em", textTransform: "uppercase" }}>Perfil verificado</span>

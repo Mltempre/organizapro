@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
+import PageLoader from "../components/PageLoader";
 
 type SiteForm = {
   nome: string;
@@ -19,6 +20,7 @@ type SiteForm = {
   hero_url: string;
   nota_google: string;
   num_avaliacoes: string;
+  horario_funcionamento: string;
   banner_url: string;
   instagram_url: string;
   facebook_url: string;
@@ -41,6 +43,16 @@ type ClinicaInfo = {
   email?: string;
 };
 
+const CONTEUDO_LINKS = [
+  { l: "Serviços",     h: "/site/servicos",     i: "🛠️", desc: "O que sua empresa oferece" },
+  { l: "Equipe",       h: "/site/equipe",       i: "👥", desc: "Quem atende seus clientes" },
+  { l: "Galeria",      h: "/site/galeria",      i: "📸", desc: "Fotos do seu trabalho e espaço" },
+  { l: "Depoimentos",  h: "/site/depoimentos",  i: "💬", desc: "Avaliações de clientes reais" },
+  { l: "FAQ",          h: "/site/faq",          i: "❓", desc: "Perguntas frequentes" },
+  { l: "Estrutura",    h: "/site/estrutura",    i: "🏢", desc: "Seu espaço em detalhe" },
+  { l: "Antes/Depois", h: "/site/antes-depois", i: "✨", desc: "Comparações de resultado" },
+];
+
 const generateSlug = (value: string) =>
   value
     .toLowerCase()
@@ -49,8 +61,17 @@ const generateSlug = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+function SectionEyebrow({ children }: { children: string }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", margin: "36px 0 12px" }}>
+      {children}
+    </div>
+  );
+}
+
 export default function Site() {
   const router = useRouter();
+  const [loading, setLoading]                   = useState(true);
   const [clinicaId, setClinicaId]               = useState("");
   const [userId, setUserId]                     = useState("");
   const [salvando, setSalvando]                 = useState(false);
@@ -64,6 +85,7 @@ export default function Site() {
   const [uploadingSeoImg, setUploadingSeoImg]   = useState(false);
   const [migrationPending, setMigrationPending] = useState(false);
   const [feedbackModal, setFeedbackModal]       = useState(false);
+  const [showPreview, setShowPreview]           = useState(false);
   const logoInputRef   = useRef<HTMLInputElement>(null);
   const heroInputRef   = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -72,12 +94,13 @@ export default function Site() {
   const [form, setForm] = useState<SiteForm>({
     nome: "", especialidade: "", telefone: "", whatsapp: "",
     endereco: "", cidade: "", estado: "", google_maps_url: "", email: "", slug: "",
-    logo_url: "", hero_url: "", nota_google: "", num_avaliacoes: "",
+    logo_url: "", hero_url: "", nota_google: "", num_avaliacoes: "", horario_funcionamento: "",
     banner_url: "", instagram_url: "", facebook_url: "", linkedin_url: "", tiktok_url: "",
     seo_titulo: "", seo_descricao: "", seo_imagem_url: "",
   });
 
   const carregar = useCallback(async () => {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
     setUserId(user.id);
@@ -107,7 +130,7 @@ export default function Site() {
 
     const { data: config, error: configError } = await supabase
       .from("clinica_config")
-      .select("slug, logo_url, hero_url, nota_google, num_avaliacoes, banner_url, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
+      .select("slug, logo_url, hero_url, nota_google, num_avaliacoes, horario_funcionamento, banner_url, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -129,21 +152,23 @@ export default function Site() {
       setMigrationPending(false);
       setForm(prev => ({
         ...prev,
-        slug:           config.slug                       || "",
-        logo_url:       config.logo_url                   || "",
-        hero_url:       config.hero_url                   || "",
-        nota_google:    config.nota_google?.toString()    || "",
-        num_avaliacoes: config.num_avaliacoes?.toString() || "",
-        banner_url:     config.banner_url                 || "",
-        instagram_url:  config.instagram_url              || "",
-        facebook_url:   config.facebook_url               || "",
-        linkedin_url:   config.linkedin_url               || "",
-        tiktok_url:     config.tiktok_url                 || "",
-        seo_titulo:     config.seo_titulo                 || "",
-        seo_descricao:  config.seo_descricao              || "",
-        seo_imagem_url: config.seo_imagem_url             || "",
+        slug:                  config.slug                       || "",
+        logo_url:              config.logo_url                   || "",
+        hero_url:              config.hero_url                   || "",
+        nota_google:           config.nota_google?.toString()    || "",
+        num_avaliacoes:        config.num_avaliacoes?.toString() || "",
+        horario_funcionamento: config.horario_funcionamento      || "",
+        banner_url:            config.banner_url                 || "",
+        instagram_url:         config.instagram_url              || "",
+        facebook_url:          config.facebook_url               || "",
+        linkedin_url:          config.linkedin_url               || "",
+        tiktok_url:            config.tiktok_url                 || "",
+        seo_titulo:            config.seo_titulo                 || "",
+        seo_descricao:         config.seo_descricao              || "",
+        seo_imagem_url:        config.seo_imagem_url             || "",
       }));
     }
+    setLoading(false);
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -199,6 +224,14 @@ export default function Site() {
     } catch { /* usuário cancelou o share */ }
   };
 
+  function abrirMeuSite() {
+    if (!siteUrl) {
+      setErro("Seu site ainda não está configurado. Preencha o nome do negócio para gerar o endereço público.");
+      return;
+    }
+    window.open(siteUrl, "_blank", "noopener,noreferrer");
+  }
+
   const normalizePhone = (value: string) => value.replace(/\D/g, "");
 
   const UPLOAD_INFO = {
@@ -229,11 +262,13 @@ export default function Site() {
         body: fd,
       });
       const data = await res.json();
-      if (!res.ok) { setErro(data.error || "Erro no upload."); return; }
+      if (!res.ok) { setErro(data.error || "Erro no upload. Tente um arquivo menor ou em outro formato."); return; }
 
       setForm(prev => ({ ...prev, [field]: data.url }));
-      setSucesso(`${label} enviada! Clique em Salvar para publicar.`);
+      setSucesso(`${label} enviada! Clique em "Salvar alterações" para publicar.`);
       setTimeout(() => setSucesso(""), 4000);
+    } catch {
+      setErro("Não foi possível enviar o arquivo agora. Verifique sua conexão e tente novamente.");
     } finally {
       setUploading(false);
     }
@@ -241,7 +276,7 @@ export default function Site() {
 
   function removerBanner() {
     setForm(prev => ({ ...prev, banner_url: "" }));
-    setSucesso("Banner removido. Clique em Salvar para publicar.");
+    setSucesso('Banner removido. Clique em "Salvar alterações" para publicar.');
     setTimeout(() => setSucesso(""), 4000);
   }
 
@@ -250,8 +285,8 @@ export default function Site() {
     setErro("");
 
     const normalizedSlug = generateSlug(computedSlug.trim());
-    if (!normalizedSlug) { setErro("Informe o nome do negócio."); setSalvando(false); return; }
-    if (!clinicaId || !userId) { setErro("Negócio não identificado. Recarregue."); setSalvando(false); return; }
+    if (!normalizedSlug) { setErro("Informe o nome do negócio para gerar o endereço do site."); setSalvando(false); return; }
+    if (!clinicaId || !userId) { setErro("Não foi possível identificar seu negócio. Recarregue a página e tente novamente."); setSalvando(false); return; }
 
     const { data: existing } = await supabase
       .from("clinica_config")
@@ -260,7 +295,7 @@ export default function Site() {
       .neq("user_id", userId)
       .maybeSingle();
 
-    if (existing) { setErro("Este slug já está em uso. Escolha outro."); setSalvando(false); return; }
+    if (existing) { setErro("Este endereço (slug) já está sendo usado por outro negócio. Escolha outro."); setSalvando(false); return; }
 
     const { error: clinicaError } = await supabase
       .from("clinicas")
@@ -277,7 +312,7 @@ export default function Site() {
         email:           form.email,
       }, { onConflict: "id" });
 
-    if (clinicaError) { setErro("Erro ao salvar dados do negócio."); setSalvando(false); return; }
+    if (clinicaError) { setErro("Não foi possível salvar os dados do negócio. Tente novamente em instantes."); setSalvando(false); return; }
 
     const configBase = {
       user_id:    userId,
@@ -288,32 +323,33 @@ export default function Site() {
     const notaGoogle    = form.nota_google    ? parseFloat(form.nota_google)    : null;
     const numAvaliacoes = form.num_avaliacoes ? parseInt(form.num_avaliacoes, 10) : null;
     if (notaGoogle !== null && (isNaN(notaGoogle) || notaGoogle < 0 || notaGoogle > 5)) {
-      setErro("Nota Google deve ser um número entre 0 e 5."); setSalvando(false); return;
+      setErro("A nota do Google deve ser um número entre 0 e 5."); setSalvando(false); return;
     }
     if (numAvaliacoes !== null && (isNaN(numAvaliacoes) || numAvaliacoes < 0)) {
-      setErro("Número de avaliações inválido."); setSalvando(false); return;
+      setErro("O número de avaliações informado é inválido."); setSalvando(false); return;
     }
     for (const [label, valor] of [
       ["Instagram", form.instagram_url], ["Facebook", form.facebook_url],
       ["LinkedIn", form.linkedin_url], ["TikTok", form.tiktok_url],
     ] as const) {
       if (valor && !/^https?:\/\//i.test(valor)) {
-        setErro(`Link do ${label} deve começar com http:// ou https://.`); setSalvando(false); return;
+        setErro(`O link do ${label} deve começar com http:// ou https://.`); setSalvando(false); return;
       }
     }
     const configFull = migrationPending ? configBase : {
       ...configBase,
-      hero_url:       form.hero_url || null,
-      nota_google:    notaGoogle,
-      num_avaliacoes: numAvaliacoes,
-      banner_url:     form.banner_url || null,
-      instagram_url:  form.instagram_url || null,
-      facebook_url:   form.facebook_url || null,
-      linkedin_url:   form.linkedin_url || null,
-      tiktok_url:     form.tiktok_url || null,
-      seo_titulo:     form.seo_titulo || null,
-      seo_descricao:  form.seo_descricao || null,
-      seo_imagem_url: form.seo_imagem_url || null,
+      hero_url:              form.hero_url || null,
+      nota_google:           notaGoogle,
+      num_avaliacoes:        numAvaliacoes,
+      horario_funcionamento: form.horario_funcionamento || null,
+      banner_url:            form.banner_url || null,
+      instagram_url:         form.instagram_url || null,
+      facebook_url:          form.facebook_url || null,
+      linkedin_url:          form.linkedin_url || null,
+      tiktok_url:            form.tiktok_url || null,
+      seo_titulo:            form.seo_titulo || null,
+      seo_descricao:         form.seo_descricao || null,
+      seo_imagem_url:        form.seo_imagem_url || null,
     };
 
     const { error: configError } = await supabase
@@ -326,9 +362,9 @@ export default function Site() {
         const { error: e2 } = await supabase
           .from("clinica_config")
           .upsert(configBase, { onConflict: "user_id" });
-        if (e2) { setErro("Erro ao salvar configurações."); setSalvando(false); return; }
+        if (e2) { setErro("Não foi possível salvar as configurações do site. Tente novamente."); setSalvando(false); return; }
       } else {
-        setErro("Erro ao salvar configurações."); setSalvando(false); return;
+        setErro("Não foi possível salvar as configurações do site. Tente novamente."); setSalvando(false); return;
       }
     }
 
@@ -355,8 +391,16 @@ export default function Site() {
 
   const MIGRATION_SQL = `ALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS hero_url TEXT;\nALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS nota_google NUMERIC(3,1);\nALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS num_avaliacoes INTEGER;`;
 
+  if (loading) {
+    return (
+      <AdminShell title="Meu Site" subtitle="Configure as informações do seu negócio para o site público">
+        <PageLoader title="Carregando as configurações do seu site..." />
+      </AdminShell>
+    );
+  }
+
   return (
-    <AdminShell title="Meu Site" subtitle="Configure as informações do seu negócio para o site público">
+    <AdminShell title="Meu Site" subtitle="Central completa de edição do site público do seu negócio">
 
       {/* ── MODAL FEEDBACK PREMIUM ─────────────────────────────────────────── */}
       {feedbackModal && (
@@ -364,7 +408,7 @@ export default function Site() {
              onClick={() => setFeedbackModal(false)}>
           <div onClick={e => e.stopPropagation()} style={{ background:"#0f172a", border:"1px solid rgba(0,200,150,0.3)", borderRadius:20, padding:"32px 28px", maxWidth:480, width:"100%", textAlign:"center" }}>
             <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
-            <h3 style={{ fontSize:20, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Site publicado com sucesso!</h3>
+            <h3 style={{ fontSize:20, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Alterações salvas com sucesso!</h3>
             <p style={{ fontSize:14, color:"rgba(255,255,255,0.55)", margin:"0 0 20px", lineHeight:1.6 }}>
               Seu negócio agora tem uma presença digital profissional. Compartilhe o link para atrair novos clientes.
             </p>
@@ -378,9 +422,9 @@ export default function Site() {
                 🔗 Compartilhar site
               </button>
               <button
-                onClick={() => { window.open(siteUrl, "_blank"); setFeedbackModal(false); }}
+                onClick={() => { abrirMeuSite(); setFeedbackModal(false); }}
                 style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"11px 22px", borderRadius:10, background:"rgba(255,255,255,0.06)", color:"rgba(255,255,255,0.75)", border:"1px solid rgba(255,255,255,0.12)", fontWeight:600, fontSize:14, cursor:"pointer" }}>
-                Visualizar site →
+                Abrir meu site →
               </button>
             </div>
             <button onClick={() => setFeedbackModal(false)} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.35)", cursor:"pointer", fontSize:13 }}>
@@ -390,25 +434,16 @@ export default function Site() {
         </div>
       )}
 
-      {/* ── MODULE NAV ──────────────────────────────────────────────────────── */}
-      <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:8 }}>
-        {[
-          { l:"Configuracoes", h:"/site",              i:"⚙️", a:true },
-          { l:"Galeria",       h:"/site/galeria",      i:"📸"  },
-          { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
-          { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
-          { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-          { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
-          { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
-          { l:"FAQ",           h:"/site/faq",        i:"❓"  },
-        ].map(m => (
-          <button key={m.h} onClick={() => router.push(m.h)} style={{ padding:"7px 14px", borderRadius:8, border:`1px solid ${m.a ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.08)"}`, background:m.a ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.02)", color:m.a ? "#c4b5fd" : "#64748b", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontWeight:m.a ? 600 : 400, whiteSpace:"nowrap" }}>
-            {m.i} {m.l}
-          </button>
-        ))}
-      </nav>
+      {erro && (
+        <div className="panel" style={{ borderColor:"#ef4444", background:"rgba(254,202,202,0.10)", color:"#b91c1c" }}>{erro}</div>
+      )}
+      {sucesso && (
+        <div className="panel" style={{ borderColor:"#7c3aed", background:"rgba(124,58,237,0.08)", color:"#c4b5fd" }}>{sucesso}</div>
+      )}
 
-      {/* ── BANNER DE MIGRAÇÃO PENDENTE ─────────────────────────────────────── */}
+      {/* ══════════════════════ VISÃO GERAL ══════════════════════ */}
+      <SectionEyebrow>Visão Geral</SectionEyebrow>
+
       {migrationPending && (
         <div className="panel" style={{ borderColor:"#f59e0b", background:"rgba(245,158,11,0.06)", padding:"16px 20px" }}>
           <div style={{ fontWeight:700, color:"#f59e0b", marginBottom:8 }}>
@@ -429,14 +464,6 @@ export default function Site() {
         </div>
       )}
 
-      {erro && (
-        <div className="panel" style={{ borderColor:"#ef4444", background:"rgba(254,202,202,0.10)", color:"#b91c1c" }}>{erro}</div>
-      )}
-      {sucesso && (
-        <div className="panel" style={{ borderColor:"#7c3aed", background:"rgba(124,58,237,0.08)", color:"#c4b5fd" }}>{sucesso}</div>
-      )}
-
-      {/* ── BARRA DE PROGRESSO ──────────────────────────────────────────────── */}
       <div className="panel" style={{ padding:"14px 20px" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
           <div style={{ fontSize:13, fontWeight:600, color:"var(--text, #f1f5f9)" }}>
@@ -466,29 +493,51 @@ export default function Site() {
         )}
       </div>
 
-      {/* ── URL PÚBLICA ─────────────────────────────────────────────────────── */}
       <div className="panel" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
         <div>
           <div style={{ fontSize:13, fontWeight:600, color:"var(--accent)" }}>🔗 URL pública</div>
-          <div style={{ fontSize:12, color:"var(--muted)", marginTop:4 }}>{siteUrl || "Preencha o nome do negócio para gerar a URL"}</div>
+          <div style={{ fontSize:12, color:"var(--muted)", marginTop:4 }}>
+            {siteUrl || "Seu site ainda não está configurado — preencha o nome do negócio abaixo para gerar o endereço."}
+          </div>
         </div>
         <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-          <button type="button" className="button-secondary" onClick={copyLink} style={{ padding:"10px 16px", fontSize:13 }}>
+          <button type="button" className="button-secondary" onClick={copyLink} disabled={!siteUrl} style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5 }}>
             Copiar link
           </button>
-          <button type="button" className="button-secondary" onClick={compartilhar} style={{ padding:"10px 16px", fontSize:13 }}>
+          <button type="button" className="button-secondary" onClick={compartilhar} disabled={!siteUrl} style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5 }}>
             🔗 Compartilhar
           </button>
-          <button type="button" className="button-primary" onClick={() => siteUrl && window.open(siteUrl, "_blank")} style={{ padding:"10px 16px", fontSize:13 }} disabled={!siteUrl}>
-            Abrir site →
+          <button type="button" className="button-secondary" onClick={() => setShowPreview(v => !v)} disabled={!siteUrl} style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5 }}>
+            {showPreview ? "Ocultar prévia" : "👁️ Pré-visualizar"}
+          </button>
+          <button type="button" className="button-primary" onClick={abrirMeuSite} style={{ padding:"10px 16px", fontSize:13 }}>
+            Abrir meu site →
           </button>
         </div>
       </div>
 
-      {/* ── DADOS DA CLÍNICA ─────────────────────────────────────────────────── */}
+      {showPreview && (
+        siteUrl ? (
+          <div className="panel" style={{ padding:0, overflow:"hidden" }}>
+            <div style={{ padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.08)", fontSize:12, color:"var(--muted)", display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ width:8, height:8, borderRadius:"50%", background:"#00c896", display:"inline-block" }} />
+              Pré-visualização ao vivo — {siteUrl}
+            </div>
+            <iframe src={siteUrl} title="Pré-visualização do site" style={{ width:"100%", height:520, border:"none", display:"block", background:"#fff" }} />
+          </div>
+        ) : (
+          <div className="panel" style={{ textAlign:"center", padding:"32px 20px", color:"var(--muted)", fontSize:13 }}>
+            Configure o nome do negócio para poder pré-visualizar o site.
+          </div>
+        )
+      )}
+
+      {/* ══════════════════════ IDENTIDADE VISUAL ══════════════════════ */}
+      <SectionEyebrow>Identidade Visual</SectionEyebrow>
+
       <div className="grid-cards">
         {([
-          { label:"Nome do Negócio",        key:"nome",          placeholder:"Ex: Meu Negócio"      },
+          { label:"Nome do Negócio",      key:"nome",          placeholder:"Ex: Meu Negócio"      },
           { label:"Slug público",         key:"slug",          placeholder:"slug-do-negocio"       },
           { label:"Área de Atuação",      key:"especialidade", placeholder:"Ex: Consultoria, Serviços" },
           { label:"Telefone",             key:"telefone",      placeholder:"(38) 99999-9999"       },
@@ -497,6 +546,7 @@ export default function Site() {
           { label:"Endereco",             key:"endereco",      placeholder:"Rua das Flores, 123"   },
           { label:"Cidade",               key:"cidade",        placeholder:"Cornelio Procopio"     },
           { label:"Estado",               key:"estado",        placeholder:"PR"                    },
+          { label:"Horário de funcionamento", key:"horario_funcionamento", placeholder:"Seg a Sex: 09h - 18h" },
         ] as const).map((f) => (
           <div key={f.key} className="panel">
             <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>{f.label}</label>
@@ -535,7 +585,6 @@ export default function Site() {
         </div>
       </div>
 
-      {/* ── LOGO DA CLÍNICA ─────────────────────────────────────────────────── */}
       <div className="panel">
         <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🖼️ Logo do Negócio</div>
         <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Exibida no topo do site público.</div>
@@ -566,7 +615,9 @@ export default function Site() {
           onChange={(e) => e.target.files?.[0] && uploadImagem(e.target.files[0], "logo")} />
       </div>
 
-      {/* ── IMAGEM HERO ─────────────────────────────────────────────────────── */}
+      {/* ══════════════════════ BANNER E HERO ══════════════════════ */}
+      <SectionEyebrow>Banner e Hero</SectionEyebrow>
+
       <div className="panel" style={{ opacity:migrationPending ? 0.55 : 1, position:"relative" }}>
         {migrationPending && (
           <div style={{ position:"absolute", inset:0, zIndex:2, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:12, background:"rgba(15,23,42,0.45)" }}>
@@ -576,7 +627,7 @@ export default function Site() {
           </div>
         )}
         <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🌅 Imagem Principal (Hero)</div>
-        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Banner de fundo do cabeçalho do site público.</div>
+        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Imagem de destaque exibida no topo do site público.</div>
         <div
           style={{
             ...uploadAreaStyle(!!form.hero_url),
@@ -604,47 +655,6 @@ export default function Site() {
           onChange={(e) => e.target.files?.[0] && uploadImagem(e.target.files[0], "hero")} />
       </div>
 
-      {/* ── AVALIAÇÕES GOOGLE ────────────────────────────────────────────────── */}
-      <div className="panel" style={{ opacity:migrationPending ? 0.55 : 1, position:"relative" }}>
-        {migrationPending && (
-          <div style={{ position:"absolute", inset:0, zIndex:2, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:12, background:"rgba(15,23,42,0.45)" }}>
-            <span style={{ background:"rgba(245,158,11,0.90)", color:"#000", fontWeight:700, fontSize:12, padding:"6px 14px", borderRadius:8 }}>
-              ⚠️ Execute o SQL acima para ativar
-            </span>
-          </div>
-        )}
-        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>⭐ Avaliações Google</div>
-        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>
-          Exibido com ★★★★★ abaixo do título no site público.
-          {" "}<span style={{ color:"var(--accent)", cursor:"default" }} title="Acesse seu perfil no Google Meu Negócio, veja a nota e o número de avaliações.">ⓘ Como encontrar?</span>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-          <div>
-            <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>Nota Google (ex: 4.9)</label>
-            <input
-              value={form.nota_google}
-              onChange={(e) => setForm(prev => ({ ...prev, nota_google: e.target.value }))}
-              placeholder="4.9"
-              className="input-field"
-              type="number" min="1" max="5" step="0.1"
-              disabled={migrationPending}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>Quantidade de avaliações (ex: 237)</label>
-            <input
-              value={form.num_avaliacoes}
-              onChange={(e) => setForm(prev => ({ ...prev, num_avaliacoes: e.target.value }))}
-              placeholder="237"
-              className="input-field"
-              type="number" min="0"
-              disabled={migrationPending}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ── BANNER ───────────────────────────────────────────────────────────── */}
       <div className="panel">
         <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🏳️ Banner</div>
         <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Faixa de imagem exibida logo abaixo do topo do site. Opcional — sem banner, essa faixa simplesmente não aparece.</div>
@@ -682,9 +692,65 @@ export default function Site() {
           onChange={(e) => e.target.files?.[0] && uploadImagem(e.target.files[0], "banner")} />
       </div>
 
-      {/* ── REDES SOCIAIS ────────────────────────────────────────────────────── */}
+      <div className="panel" style={{ opacity:migrationPending ? 0.55 : 1, position:"relative" }}>
+        {migrationPending && (
+          <div style={{ position:"absolute", inset:0, zIndex:2, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:12, background:"rgba(15,23,42,0.45)" }}>
+            <span style={{ background:"rgba(245,158,11,0.90)", color:"#000", fontWeight:700, fontSize:12, padding:"6px 14px", borderRadius:8 }}>
+              ⚠️ Execute o SQL acima para ativar
+            </span>
+          </div>
+        )}
+        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>⭐ Avaliações Google</div>
+        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>
+          Exibido com ★★★★★ no site público.
+          {" "}<span style={{ color:"var(--accent)", cursor:"default" }} title="Acesse seu perfil no Google Meu Negócio, veja a nota e o número de avaliações.">ⓘ Como encontrar?</span>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+          <div>
+            <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>Nota Google (ex: 4.9)</label>
+            <input
+              value={form.nota_google}
+              onChange={(e) => setForm(prev => ({ ...prev, nota_google: e.target.value }))}
+              placeholder="4.9"
+              className="input-field"
+              type="number" min="1" max="5" step="0.1"
+              disabled={migrationPending}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize:12, color:"var(--muted)", display:"block", marginBottom:8 }}>Quantidade de avaliações (ex: 237)</label>
+            <input
+              value={form.num_avaliacoes}
+              onChange={(e) => setForm(prev => ({ ...prev, num_avaliacoes: e.target.value }))}
+              placeholder="237"
+              className="input-field"
+              type="number" min="0"
+              disabled={migrationPending}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════ CONTEÚDO ══════════════════════ */}
+      <SectionEyebrow>Conteúdo</SectionEyebrow>
+      <div className="panel" style={{ marginBottom: 12, fontSize: 12, color: "var(--muted)" }}>
+        Cada área de conteúdo tem sua própria tela de edição, com upload de imagens e reordenação. Clique para abrir.
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:14 }}>
+        {CONTEUDO_LINKS.map(c => (
+          <button key={c.h} onClick={() => router.push(c.h)} className="panel" style={{ textAlign:"left", cursor:"pointer", border:"1px solid rgba(255,255,255,0.08)", transition:"border-color 0.15s" }}>
+            <div style={{ fontSize:24, marginBottom:8 }}>{c.i}</div>
+            <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>{c.l}</div>
+            <div style={{ fontSize:12, color:"var(--muted)" }}>{c.desc}</div>
+            <div style={{ fontSize:12, color:"var(--accent)", marginTop:10, fontWeight:600 }}>Editar →</div>
+          </button>
+        ))}
+      </div>
+
+      {/* ══════════════════════ REDES SOCIAIS ══════════════════════ */}
+      <SectionEyebrow>Redes Sociais</SectionEyebrow>
+
       <div className="panel">
-        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>📱 Redes Sociais</div>
         <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Só aparecem no site os ícones das redes preenchidas aqui.</div>
         <div className="grid-cards">
           {([
@@ -706,9 +772,10 @@ export default function Site() {
         </div>
       </div>
 
-      {/* ── SEO ──────────────────────────────────────────────────────────────── */}
+      {/* ══════════════════════ SEO ══════════════════════ */}
+      <SectionEyebrow>SEO</SectionEyebrow>
+
       <div className="panel">
-        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🔎 SEO</div>
         <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>
           Controla o título e a prévia do site quando compartilhado (Google, WhatsApp, redes sociais). Deixe em branco para usar os valores gerados automaticamente a partir do nome e da especialidade.
         </div>
@@ -757,9 +824,9 @@ export default function Site() {
         </div>
       </div>
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}>
-        <button onClick={salvar} disabled={salvando} className="button-primary" style={{ padding:"12px 32px", opacity:salvando ? 0.7 : 1 }}>
-          {salvando ? "Salvando..." : "💾 Salvar e Publicar"}
+      <div style={{ display:"flex", justifyContent:"flex-end", marginTop: 32, position: "sticky", bottom: 16 }}>
+        <button onClick={salvar} disabled={salvando} className="button-primary" style={{ padding:"14px 36px", fontSize: 15, opacity:salvando ? 0.7 : 1, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}>
+          {salvando ? "Salvando..." : "💾 Salvar alterações"}
         </button>
       </div>
     </AdminShell>
