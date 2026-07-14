@@ -15,7 +15,7 @@ import Contato from "./_components/Contato";
 import CtaFinal from "./_components/CtaFinal";
 import Footer from "./_components/Footer";
 import { IcWa } from "./_components/icons";
-import { gerarSobre, gerarTituloHero, gerarSubtituloHero, safeData } from "./_lib/helpers";
+import { gerarSobre, gerarTituloHero, gerarSubtituloHero, normalizarEspecialidade, safeData } from "./_lib/helpers";
 import { color, font, gradient, shadow } from "./_lib/theme";
 import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura, DBFaq } from "./_lib/types";
 
@@ -80,6 +80,7 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
 
       setEmpresa({
         ...(empresaRes.data ?? {}),
+        especialidade: normalizarEspecialidade(empresaRes.data?.especialidade),
         logo_url: config.logo_url ?? undefined,
         hero_url: config.hero_url ?? undefined,
         banner_url: config.banner_url ?? null,
@@ -128,7 +129,7 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
   const whatsappNumber = empresa.whatsapp?.replace(/\D/g, "");
   const waLink = whatsappNumber ? "https://wa.me/" + whatsappNumber + "?text=Ol%C3%A1!%20Gostaria%20de%20saber%20mais." : "#";
   const nome = empresa.nome || "Nosso negócio";
-  const esp = empresa.especialidade || "";
+  const esp = normalizarEspecialidade(empresa.especialidade);
   const local = [empresa.cidade, empresa.estado].filter(Boolean).join(", ");
   const sobre = gerarSobre(empresa, equipe.length);
   const titulo = gerarTituloHero(empresa);

@@ -3,20 +3,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../components/AdminShell";
+import SiteWorkspaceNav from "../SiteWorkspaceNav";
 
 type Item = { id: string; icone: string; imagem_url: string|null; nome: string; descricao: string|null; ordem: number; };
 type Form = { icone: string; imagem_url: string; nome: string; descricao: string; };
 
-const NAV = [
-  { l:"Configuracoes", h:"/site",              i:"⚙️"  },
-  { l:"Galeria",       h:"/site/galeria",      i:"📸"  },
-  { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
-  { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
-  { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🛠️", a:true },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
-  { l:"FAQ",           h:"/site/faq",        i:"❓"  },
-];
 
 const ICONS = [
   { key:"tooth",       emoji:"⭐", label:"Destaque"    },
@@ -115,13 +106,7 @@ export default function ServicosAdmin() {
   return (
     <AdminShell title="Servicos" subtitle="Servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"" }); setModal({ mode:"add" }); setErro(""); }}>
 
-      <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
-        {NAV.map(m => (
-          <button key={m.h} onClick={() => router.push(m.h)} style={{ padding:"7px 14px", borderRadius:8, border:`1px solid ${m.a ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.08)"}`, background:m.a ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.02)", color:m.a ? "#c4b5fd" : "#64748b", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontWeight:m.a ? 600 : 400, whiteSpace:"nowrap" }}>
-            {m.i} {m.l}
-          </button>
-        ))}
-      </nav>
+      <SiteWorkspaceNav />
 
       {loading && <p style={{ color:"var(--muted)" }}>Carregando...</p>}
 

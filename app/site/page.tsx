@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
+import SiteWorkspaceNav from "./SiteWorkspaceNav";
+import { normalizarEspecialidade } from "../empresa/[slug]/_lib/helpers";
 
 type SiteForm = {
   nome: string;
@@ -117,7 +119,7 @@ export default function Site() {
       setForm(prev => ({
         ...prev,
         nome:            c.nome            || "",
-        especialidade:   c.especialidade   || "",
+        especialidade:   normalizarEspecialidade(c.especialidade),
         telefone:        c.telefone        || "",
         whatsapp:        c.whatsapp        || "",
         endereco:        c.endereco        || "",
@@ -402,13 +404,20 @@ export default function Site() {
   return (
     <AdminShell title="Meu Site" subtitle="Central completa de edição do site público do seu negócio">
 
+      <SiteWorkspaceNav
+        siteUrl={siteUrl}
+        onPreview={() => setShowPreview(value => !value)}
+        onPublish={salvar}
+        publishing={salvando}
+      />
+
       {/* ── MODAL FEEDBACK PREMIUM ─────────────────────────────────────────── */}
       {feedbackModal && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.65)", backdropFilter:"blur(8px)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
              onClick={() => setFeedbackModal(false)}>
           <div onClick={e => e.stopPropagation()} style={{ background:"#0f172a", border:"1px solid rgba(0,200,150,0.3)", borderRadius:20, padding:"32px 28px", maxWidth:480, width:"100%", textAlign:"center" }}>
             <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
-            <h3 style={{ fontSize:20, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Alterações salvas com sucesso!</h3>
+            <h3 style={{ fontSize:20, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Site publicado com sucesso!</h3>
             <p style={{ fontSize:14, color:"rgba(255,255,255,0.55)", margin:"0 0 20px", lineHeight:1.6 }}>
               Seu negócio agora tem uma presença digital profissional. Compartilhe o link para atrair novos clientes.
             </p>
@@ -508,7 +517,7 @@ export default function Site() {
             🔗 Compartilhar
           </button>
           <button type="button" className="button-secondary" onClick={() => setShowPreview(v => !v)} disabled={!siteUrl} style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5 }}>
-            {showPreview ? "Ocultar prévia" : "👁️ Pré-visualizar"}
+            {showPreview ? "Ocultar site publicado" : "👁️ Ver site publicado"}
           </button>
           <button type="button" className="button-primary" onClick={abrirMeuSite} style={{ padding:"10px 16px", fontSize:13 }}>
             Abrir meu site →
@@ -521,7 +530,7 @@ export default function Site() {
           <div className="panel" style={{ padding:0, overflow:"hidden" }}>
             <div style={{ padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.08)", fontSize:12, color:"var(--muted)", display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ width:8, height:8, borderRadius:"50%", background:"#00c896", display:"inline-block" }} />
-              Pré-visualização ao vivo — {siteUrl}
+              Site publicado — {siteUrl}
             </div>
             <iframe src={siteUrl} title="Pré-visualização do site" style={{ width:"100%", height:520, border:"none", display:"block", background:"#fff" }} />
           </div>
@@ -826,7 +835,7 @@ export default function Site() {
 
       <div style={{ display:"flex", justifyContent:"flex-end", marginTop: 32, position: "sticky", bottom: 16 }}>
         <button onClick={salvar} disabled={salvando} className="button-primary" style={{ padding:"14px 36px", fontSize: 15, opacity:salvando ? 0.7 : 1, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}>
-          {salvando ? "Salvando..." : "💾 Salvar alterações"}
+          {salvando ? "Publicando..." : "Publicar alterações"}
         </button>
       </div>
     </AdminShell>

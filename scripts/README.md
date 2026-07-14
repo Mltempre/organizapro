@@ -38,20 +38,21 @@ O script pedirá no terminal:
 
 ### O que o script faz
 
-Executa 4 etapas em sequência, com rollback automático em caso de falha:
+Executa 5 etapas em sequência, com rollback automático em caso de falha:
 
 1. **Cria o usuário** em `auth.users` via `supabase.auth.admin.createUser` — e-mail já confirmado, sem necessidade de link de verificação
-2. **Cria a empresa** em `clinicas` com nome, whatsapp e slug
-3. **Cria o vínculo** em `clinica_usuarios` (usuario_id → clinica_id) — sem isso, o sistema aparece vazio para o usuário
-4. **Cria a configuração inicial** em `clinica_config` com nome e e-mail pré-preenchidos
+2. **Cria o perfil** em `usuarios` com o mesmo ID do usuário autenticado
+3. **Cria a empresa** em `clinicas` com nome e WhatsApp
+4. **Cria o vínculo ativo** em `clinica_usuarios` (usuario_id → clinica_id), com o papel padrão `recepcionista`
+5. **Cria a configuração inicial** em `clinica_config`, incluindo o slug público
 
 ### O que conferir depois
 
 - [ ] Usuário consegue acessar `/login` com o e-mail e senha informados
 - [ ] Dashboard exibe os dados do negócio (não aparece vazio)
 - [ ] `/configuracoes` exibe o nome do negócio pré-preenchido
-- [ ] Slug acessível em `/clinica/<slug>` (após o cliente configurar o site)
+- [ ] Slug acessível em `/empresa/<slug>`
 
 ### Rollback automático
 
-Se a etapa 2 ou 3 falhar após o usuário ser criado, o script remove automaticamente o usuário e a empresa criados para não deixar dados inconsistentes no banco.
+Se qualquer etapa falhar após o usuário ser criado, o script remove configuração, vínculo, empresa, perfil e usuário Auth criados, em ordem segura, para não deixar dados inconsistentes no banco.

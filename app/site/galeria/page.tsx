@@ -3,20 +3,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../components/AdminShell";
+import SiteWorkspaceNav from "../SiteWorkspaceNav";
 
 type Item = { id: string; url: string; categoria: string; titulo: string | null; ordem: number; };
 
 const CATS = ["Fachada","Recepcao","Sala de Espera","Espaco de Atendimento","Equipamentos","Equipe","Outros"];
-const NAV  = [
-  { l:"Configuracoes", h:"/site",              i:"⚙️"  },
-  { l:"Galeria",       h:"/site/galeria",      i:"📸", a:true },
-  { l:"Equipe",        h:"/site/equipe",       i:"👥"  },
-  { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
-  { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
-  { l:"FAQ",           h:"/site/faq",        i:"❓"  },
-];
 
 export default function GaleriaAdmin() {
   const router = useRouter();
@@ -96,14 +87,7 @@ export default function GaleriaAdmin() {
   return (
     <AdminShell title="Galeria de Fotos" subtitle="Fotos do negocio exibidas no site publico" actionLabel="+ Adicionar Foto" actionOnClick={() => { setForm({ url:"", categoria:"Espaco de Atendimento", titulo:"" }); setModal({ mode:"add" }); setErro(""); }}>
 
-      {/* MODULE NAV */}
-      <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
-        {NAV.map(m => (
-          <button key={m.h} onClick={() => router.push(m.h)} style={{ padding:"7px 14px", borderRadius:8, border:`1px solid ${m.a ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.08)"}`, background:m.a ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.02)", color:m.a ? "#c4b5fd" : "#64748b", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontWeight:m.a ? 600 : 400, whiteSpace:"nowrap" }}>
-            {m.i} {m.l}
-          </button>
-        ))}
-      </nav>
+      <SiteWorkspaceNav />
 
       {loading && <p style={{ color:"var(--muted)" }}>Carregando...</p>}
 

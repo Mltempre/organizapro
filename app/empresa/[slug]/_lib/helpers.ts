@@ -22,11 +22,19 @@ export const safeData = <T,>(res: { data: T[] | null; error: { code?: string } |
 
 function tituloCase(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
+// O schema legado de clinicas usa "odontologia" como default. Esse valor
+// não representa uma escolha do cliente em contas universais recém-criadas.
+// Segmentos realmente informados continuam sendo exibidos normalmente.
+export function normalizarEspecialidade(especialidade?: string | null): string {
+  const valor = especialidade?.trim() ?? "";
+  return valor.toLocaleLowerCase("pt-BR") === "odontologia" ? "" : valor;
+}
+
 // Texto "Sobre a empresa" — parágrafos curtos, nunca um bloco genérico.
 export function gerarSobre(empresa: Empresa, qtdEquipe: number): string[] {
   const blocos: string[] = [];
   const local = [empresa.cidade, empresa.estado].filter(Boolean).join(", ");
-  const esp = empresa.especialidade?.toLowerCase();
+  const esp = normalizarEspecialidade(empresa.especialidade).toLowerCase();
 
   if (esp && local) {
     blocos.push(`${empresa.nome} atua em ${esp}, em ${local}.`);
@@ -50,9 +58,10 @@ export function gerarSobre(empresa: Empresa, qtdEquipe: number): string[] {
 // Hero — headline muda de fato conforme o dado real disponível, em vez de
 // uma frase institucional fixa repetida em todo site publicado.
 export function gerarTituloHero(empresa: Empresa): string {
-  if (empresa.especialidade) return `${tituloCase(empresa.especialidade)}, sem complicação.`;
-  if (empresa.nome) return `${empresa.nome}: atendimento que faz a diferença.`;
-  return "Um atendimento que faz a diferença.";
+  const especialidade = normalizarEspecialidade(empresa.especialidade);
+  if (especialidade) return `${tituloCase(especialidade)}, sem complicação.`;
+  if (empresa.nome) return `Conheça ${empresa.nome}.`;
+  return "Soluções desenvolvidas para você.";
 }
 
 export function gerarSubtituloHero(empresa: Empresa, local: string): string {
@@ -64,7 +73,8 @@ export function gerarSubtituloHero(empresa: Empresa, local: string): string {
 export function gerarIndicadoresConfianca(empresa: Empresa, local: string): { icone: string; texto: string }[] {
   const itens: { icone: string; texto: string }[] = [];
   if (local) itens.push({ icone: "pin", texto: local });
-  if (empresa.especialidade) itens.push({ icone: "target", texto: empresa.especialidade });
+  const especialidade = normalizarEspecialidade(empresa.especialidade);
+  if (especialidade) itens.push({ icone: "target", texto: especialidade });
   if (empresa.nota_google) itens.push({ icone: "star", texto: `${empresa.nota_google} ${empresa.num_avaliacoes ? `(${empresa.num_avaliacoes} avaliações)` : "no Google"}` });
   if (empresa.horario_funcionamento) itens.push({ icone: "clock", texto: empresa.horario_funcionamento });
   return itens.slice(0, 4);
@@ -75,17 +85,20 @@ export function gerarIndicadoresConfianca(empresa: Empresa, local: string): { ic
 // ("Conheça um pouco mais", "Somos especialistas", "Empresa pensada para
 // você") e qualquer construção que exija concordância de gênero com o nome.
 export function gerarTituloSobre(empresa: Empresa): string {
-  if (empresa.especialidade) return `${tituloCase(empresa.especialidade)}, do jeito certo.`;
-  return "Quem cuida do seu atendimento";
+  const especialidade = normalizarEspecialidade(empresa.especialidade);
+  if (especialidade) return `${tituloCase(especialidade)}, do jeito certo.`;
+  return "Conheça nossa empresa";
 }
 
 export function gerarTituloServicos(empresa: Empresa): string {
-  if (empresa.especialidade) return `Serviços em ${empresa.especialidade.toLowerCase()}`;
+  const especialidade = normalizarEspecialidade(empresa.especialidade);
+  if (especialidade) return `Serviços em ${especialidade.toLowerCase()}`;
   return "O que oferecemos";
 }
 
 export function gerarTituloGaleria(empresa: Empresa): string {
-  if (empresa.especialidade) return `${tituloCase(empresa.especialidade)} em imagens`;
+  const especialidade = normalizarEspecialidade(empresa.especialidade);
+  if (especialidade) return `${tituloCase(especialidade)} em imagens`;
   return "Nosso trabalho em imagens";
 }
 
@@ -99,6 +112,7 @@ export function gerarTituloContato(local: string): string {
 }
 
 export function gerarTituloCtaFinal(empresa: Empresa): string {
-  if (empresa.especialidade) return `Pronto para tratar de ${empresa.especialidade.toLowerCase()}?`;
+  const especialidade = normalizarEspecialidade(empresa.especialidade);
+  if (especialidade) return `Quer saber mais sobre ${especialidade.toLowerCase()}?`;
   return "Vamos conversar sobre o que você precisa?";
 }

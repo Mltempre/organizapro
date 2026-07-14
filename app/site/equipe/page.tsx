@@ -3,20 +3,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../components/AdminShell";
+import SiteWorkspaceNav from "../SiteWorkspaceNav";
 
 type Membro = { id: string; foto_url: string|null; nome: string; especialidade: string|null; cro: string|null; descricao: string|null; ordem: number; };
 type Form   = { foto_url: string; nome: string; especialidade: string; cro: string; descricao: string; };
 
-const NAV = [
-  { l:"Configuracoes", h:"/site",              i:"⚙️"  },
-  { l:"Galeria",       h:"/site/galeria",      i:"📸"  },
-  { l:"Equipe",        h:"/site/equipe",       i:"👥", a:true },
-  { l:"Antes/Depois",  h:"/site/antes-depois", i:"✨"  },
-  { l:"Depoimentos",   h:"/site/depoimentos",  i:"💬"  },
-  { l:"Servicos",      h:"/site/servicos",     i:"🛠️"  },
-  { l:"Estrutura",     h:"/site/estrutura",    i:"🏢"  },
-  { l:"FAQ",           h:"/site/faq",        i:"❓"  },
-];
 
 const initials = (nome: string) => nome.trim().split(" ").filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join("");
 const COLORS = ["#0d3d2e","#1a3a5c","#2d1b69","#7c2d12","#064e3b","#1e3a5f"];
@@ -107,13 +98,7 @@ export default function EquipeAdmin() {
   return (
     <AdminShell title="Equipe" subtitle="Profissionais exibidos no site publico" actionLabel="+ Adicionar Profissional" actionOnClick={() => { setForm({ foto_url:"", nome:"", especialidade:"", cro:"", descricao:"" }); setModal({ mode:"add" }); setErro(""); }}>
 
-      <nav style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
-        {NAV.map(m => (
-          <button key={m.h} onClick={() => router.push(m.h)} style={{ padding:"7px 14px", borderRadius:8, border:`1px solid ${m.a ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.08)"}`, background:m.a ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.02)", color:m.a ? "#c4b5fd" : "#64748b", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontWeight:m.a ? 600 : 400, whiteSpace:"nowrap" }}>
-            {m.i} {m.l}
-          </button>
-        ))}
-      </nav>
+      <SiteWorkspaceNav />
 
       {loading && <p style={{ color:"var(--muted)" }}>Carregando...</p>}
 

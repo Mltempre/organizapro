@@ -78,21 +78,43 @@ async function coletarDados(rl) {
 async function validarPreCondicoes(supabase, dados) {
   console.log('\n⏳ Validando pré-condições...');
 
-  // Slug único
-  const { data: clinicaExistente, error: slugErr } = await supabase
-    .from('clinicas')
+  // O slug público pertence a clinica_config no schema atual.
+  const { data: configExistente, error: slugErr } = await supabase
+    .from('clinica_config')
     .select('id')
     .eq('slug', dados.slug)
     .maybeSingle();
   if (slugErr) falhar('Não foi possível verificar slug: ' + slugErr.message);
-  if (clinicaExistente) falhar(`Slug "${dados.slug}" já está em uso. Escolha outro.`);
+  if (configExistente) falhar(`Slug "${dados.slug}" já está em uso. Escolha outro.`);
+
+  // O Auth Admin não oferece filtro exato por e-mail. A paginação evita criar
+  // duplicidade mesmo quando o projeto possuir mais de mil usuários.
+  let pagina = 1;
+  let usuarioAuth = null;
+  do {
+    const { data, error } = await supabase.auth.admin.listUsers({ page: pagina, perPage: 1000 });
+    if (error) falhar('Não foi possível verificar usuários do Auth: ' + error.message);
+    usuarioAuth = data.users.find(usuario => usuario.email?.toLowerCase() === dados.email) ?? null;
+    if (usuarioAuth || data.users.length < 1000) break;
+    pagina += 1;
+  } while (pagina <= 100);
+  if (usuarioAuth) falhar(`E-mail "${dados.email}" já está cadastrado no Supabase Auth.`);
+
+  const { data: perfilExistente, error: perfilErr } = await supabase
+    .from('usuarios')
+    .select('id')
+    .eq('email', dados.email)
+    .maybeSingle();
+  if (perfilErr) falhar('Não foi possível verificar perfis: ' + perfilErr.message);
+  if (perfilExistente) falhar(`Já existe um perfil em usuarios para "${dados.email}".`);
 
   console.log('   ✅ Slug disponível');
+  console.log('   ✅ E-mail disponível no Auth e em usuarios');
   console.log('   ✅ Formato de dados válido');
 }
 
 async function criarUsuario(supabase, email, senha) {
-  console.log('⏳ Etapa 1/4: Criando usuário no Supabase Auth...');
+  console.log('⏳ Etapa 1/5: Criando usuário no Supabase Auth...');
   const { data, error } = await supabase.auth.admin.createUser({
     email,
     password: senha,
@@ -110,38 +132,45 @@ async function criarUsuario(supabase, email, senha) {
   return data.user;
 }
 
-async function criarEmpresa(supabase, dados, userId) {
-  console.log('⏳ Etapa 2/4: Criando registro em clinicas...');
+async function criarPerfil(supabase, userId, dados) {
+  console.log('⏳ Etapa 2/5: Criando perfil em usuarios...');
+  const { error } = await supabase
+    .from('usuarios')
+    .insert({ id: userId, nome: dados.nome, email: dados.email });
+  if (error) throw new Error('Falha ao criar perfil: ' + error.message);
+  console.log('   → Perfil criado em usuarios');
+}
+
+async function criarEmpresa(supabase, dados) {
+  console.log('⏳ Etapa 3/5: Criando registro em clinicas...');
   const { data: clinica, error } = await supabase
     .from('clinicas')
-    .insert({ nome: dados.nome, whatsapp: dados.whatsapp || null, slug: dados.slug })
+    // Sobrescreve o default legado "odontologia". O segmento deve ser uma
+    // escolha explícita do cliente, nunca uma suposição da implantação.
+    .insert({ nome: dados.nome, whatsapp: dados.whatsapp || null, especialidade: null })
     .select('id')
     .single();
-  if (error || !clinica) {
-    // Rollback: remover usuário criado
-    await supabase.auth.admin.deleteUser(userId).catch(() => null);
-    falhar('Falha ao criar empresa: ' + (error?.message ?? 'resposta vazia'));
-  }
+  if (error || !clinica) throw new Error('Falha ao criar empresa: ' + (error?.message ?? 'resposta vazia'));
   console.log(`   → Empresa criada: ${clinica.id}`);
   return clinica;
 }
 
 async function vincularUsuario(supabase, userId, clinicaId) {
-  console.log('⏳ Etapa 3/4: Vinculando usuário à empresa...');
+  console.log('⏳ Etapa 4/5: Vinculando usuário à empresa...');
   const { error } = await supabase
     .from('clinica_usuarios')
-    .insert({ usuario_id: userId, clinica_id: clinicaId });
-  if (error) {
-    // Rollback
-    await supabase.auth.admin.deleteUser(userId).catch(() => null);
-    await supabase.from('clinicas').delete().eq('id', clinicaId).catch(() => null);
-    falhar('Falha ao criar vínculo: ' + error.message);
-  }
+    .insert({
+      usuario_id: userId,
+      clinica_id: clinicaId,
+      papel: 'recepcionista',
+      ativo: true,
+    });
+  if (error) throw new Error('Falha ao criar vínculo: ' + error.message);
   console.log('   → Vínculo criado em clinica_usuarios');
 }
 
 async function criarConfigInicial(supabase, userId, clinicaId, dados) {
-  console.log('⏳ Etapa 4/4: Criando configuração inicial em clinica_config...');
+  console.log('⏳ Etapa 5/5: Criando configuração inicial em clinica_config...');
   const { error } = await supabase
     .from('clinica_config')
     .upsert(
@@ -152,15 +181,40 @@ async function criarConfigInicial(supabase, userId, clinicaId, dados) {
         telefone:              dados.whatsapp || '',
         email:                 dados.email,
         horario_funcionamento: 'Seg a Sex: 08h - 18h',
+        slug:                   dados.slug,
       },
       { onConflict: 'user_id' }
     );
-  if (error) {
-    console.warn('   ⚠ Configuração inicial não gravada:', error.message);
-    console.warn('     O cliente pode preencher manualmente em /configuracoes.');
-  } else {
-    console.log('   → Configuração inicial criada');
+  if (error) throw new Error('Falha ao criar configuração inicial: ' + error.message);
+  console.log('   → Configuração inicial criada');
+}
+
+async function rollbackImplantacao(supabase, estado) {
+  console.warn('\n↩ Revertendo implantação incompleta...');
+  const erros = [];
+  const executar = async (etapa, operacao) => {
+    try {
+      const resultado = await operacao();
+      if (resultado?.error) throw resultado.error;
+    } catch (error) {
+      erros.push(`${etapa}: ${error?.message ?? String(error)}`);
+    }
+  };
+
+  if (estado.userId) {
+    await executar('configuração', () => supabase.from('clinica_config').delete().eq('user_id', estado.userId));
+    await executar('vínculo', () => supabase.from('clinica_usuarios').delete().eq('usuario_id', estado.userId));
   }
+  if (estado.clinicaId) {
+    await executar('empresa', () => supabase.from('clinicas').delete().eq('id', estado.clinicaId));
+  }
+  if (estado.userId) {
+    await executar('perfil', () => supabase.from('usuarios').delete().eq('id', estado.userId));
+    await executar('usuário Auth', () => supabase.auth.admin.deleteUser(estado.userId));
+  }
+
+  if (erros.length) throw new Error('Rollback incompleto — ' + erros.join('; '));
+  console.warn('   → Rollback concluído sem registros órfãos');
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -188,9 +242,10 @@ async function main() {
     console.log('✅ @supabase/supabase-js disponível');
     console.log('\nEm produção, o script executaria:');
     console.log('  1. supabase.auth.admin.createUser({ email, password, email_confirm: true })');
-    console.log('  2. INSERT INTO clinicas (nome, whatsapp, slug)');
-    console.log('  3. INSERT INTO clinica_usuarios (usuario_id, clinica_id)');
-    console.log('  4. UPSERT INTO clinica_config (user_id, clinica_id, nome_clinica, ...)');
+    console.log('  2. INSERT INTO usuarios (id, nome, email)');
+    console.log('  3. INSERT INTO clinicas (nome, whatsapp)');
+    console.log('  4. INSERT INTO clinica_usuarios (usuario_id, clinica_id, papel, ativo)');
+    console.log('  5. UPSERT INTO clinica_config (user_id, clinica_id, slug, ...)');
     console.log('\nPara implantar de verdade: node scripts/implantar-cliente.mjs\n');
     process.exit(0);
   }
@@ -211,10 +266,25 @@ async function main() {
 
   // Executar implantação
   await validarPreCondicoes(supabase, dados);
-  const user    = await criarUsuario(supabase, dados.email, dados.senha);
-  const clinica = await criarEmpresa(supabase, dados, user.id);
-  await vincularUsuario(supabase, user.id, clinica.id);
-  await criarConfigInicial(supabase, user.id, clinica.id, dados);
+  const estado = { userId: null, clinicaId: null };
+  let user;
+  let clinica;
+  try {
+    user = await criarUsuario(supabase, dados.email, dados.senha);
+    estado.userId = user.id;
+    await criarPerfil(supabase, user.id, dados);
+    clinica = await criarEmpresa(supabase, dados);
+    estado.clinicaId = clinica.id;
+    await vincularUsuario(supabase, user.id, clinica.id);
+    await criarConfigInicial(supabase, user.id, clinica.id, dados);
+  } catch (error) {
+    try {
+      await rollbackImplantacao(supabase, estado);
+    } catch (rollbackError) {
+      falhar(`${error.message}. ${rollbackError.message}`);
+    }
+    falhar(error.message);
+  }
 
   // Resumo final
   console.log('\n╔══════════════════════════════════════════════╗');
@@ -222,7 +292,6 @@ async function main() {
   console.log('╠══════════════════════════════════════════════╣');
   console.log(`║  Nome do negócio:   ${dados.nome.padEnd(26)}║`);
   console.log(`║  E-mail:            ${dados.email.padEnd(26)}║`);
-  console.log(`║  Senha temporária:  ${dados.senha.padEnd(26)}║`);
   console.log(`║  URL de login:      ${(appUrl + '/login').padEnd(26)}║`);
   console.log('╠══════════════════════════════════════════════╣');
   console.log(`║  user_id:    ${user.id.slice(0, 33)}║`);
@@ -235,7 +304,14 @@ async function main() {
   console.log('   4. Verificar vínculo no Supabase se algo parecer vazio\n');
 }
 
-main().catch(err => {
-  console.error('\n❌ Erro inesperado:', err?.message ?? String(err));
-  process.exit(1);
-});
+const executadoDiretamente = process.argv[1]
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (executadoDiretamente) {
+  main().catch(err => {
+    console.error('\n❌ Erro inesperado:', err?.message ?? String(err));
+    process.exit(1);
+  });
+}
+
+export { rollbackImplantacao };

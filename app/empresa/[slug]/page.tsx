@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { supabase } from "../../../lib/supabase";
 import SiteEmpresaClient from "./SiteEmpresaClient";
+import { normalizarEspecialidade } from "./_lib/helpers";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
@@ -58,8 +59,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const local = [resumo.cidade, resumo.estado].filter(Boolean).join(", ");
-  const descricaoAuto = [resumo.especialidade, local].filter(Boolean).join(" · ") || `Conheça ${resumo.nome}.`;
-  const tituloAuto = resumo.especialidade ? `${resumo.nome} — ${resumo.especialidade}` : resumo.nome!;
+  const especialidade = normalizarEspecialidade(resumo.especialidade);
+  const descricaoAuto = [especialidade, local].filter(Boolean).join(" · ") || `Conheça ${resumo.nome}.`;
+  const tituloAuto = especialidade ? `${resumo.nome} — ${especialidade}` : resumo.nome!;
 
   const titulo = resumo.seo_titulo?.trim() || tituloAuto;
   const descricao = resumo.seo_descricao?.trim() || descricaoAuto;

@@ -528,7 +528,7 @@ export default function Page() {
               </div>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 2, marginBottom: 8 }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: "#64748b", marginTop: 14 }}>R$</span>
-                <span style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: "#f1f5f9" }}>49</span>
+                <span style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: "#f1f5f9" }}>99</span>
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 20 }}>
                   <span style={{ fontSize: 26, fontWeight: 800, color: "#f1f5f9", lineHeight: 1 }}>,90</span>
                   <span style={{ fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>/mês</span>
@@ -564,7 +564,7 @@ export default function Page() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#94a3b8", marginBottom: 4 }}>Primeiro ano completo:</div>
               <div style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: "#4a9bb0" }}>
-                R$997 + 12 × R$49,90 = <span style={{ color: "#f1f5f9" }}>R$1.595,80</span>
+                R$997 + 12 × R$99,90 = <span style={{ color: "#f1f5f9" }}>R$2.195,80</span>
               </div>
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Diretor Digital + landing page + Google + suporte por 12 meses</div>
             </div>
