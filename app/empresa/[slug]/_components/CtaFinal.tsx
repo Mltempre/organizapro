@@ -1,36 +1,8 @@
 import Reveal from "./Reveal";
-import { IcWa, IcPhone } from "./icons";
-import { gerarTituloCtaFinal } from "../_lib/helpers";
-import { color, gradient, radius, shadow } from "../_lib/theme";
+import { IcWa,IcPhone } from "./icons";
+import { color,gradient,shadow } from "../_lib/theme";
 import type { Empresa } from "../_lib/types";
-
-export default function CtaFinal({ empresa, waLink, whatsappNumber }: { empresa: Empresa; waLink: string; whatsappNumber?: string }) {
-  if (!whatsappNumber && !empresa.telefone) return null;
-  return (
-    <section style={{ background: `radial-gradient(ellipse at center, rgba(74,155,176,0.12), ${color.ink} 65%)`, padding: "116px 24px", textAlign: "center" }}>
-      <Reveal>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ fontSize: 40, marginBottom: 18 }}>💬</div>
-          <h2 style={{ fontSize: "clamp(28px,4.2vw,44px)", fontWeight: 900, color: color.text, margin: "0 0 18px", lineHeight: 1.2, letterSpacing: "-0.02em" }}>
-            {gerarTituloCtaFinal(empresa)}
-          </h2>
-          <p style={{ fontSize: 16, color: color.textMuted, margin: "0 0 40px", lineHeight: 1.65 }}>
-            Fale com a gente agora e receba uma resposta rápida e direta.
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
-            {whatsappNumber && (
-              <a href={waLink} target="_blank" rel="noreferrer" className="btn-hero-glow" style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "17px 36px", borderRadius: radius.sm, background: gradient, color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 16, boxShadow: shadow.ctaGlow }}>
-                <IcWa/> Falar no WhatsApp
-              </a>
-            )}
-            {empresa.telefone && (
-              <a href={"tel:" + empresa.telefone} style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "17px 30px", borderRadius: radius.sm, border: `1.5px solid ${color.line}`, color: color.text, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
-                <IcPhone/> {empresa.telefone}
-              </a>
-            )}
-          </div>
-        </div>
-      </Reveal>
-    </section>
-  );
+export default function CtaFinal({empresa,waLink,whatsappNumber}:{empresa:Empresa;waLink:string;whatsappNumber?:string}){
+  if(!whatsappNumber&&!empresa.telefone)return null;
+  return <section className="premium-cta"><Reveal><div><span className="section-label">Vamos conversar</span><h2>Vamos conversar sobre o que você precisa?</h2><p>Entre em contato pelo canal que for mais conveniente para você.</p><div className="premium-cta__actions">{whatsappNumber&&<a className="primary" href={waLink} target="_blank" rel="noreferrer"><IcWa/>Falar no WhatsApp</a>}{empresa.telefone&&<a href={"tel:"+empresa.telefone}><IcPhone/>{empresa.telefone}</a>}</div></div></Reveal><style>{`.premium-cta{padding:100px 24px;background:radial-gradient(620px 320px at 50% 50%,rgba(38,111,130,.2),transparent 72%),${color.ink2};text-align:center}.premium-cta>div>div{max-width:760px;margin:auto}.premium-cta h2{margin:20px auto 18px;font-size:clamp(38px,5vw,62px);line-height:1.05;letter-spacing:-.05em}.premium-cta p{margin:0 0 32px;color:${color.textMuted};font-size:16px}.premium-cta__actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.premium-cta__actions a{min-height:52px;padding:0 24px;border:1px solid ${color.lineStrong};border-radius:10px;display:inline-flex;align-items:center;gap:9px;color:${color.textBody};text-decoration:none;font-size:14px;font-weight:700}.premium-cta__actions .primary{background:${gradient};color:#fff;box-shadow:${shadow.ctaGlow}}@media(max-width:560px){.premium-cta{padding:76px 20px}.premium-cta__actions{flex-direction:column}.premium-cta__actions a{justify-content:center}}`}</style></section>;
 }

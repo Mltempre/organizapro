@@ -1,98 +1,38 @@
+import Image from "next/image";
 import { IcWa, Icon } from "./icons";
 import { gerarIndicadoresConfianca } from "../_lib/helpers";
-import { CONFIANCA_FALLBACK } from "../_lib/content";
 import { color, gradient, radius, shadow } from "../_lib/theme";
 import type { Empresa } from "../_lib/types";
 
-export default function Hero({ empresa, esp, local, titulo, subtitulo, waLink, whatsappNumber }: {
-  empresa: Empresa; esp: string; local: string; titulo: string; subtitulo: string; waLink: string; whatsappNumber?: string;
+export default function Hero({ empresa, esp, local, titulo, subtitulo, waLink, whatsappNumber, mediaUrl, hasServices }: {
+  empresa: Empresa; esp: string; local: string; titulo: string; subtitulo: string; waLink: string; whatsappNumber?: string; mediaUrl?: string | null; hasServices: boolean;
 }) {
   const indicadores = gerarIndicadoresConfianca(empresa, local);
-  const temIndicadores = indicadores.length > 0;
-
   return (
-    <section id="hero" style={{ background: `radial-gradient(ellipse at top, rgba(31,78,95,0.35), ${color.ink} 65%)`, padding: "148px 24px 96px" }}>
-      <div className="hero-grid" style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 56, alignItems: "center" }}>
-        {/* ── coluna texto ── */}
-        <div>
-          {(esp || local) && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: color.accentSoft, border: `1px solid ${color.accentBorder}`, borderRadius: radius.pill, padding: "6px 16px", marginBottom: 26 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: color.accent, display: "inline-block" }}/>
-              <span style={{ fontSize: 13, fontWeight: 700, color: color.accent }}>{esp}{esp && local ? " · " : ""}{local}</span>
-            </div>
-          )}
-          <h1 className="hero-title" style={{
-            fontSize: "clamp(34px,4.4vw,52px)", fontWeight: 900, color: color.text, lineHeight: 1.12,
-            margin: "0 0 20px", letterSpacing: "-0.02em", maxWidth: 540,
-          }}>
-            {titulo}
-          </h1>
-          <p style={{ fontSize: "clamp(16px,1.4vw,18px)", color: color.textMuted, margin: "0 0 36px", maxWidth: 440, lineHeight: 1.7 }}>
-            {subtitulo}
-          </p>
-          <div className="hero-ctas" style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", marginBottom: 30 }}>
-            {whatsappNumber && (
-              <a href={waLink} target="_blank" rel="noreferrer" className="btn-hero-glow" style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "17px 32px", borderRadius: radius.sm, background: gradient, color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 15.5, boxShadow: shadow.ctaGlow }}>
-                <IcWa size={17}/> Falar pelo WhatsApp
-              </a>
-            )}
-            <a href="#servicos" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "17px 26px", borderRadius: radius.sm, border: `1.5px solid ${color.line}`, color: color.textBody, textDecoration: "none", fontSize: 14.5, fontWeight: 600, transition: "border-color 0.2s, background 0.2s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = color.accentBorder; (e.currentTarget as HTMLAnchorElement).style.background = color.accentSoft; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = color.line; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}>
-              Conhecer os serviços
-            </a>
+    <section id="hero" className={`premium-hero ${mediaUrl ? "premium-hero--media" : "premium-hero--editorial"}`}>
+      <div className="premium-hero__inner">
+        <div className="premium-hero__copy">
+          {(esp || local) && <div className="premium-kicker"><span/>{[esp, local].filter(Boolean).join(" · ")}</div>}
+          <h1>{titulo}</h1>
+          <p>{subtitulo}</p>
+          <div className="premium-actions">
+            {whatsappNumber && <a href={waLink} target="_blank" rel="noreferrer" className="premium-button premium-button--primary"><IcWa size={17}/> Falar pelo WhatsApp</a>}
+            {hasServices && <a href="#servicos" className="premium-button premium-button--secondary">Conhecer os serviços</a>}
           </div>
-
-          {/* indicadores de confiança — dado real quando existe, honesto quando não */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "9px 24px", paddingTop: 22, borderTop: `1px solid ${color.line}` }}>
-            {(temIndicadores ? indicadores : CONFIANCA_FALLBACK.map(t => ({ icone: "check", texto: t }))).map((it, i) => (
-              <span key={i} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, display: "flex", alignItems: "center", gap: 7 }}>
-                <Icon name={it.icone} size={14} color={it.icone === "star" ? color.star : color.accent}/>{it.texto}
-              </span>
-            ))}
-          </div>
+          {indicadores.length > 0 && <div className="premium-proof">
+            {indicadores.map((item, index) => <span key={index}><Icon name={item.icone} size={14} color={item.icone === "star" ? color.star : color.accent}/>{item.texto}</span>)}
+          </div>}
         </div>
-
-        {/* ── coluna visual ── */}
-        {empresa.hero_url ? (
-          <div className="hero-visual" style={{ position: "relative", aspectRatio: "4 / 4.4", borderRadius: radius.lg, overflow: "hidden", boxShadow: shadow.hero, border: `1px solid ${color.line}` }}>
-            <img src={empresa.hero_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
-          </div>
-        ) : (
-          // Sem foto cadastrada ainda: em vez de um placeholder vazio ou uma
-          // caixa de gradiente decorativa, mostramos um painel institucional —
-          // a mesma linguagem do painel "ao vivo" do Diretor Digital na
-          // Landing Oficial, elevada a selo de marca. Nunca inventa número
-          // ou estatística: cada linha só existe se o dado for real.
-          <div className="hero-visual hero-visual-panel" style={{ position: "relative" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-              <span className="live-dot-hero" style={{ width: 8, height: 8, borderRadius: "50%", background: color.live, display: "inline-block" }}/>
-              <span style={{ fontSize: 12, fontWeight: 700, color: color.live, letterSpacing: "0.04em", textTransform: "uppercase" }}>Perfil verificado</span>
-            </div>
-            <div style={{ position: "relative", background: color.surface, border: `1px solid ${color.lineStrong}`, borderRadius: radius.lg, padding: "40px 32px", boxShadow: shadow.hero, overflow: "hidden" }}>
-              <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(${color.lineStrong} 1px, transparent 1px)`, backgroundSize: "18px 18px", maskImage: "radial-gradient(circle at 30% 20%, black, transparent 70%)", WebkitMaskImage: "radial-gradient(circle at 30% 20%, black, transparent 70%)" }}/>
-              <div aria-hidden style={{ position: "absolute", width: 220, height: 220, borderRadius: "50%", background: `radial-gradient(circle, ${color.accent}22, transparent 70%)`, top: -60, right: -60 }}/>
-
-              <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: 28 }}>
-                <div style={{ width: 68, height: 68, borderRadius: radius.lg, background: gradient, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 800, color: "#fff", marginBottom: 16, boxShadow: shadow.ctaGlow }}>
-                  {(empresa.nome || "?").trim().charAt(0).toUpperCase()}
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: color.text }}>{empresa.nome}</div>
-                {esp && <div style={{ fontSize: 13, color: color.textFaint, marginTop: 3 }}>{esp}</div>}
-              </div>
-
-              <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 0 }}>
-                {(temIndicadores ? indicadores : CONFIANCA_FALLBACK.map(t => ({ icone: "check", texto: t }))).map((it, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderTop: `1px solid ${color.line}` }}>
-                    <Icon name={it.icone} size={15} color={it.icone === "star" ? color.star : color.accent}/>
-                    <span style={{ fontSize: 13.5, color: color.textBody }}>{it.texto}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {mediaUrl && <figure className="premium-hero__media"><Image src={mediaUrl} alt={`Imagem de apresentação de ${empresa.nome || "empresa"}`} fill priority sizes="(max-width: 700px) 100vw, 46vw" unoptimized/><span aria-hidden="true"/></figure>}
       </div>
+      <style>{`
+        .premium-hero{position:relative;min-height:700px;padding:134px 24px 82px;display:flex;align-items:center;overflow:hidden;background:radial-gradient(760px 500px at 82% 30%,rgba(38,111,130,.18),transparent 72%),radial-gradient(560px 360px at 8% 16%,rgba(31,78,95,.13),transparent 72%),${color.ink}}
+        .premium-hero:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);background-size:56px 56px;mask-image:linear-gradient(#000,transparent 90%);pointer-events:none}
+        .premium-hero__inner{position:relative;width:100%;max-width:1180px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr);align-items:center}.premium-hero--media .premium-hero__inner{grid-template-columns:minmax(0,1.08fr) minmax(420px,.92fr);gap:68px}.premium-hero--editorial .premium-hero__inner{max-width:920px}.premium-hero--editorial .premium-hero__copy{max-width:820px;margin:auto;text-align:center}.premium-hero__copy{max-width:650px}.premium-kicker{display:inline-flex;align-items:center;gap:9px;padding:7px 13px;margin-bottom:25px;border:1px solid ${color.accentBorder};border-radius:999px;background:${color.accentSoft};color:${color.accent};font-size:11.5px;font-weight:700}.premium-kicker span{width:6px;height:6px;border-radius:50%;background:${color.accent}}
+        .premium-hero h1{margin:0 0 22px;color:${color.text};font-size:clamp(46px,5.5vw,72px);line-height:1.015;letter-spacing:-.055em;font-weight:850}.premium-hero p{max-width:540px;margin:0 0 32px;color:${color.textMuted};font-size:17px;line-height:1.7}.premium-hero--editorial p{margin-left:auto;margin-right:auto}.premium-actions{display:flex;gap:12px;flex-wrap:wrap}.premium-hero--editorial .premium-actions,.premium-hero--editorial .premium-proof{justify-content:center}.premium-button{min-height:52px;padding:0 23px;border-radius:${radius.sm}px;display:inline-flex;align-items:center;justify-content:center;gap:9px;text-decoration:none;font-size:14px;font-weight:750}.premium-button--primary{color:#fff;background:${gradient};border:1px solid rgba(137,218,237,.36);box-shadow:${shadow.ctaGlow}}.premium-button--secondary{color:${color.textBody};background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.13)}.premium-proof{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:28px;padding-top:20px;border-top:1px solid ${color.line};max-width:680px}.premium-proof span{display:flex;align-items:center;gap:7px;color:${color.textMuted};font-size:12.5px;font-weight:600}.premium-hero__media{position:relative;margin:0;aspect-ratio:4/4.35;border-radius:28px;overflow:hidden;border:1px solid ${color.lineStrong};box-shadow:${shadow.hero};background:${color.ink2}}.premium-hero__media img{display:block;width:100%;height:100%;object-fit:cover}.premium-hero__media span{position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);border-radius:inherit;pointer-events:none}
+        @media(max-width:960px){.premium-hero--media .premium-hero__inner{grid-template-columns:1fr 42%;gap:36px}.premium-hero h1{font-size:clamp(42px,6vw,62px)}}
+        @media(max-width:700px){.premium-hero{min-height:auto;padding:104px 20px 58px}.premium-hero--media .premium-hero__inner{grid-template-columns:1fr;gap:34px}.premium-hero--editorial .premium-hero__copy{text-align:left}.premium-hero h1{font-size:clamp(39px,12vw,52px);letter-spacing:-.045em}.premium-hero p{font-size:15.5px}.premium-hero--editorial p{margin-left:0}.premium-actions{flex-direction:column}.premium-hero--editorial .premium-actions,.premium-hero--editorial .premium-proof{justify-content:flex-start}.premium-button{width:100%}.premium-proof{gap:10px 16px}.premium-hero__media{aspect-ratio:4/3;order:2;border-radius:20px}}
+      `}</style>
     </section>
   );
 }

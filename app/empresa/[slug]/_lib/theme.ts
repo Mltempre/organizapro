@@ -1,52 +1,33 @@
-// Sistema de design do Site Premium — DERIVADO da Landing Oficial do
-// OrganizaPro (app/page.tsx), não copiado dela. Mesma família visual: fundo
-// escuro, gradiente petróleo, cards "vidro", pills de eyebrow, CTA com o
-// mesmo gradiente (nunca verde de WhatsApp — a própria Landing já toma essa
-// decisão: o botão que abre o WhatsApp usa o gradiente da marca, não verde).
-// Trocar o visual inteiro do site é, na prática, trocar este arquivo.
-
 export const color = {
-  ink: "#0f1117",
-  ink2: "#0c0e14",
-  ink3: "#0a0b10",
-  surface: "rgba(255,255,255,0.03)",
-  surfaceHover: "rgba(255,255,255,0.05)",
-  line: "rgba(255,255,255,0.08)",
-  lineStrong: "rgba(255,255,255,0.14)",
+  ink: "#0d1016",
+  ink2: "#10141c",
+  ink3: "#090c11",
+  surface: "rgba(255,255,255,0.035)",
+  surfaceHover: "rgba(255,255,255,0.055)",
+  line: "rgba(255,255,255,0.09)",
+  lineStrong: "rgba(138,190,203,0.24)",
   text: "#f8fafc",
-  textBody: "#e2e8f0",
-  textMuted: "#94a3b8",
-  textFaint: "#64748b",
-  accent: "#4a9bb0",
-  accentSoft: "rgba(74,155,176,0.12)",
-  accentBorder: "rgba(74,155,176,0.30)",
-  gradA: "#1F4E5F",
-  gradB: "#0d3547",
-  live: "#4ade80",
+  textBody: "#d6dee7",
+  textMuted: "#9aa8b9",
+  textFaint: "#687589",
+  accent: "#79bdcd",
+  accentSoft: "rgba(55,134,154,0.09)",
+  accentBorder: "rgba(103,187,207,0.25)",
+  gradA: "#347f95",
+  gradB: "#1c4d5d",
+  live: "#5fba8d",
   star: "#fbbf24",
 };
 
-export const gradient = `linear-gradient(135deg, ${color.gradA}, ${color.gradB})`;
-
-export const radius = { sm: 10, md: 16, lg: 22, xl: 28, pill: 999 };
-
+export const gradient = `linear-gradient(145deg, ${color.gradA}, ${color.gradB})`;
+export const radius = { sm: 10, md: 18, lg: 26, xl: 32, pill: 999 };
 export const shadow = {
-  card: "0 1px 2px rgba(0,0,0,0.2)",
-  cardHover: "0 20px 44px -16px rgba(0,0,0,0.45)",
-  hero: "0 40px 100px rgba(0,0,0,0.5), 0 0 90px rgba(74,155,176,0.18)",
-  ctaGlow: "0 4px 20px rgba(31,78,95,0.4)",
-  ctaGlowHover: "0 8px 30px rgba(31,78,95,0.55)",
+  card: "0 1px 0 rgba(255,255,255,.04)",
+  cardHover: "0 24px 60px -24px rgba(0,0,0,.72)",
+  hero: "0 42px 100px rgba(0,0,0,.54), inset 0 1px rgba(255,255,255,.06)",
+  ctaGlow: "inset 0 1px rgba(255,255,255,.12), 0 12px 30px rgba(11,41,50,.42)",
+  ctaGlowHover: "inset 0 1px rgba(255,255,255,.16), 0 18px 42px rgba(11,41,50,.56)",
 };
-
-export const layout = { maxWidth: 1180, maxWidthNarrow: 760, section: "128px 24px" };
-
-export const font = {
-  family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
-
-export const eyebrow = {
-  fontSize: 12,
-  fontWeight: 800,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase" as const,
-};
+export const layout = { maxWidth: 1180, maxWidthNarrow: 760, section: "96px 24px" };
+export const font = { family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
+export const eyebrow = { fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const };

@@ -7,7 +7,6 @@ import Banner from "./_components/Banner";
 import Sobre from "./_components/Sobre";
 import Servicos from "./_components/Servicos";
 import Diferenciais from "./_components/Diferenciais";
-import Processo from "./_components/Processo";
 import Galeria from "./_components/Galeria";
 import Equipe from "./_components/Equipe";
 import Depoimentos from "./_components/Depoimentos";
@@ -134,15 +133,33 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
   const sobre = gerarSobre(empresa, equipe.length);
   const titulo = gerarTituloHero(empresa);
   const subtitulo = gerarSubtituloHero(empresa, local);
+  const mediaHero = empresa.hero_url || empresa.banner_url;
+  const temGaleria = galeria.length + estrutura.length > 0;
+  const temContato = Boolean(empresa.endereco || empresa.telefone || empresa.email || whatsappNumber);
+  const navItems: [string, string][] = [
+    ["#sobre", "Sobre"],
+    ...(servicos.length > 0 ? [["#servicos", "Serviços"]] as [string, string][] : []),
+    ...(temGaleria ? [["#galeria", "Galeria"]] as [string, string][] : []),
+    ...(equipe.length > 0 ? [["#equipe", "Equipe"]] as [string, string][] : []),
+    ...(depoimentos.length > 0 ? [["#depoimentos", "Depoimentos"]] as [string, string][] : []),
+    ...(faqs.length > 0 ? [["#faq", "FAQ"]] as [string, string][] : []),
+    ...(temContato ? [["#contato", "Contato"]] as [string, string][] : []),
+  ];
 
   return (
     <div style={{ fontFamily: font.family, background: color.ink, color: color.text }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        *{box-sizing:border-box}body{margin:0}
+        *{box-sizing:border-box}body{margin:0}body{overflow-x:hidden}a,button{outline-offset:4px}a:focus-visible,button:focus-visible{outline:2px solid ${color.accent}}
         html{scroll-behavior:smooth}
         h1,h2,h3{text-wrap:balance;font-family:${font.family}}
         #sobre,#servicos,#depoimentos,#contato{scroll-margin-top:76px}
+        .premium-section{padding:96px 24px}
+        .section-shell{max-width:1180px;margin:0 auto}
+        .section-label{display:inline-block;color:${color.accent};font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+        .section-heading{display:flex;align-items:end;justify-content:space-between;gap:48px;margin-bottom:46px}
+        .section-heading h2{max-width:660px;margin:18px 0 0;color:${color.text};font-size:clamp(34px,4vw,50px);line-height:1.08;letter-spacing:-.04em}
+        .section-heading>p{max-width:390px;margin:0;color:${color.textMuted};font-size:14px;line-height:1.75}
 
         .nav-link-item{transition:opacity .18s}
         .nav-link-item:hover{opacity:1!important}
@@ -163,36 +180,27 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
         @media(max-width:900px){
           .nav-links{display:none!important}
           .nav-burger{display:flex!important}
-          .hero-grid{grid-template-columns:1fr!important;padding-top:116px!important;gap:40px!important}
-          .hero-visual{order:-1;aspect-ratio:16/9!important;max-height:320px}
-          .hero-visual-panel{aspect-ratio:auto!important;max-height:none!important}
-          .sobre-grid{grid-template-columns:1fr!important}
-          .sobre-grid > div:last-child{aspect-ratio:16/9!important;order:-1}
+          .section-heading{align-items:start;flex-direction:column;gap:18px}
         }
         @media(max-width:768px){
           .hero-ctas{flex-direction:column!important;align-items:stretch!important}
           .two-col{grid-template-columns:1fr!important;gap:16px!important}
-          .processo-grid{grid-template-columns:1fr!important;gap:32px!important}
-          .processo-line{display:none!important}
-          .galeria-grid{grid-template-columns:1fr 1fr!important}
           .footer-cols{flex-direction:column!important;gap:24px!important}
         }
         @media(max-width:560px){
           .three-col{grid-template-columns:1fr!important}
           .dif-grid{grid-template-columns:1fr!important}
           .four-col{grid-template-columns:1fr!important}
-          .galeria-grid{grid-template-columns:1fr!important}
-          .galeria-grid > div{grid-row:auto!important}
+          .premium-section{padding:74px 20px}
         }
       `}</style>
 
-      <Header nome={nome} logoUrl={empresa.logo_url} waLink={waLink} whatsappNumber={whatsappNumber}/>
-      <Hero empresa={empresa} esp={esp} local={local} titulo={titulo} subtitulo={subtitulo} waLink={waLink} whatsappNumber={whatsappNumber}/>
-      <Banner bannerUrl={empresa.banner_url} nome={nome}/>
+      <Header nome={nome} logoUrl={empresa.logo_url} waLink={waLink} whatsappNumber={whatsappNumber} navItems={navItems}/>
+      <Hero empresa={empresa} esp={esp} local={local} titulo={titulo} subtitulo={subtitulo} waLink={waLink} whatsappNumber={whatsappNumber} mediaUrl={mediaHero} hasServices={servicos.length > 0}/>
+      <Banner bannerUrl={empresa.hero_url ? empresa.banner_url : null} nome={nome}/>
       <Sobre empresa={empresa} nome={nome} sobre={sobre}/>
       <Servicos servicos={servicos} empresa={empresa}/>
       <Diferenciais/>
-      <Processo/>
       <Galeria galeria={galeria} estrutura={estrutura} empresa={empresa}/>
       <Equipe equipe={equipe}/>
       <Depoimentos depoimentos={depoimentos}/>
@@ -209,7 +217,7 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
         </a>
       )}
 
-      <Footer empresa={empresa} nome={nome} esp={esp} waLink={waLink} whatsappNumber={whatsappNumber}/>
+      <Footer empresa={empresa} nome={nome} esp={esp} waLink={waLink} whatsappNumber={whatsappNumber} navItems={navItems}/>
     </div>
   );
 }

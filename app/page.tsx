@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import LandingHero from "./components/landing/LandingHero";
 
 // ── Landing Page Premium 2.0 · Diretor Digital ──────────────────────────
 //
@@ -36,14 +37,6 @@ function useReveal<T extends HTMLElement>(): [React.RefObject<T | null>, string]
   return [elRef, "reveal" + (visible ? " reveal-visible" : "")];
 }
 
-const HERO_MENSAGENS = [
-  { icon: "🟢", texto: "Bom dia. Hoje existem 8 compromissos programados." },
-  { icon: "⚠️", texto: "Existem 2 clientes aguardando retorno." },
-  { icon: "📈", texto: "Receita prevista para hoje: R$ 2.480" },
-  { icon: "💡", texto: "Recomendação do Diretor: confirmar os atendimentos da tarde pode reduzir faltas." },
-  { icon: "✅", texto: "Empresa organizada." },
-];
-
 const TRABALHO = [
   { icone: "🌅", titulo: "Pela manhã",           desc: "Organiza prioridades."          },
   { icone: "☀️", titulo: "Durante o expediente", desc: "Acompanha clientes e agenda."   },
@@ -77,17 +70,7 @@ const AUDIENCE = [
 const VALOR_OFERTA = ["Diretor Digital", "Dashboard Inteligente", "Atualizações", "IA integrada", "Suporte"];
 
 export default function Page() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [msgIndex, setMsgIndex] = useState(0);
-  const [msgVisible, setMsgVisible] = useState(true);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -96,26 +79,8 @@ export default function Page() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setMsgVisible(false);
-      setTimeout(() => {
-        setMsgIndex(i => (i + 1) % HERO_MENSAGENS.length);
-        setMsgVisible(true);
-      }, 350);
-    }, 3400);
-    return () => clearInterval(timer);
-  }, []);
-
   const wpp = (msg = "Quero um Diretor Digital cuidando do meu negócio") =>
     window.open(`https://wa.me/5541988379119?text=${encodeURIComponent(msg)}`, "_blank");
-
-  const NAV_LINKS: [string, string][] = [
-    ["Como funciona", "#como-funciona"],
-    ["O que ele faz",  "#modulos"      ],
-    ["Para quem",      "#para-quem"    ],
-    ["Investimento",   "#oferta"       ],
-  ];
 
   const [refDash, classDash]     = useReveal<HTMLDivElement>();
   const [refTrab, classTrab]     = useReveal<HTMLDivElement>();
@@ -123,8 +88,6 @@ export default function Page() {
   const [refFrent, classFrent]   = useReveal<HTMLDivElement>();
   const [refProva, classProva]   = useReveal<HTMLDivElement>();
   const [refOferta, classOferta] = useReveal<HTMLDivElement>();
-
-  const msgAtual = HERO_MENSAGENS[msgIndex];
 
   return (
     <div style={{ fontFamily: "Inter, -apple-system, sans-serif", background: "#0f1117", color: "#e2e8f0", overflowX: "hidden", maxWidth: "100vw" }}>
@@ -143,15 +106,6 @@ export default function Page() {
         .btn-main:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(31,78,95,0.55); }
 
         .btn-hero { animation: ctaGlow 2.6s ease-in-out infinite; }
-
-        .btn-outline {
-          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          background: transparent; color: rgba(255,255,255,0.8);
-          border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
-          font-family: inherit; font-size: 15px; font-weight: 600; padding: 14px 28px;
-          cursor: pointer; transition: all 0.22s; text-decoration: none; text-align: center; line-height: 1.3; max-width: 100%;
-        }
-        .btn-outline:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.35); color: #fff; }
 
         .card-soft {
           background: rgba(255,255,255,0.03); border-radius: 16px;
@@ -204,161 +158,7 @@ export default function Page() {
         }
       `}</style>
 
-      {/* ── NAV ────────────────────────────────────────────────────── */}
-      <nav style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: isMobile ? "0 16px" : "0 40px", height: 64,
-        background: scrolled ? "rgba(15,17,23,0.92)" : "transparent",
-        backdropFilter: scrolled ? "blur(16px)" : "none",
-        boxShadow: scrolled ? "0 1px 20px rgba(0,0,0,0.3)" : "none",
-        borderBottom: scrolled ? "1px solid rgba(255,255,255,0.07)" : "none",
-        transition: "all 0.3s",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>👔</span>
-          <span style={{ fontSize: 17, fontWeight: 800, color: "#f1f5f9" }}>OrganizaPro</span>
-        </div>
-
-        {!isMobile && (
-          <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-            {NAV_LINKS.map(([label, href]) => (
-              <a key={href} href={href}
-                style={{ fontSize: 14, color: "#e2e8f0", textDecoration: "none", fontWeight: 500, opacity: 0.7, transition: "opacity 0.2s" }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                onMouseLeave={e => (e.currentTarget.style.opacity = "0.7")}
-              >{label}</a>
-            ))}
-          </div>
-        )}
-
-        {!isMobile && (
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <Link href="/login" style={{ fontSize: 14, color: "#94a3b8", textDecoration: "none", fontWeight: 500 }}>Entrar</Link>
-            <button className="btn-main" style={{ padding: "10px 20px", fontSize: 14 }} onClick={() => wpp()}>
-              💬 Falar agora
-            </button>
-          </div>
-        )}
-
-        {isMobile && (
-          <button onClick={() => setMenuOpen(o => !o)}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ display: "block", width: 22, height: 2, background: "#e2e8f0", borderRadius: 2, transition: "all 0.2s", transform: menuOpen ? "rotate(45deg) translate(5px,5px)" : "none" }} />
-            <span style={{ display: "block", width: 22, height: 2, background: menuOpen ? "transparent" : "#e2e8f0", borderRadius: 2, transition: "all 0.2s" }} />
-            <span style={{ display: "block", width: 22, height: 2, background: "#e2e8f0", borderRadius: 2, transition: "all 0.2s", transform: menuOpen ? "rotate(-45deg) translate(5px,-5px)" : "none" }} />
-          </button>
-        )}
-      </nav>
-
-      {/* ── MOBILE MENU ────────────────────────────────────────────── */}
-      {isMobile && menuOpen && (
-        <div style={{ position: "fixed", inset: 0, top: 64, background: "rgba(15,17,23,0.98)", zIndex: 99, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 32 }}>
-          {NAV_LINKS.map(([label, href]) => (
-            <a key={href} href={href} onClick={() => setMenuOpen(false)}
-              style={{ fontSize: 22, color: "#e2e8f0", textDecoration: "none", fontWeight: 600 }}
-            >{label}</a>
-          ))}
-          <button className="btn-main" style={{ fontSize: 16 }} onClick={() => { setMenuOpen(false); wpp(); }}>
-            💬 Falar agora
-          </button>
-          <Link href="/login" onClick={() => setMenuOpen(false)}
-            style={{ fontSize: 14, color: "#64748b", textDecoration: "none" }}>
-            Já sou cliente → Entrar
-          </Link>
-        </div>
-      )}
-
-      {/* ── HERO ───────────────────────────────────────────────────── */}
-      <section style={{
-        background: "radial-gradient(ellipse at top, rgba(31,78,95,0.35), #0f1117 65%)",
-        padding: isMobile ? "104px 20px 64px" : "148px 40px 100px",
-      }}>
-        <div style={{
-          maxWidth: 1180, margin: "0 auto", display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1.05fr 0.95fr",
-          gap: isMobile ? 48 : 56, alignItems: "center",
-        }}>
-          <div style={{ textAlign: isMobile ? "center" : "left", minWidth: 0 }}>
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.3)",
-              borderRadius: 999, padding: "6px 18px", marginBottom: 28,
-              fontSize: 13, color: "#4a9bb0", fontWeight: 700,
-            }}>
-              👔 Não é mais um sistema. É um Diretor Digital.
-            </div>
-
-            <h1 style={{
-              fontSize: isMobile ? 34 : 54, fontWeight: 900, color: "#f8fafc",
-              lineHeight: 1.12, margin: "0 0 22px", letterSpacing: "-0.5px",
-            }}>
-              O OrganizaPro cuida do seu negócio{" "}
-              <span style={{ color: "#4a9bb0" }}>enquanto você cuida dos seus clientes.</span>
-            </h1>
-
-            <p style={{
-              fontSize: isMobile ? 16 : 18, color: "#94a3b8",
-              margin: isMobile ? "0 auto 36px" : "0 0 36px", lineHeight: 1.75, maxWidth: isMobile ? 520 : 480,
-            }}>
-              Ele observa sua agenda, seus clientes e sua reputação — e decide,
-              todos os dias, qual é a ação mais importante agora.
-            </p>
-
-            <div style={{ display: "flex", gap: 14, justifyContent: isMobile ? "center" : "flex-start", flexWrap: "wrap", minWidth: 0 }}>
-              <button className="btn-main btn-hero" style={{ fontSize: isMobile ? 15 : 17, padding: isMobile ? "14px 24px" : "17px 36px", minWidth: 0, maxWidth: "100%" }}
-                onClick={() => wpp()}>
-                Quero um Diretor Digital no meu negócio
-              </button>
-              <a href="#como-funciona" className="btn-outline"
-                style={{ fontSize: isMobile ? 14 : 15, padding: isMobile ? "13px 22px" : "15px 28px", minWidth: 0, maxWidth: "100%" }}>
-                Ver como ele trabalha ↓
-              </a>
-            </div>
-
-            <p style={{ marginTop: 20, fontSize: 13, color: "#64748b" }}>
-              Já em produção: Agenda · Clientes · Dashboard · Site · Reputação · Conteúdo IA
-            </p>
-          </div>
-
-          {/* PAINEL VIVO */}
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, justifyContent: isMobile ? "center" : "flex-start" }}>
-              <span className="live-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                Diretor Digital · ao vivo
-              </span>
-            </div>
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 18, padding: "30px 26px", minHeight: 168,
-              display: "flex", alignItems: "center",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-            }}>
-              <div style={{
-                opacity: msgVisible ? 1 : 0,
-                transform: msgVisible ? "translateY(0)" : "translateY(10px)",
-                transition: "opacity 0.35s ease, transform 0.35s ease",
-                display: "flex", alignItems: "flex-start", gap: 14, width: "100%",
-              }}>
-                <span style={{ fontSize: 26, flexShrink: 0, lineHeight: 1 }}>{msgAtual.icon}</span>
-                <span style={{ fontSize: 16, color: "#e2e8f0", lineHeight: 1.6, fontWeight: 500 }}>
-                  {msgAtual.texto}
-                </span>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 6, justifyContent: isMobile ? "center" : "flex-start", marginTop: 14 }}>
-              {HERO_MENSAGENS.map((_, i) => (
-                <span key={i} style={{
-                  width: i === msgIndex ? 18 : 6, height: 6, borderRadius: 999,
-                  background: i === msgIndex ? "#4a9bb0" : "rgba(255,255,255,0.15)",
-                  transition: "all 0.3s ease",
-                }} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      <LandingHero onPrimaryCta={() => wpp()} />
 
       {/* ── DASHBOARD PROTAGONISTA ─────────────────────────────────── */}
       <section style={{ padding: isMobile ? "20px 20px 90px" : "10px 40px 130px", background: "#0f1117" }}>

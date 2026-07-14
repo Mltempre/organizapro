@@ -1,144 +1,63 @@
-export default function Page() {
-  const stats = [
-    { label: "Clientes Ativos", value: "248", subtitle: "Fluxo saudável", gradient: "linear-gradient(135deg,#5b5dff,#8f3dff)" },
-    { label: "Compromissos Hoje", value: "18", subtitle: "Agenda dinâmica", gradient: "linear-gradient(135deg,#00bcd4,#3b82f6)" },
-    { label: "94% Taxa de Confirmação", value: "94%", subtitle: "Compromisso real", gradient: "linear-gradient(135deg,#6366f1,#a855f7)" },
-    { label: "4.9 ⭐ Avaliação Média", value: "4.9", subtitle: "Confiança do negócio", gradient: "linear-gradient(135deg,#f97316,#facc15)" },
-  ];
+"use client";
 
-  const results = [
-    "✅ 37 compromissos recuperados",
-    "✅ 94% de confirmações",
-    "✅ 4.9 estrelas de satisfação",
-    "✅ 248 clientes ativos",
-  ];
+import AdminShell from "../components/AdminShell";
 
-  const whatsappItems = [
-    "✓ Lembrete 24h antes",
-    "✓ Confirmação automática",
-    "✓ Pedido de avaliação Google",
-    "✓ Recuperação de clientes ausentes",
-  ];
+const recursos = [
+  ["👥", "Clientes"], ["📅", "Agenda"], ["🌐", "Site"],
+  ["✍️", "Conteúdo IA"], ["💬", "Chatbot"], ["🤖", "Automação"],
+  ["⭐", "Reputação"], ["📈", "Métricas"], ["📊", "Raio-X Inteligente"],
+];
 
-  const beforeAfter = [
-    {
-      title: "ANTES",
-      items: [
-        "❌ Clientes esquecem compromissos",
-        "❌ Agenda desorganizada",
-        "❌ Poucas avaliações",
-      ],
-      bg: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.08)",
-    },
-    {
-      title: "DEPOIS",
-      items: [
-        "✅ Confirmações automáticas",
-        "✅ Agenda organizada",
-        "✅ Mais avaliações Google",
-      ],
-      bg: "rgba(16,185,129,0.12)",
-      border: "1px solid rgba(16,185,129,0.3)",
-    },
-  ];
+const agenda = [
+  { hora: "09:00", cliente: "Empresa Horizonte", servico: "Reunião", responsavel: "Comercial", status: "Confirmado", cor: "#4ade80" },
+  { hora: "11:30", cliente: "João Martins", servico: "Retorno", responsavel: "Equipe", status: "Confirmado", cor: "#4ade80" },
+  { hora: "14:00", cliente: "Comercial Aurora", servico: "Apresentação", responsavel: "Administrativo", status: "Aguardando", cor: "#fbbf24" },
+];
 
+export default function DashboardDemo() {
   return (
-    <div style={{ minHeight: "100vh", background: "radial-gradient(circle at top, #0c1532 0%, #050811 45%, #030712 100%)", color: "#fff", fontFamily: "Inter,system-ui,sans-serif", padding: "40px 20px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <header style={{ textAlign: "center", marginBottom: 40, padding: "0 10px" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999, padding: "8px 16px", marginBottom: 18 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.2em", color: "#a5b4fc" }}>DEMO PREMIUM</span>
-          </div>
-          <h1 style={{ fontSize: "clamp(36px,4vw,64px)", fontWeight: 900, margin: "0 0 18px", lineHeight: 1.05 }}>Seu negócio está pronto para crescer 🚀</h1>
-          <p style={{ fontSize: 18, maxWidth: 760, margin: "0 auto 12px", lineHeight: 1.7, color: "rgba(255,255,255,0.8)" }}>Reduza faltas, aumente confirmações e acompanhe os resultados do seu negócio em tempo real.</p>
-          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", margin: 0 }}>Demonstração ilustrativa da plataforma.</p>
-        </header>
+    <AdminShell title="Painel Executivo">
+      <style>{`
+        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .dc { animation: fadeUp .35s ease both; }
+        .demo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+        .bottom-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:16px; }
+        @media(max-width:860px){.demo-grid,.bottom-grid{grid-template-columns:1fr}}
+      `}</style>
 
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 24, marginBottom: 36 }}>
-          {stats.map((item) => (
-            <div key={item.label} style={{ position: "relative", overflow: "hidden", borderRadius: 32, padding: 28, minHeight: 220, background: item.gradient, boxShadow: "0 28px 60px rgba(10,20,60,0.28)", border: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(14px)", color: "#fff", transition: "transform .3s, box-shadow .3s" }}>
-              <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 32%)", pointerEvents: "none" }} />
-              <div style={{ position: "absolute", bottom: -20, right: -30, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }} />
-              <div style={{ position: "relative", zIndex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14, opacity: 0.92 }}>{item.label}</div>
-                <div style={{ fontSize: 52, fontWeight: 900, marginBottom: 12, lineHeight: 1 }}>{item.value}</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)" }}>{item.subtitle}</div>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section style={{ display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: 24, marginBottom: 36 }}>
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 32, padding: 32, boxShadow: "0 24px 48px rgba(0,0,0,0.18)" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#c7d2fe", marginBottom: 18 }}>RESULTADOS DO ÚLTIMO MÊS</div>
-            <div style={{ display: "grid", gap: 16 }}>
-              {results.map((item) => (
-                <div key={item} style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 20px", borderRadius: 22, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <span style={{ fontSize: 20 }}>{item.startsWith("✅") ? "✅" : ""}</span>
-                  <span style={{ color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>{item.slice(2)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ background: "linear-gradient(180deg, rgba(37,99,235,0.12) 0%, rgba(79,70,229,0.08) 100%)", borderRadius: 32, padding: 28, display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 24px 48px rgba(0,0,0,0.14)" }}>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#a5b4fc", marginBottom: 16 }}>WhatsApp Automatizado</div>
-              <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 24, padding: 20, color: "#e5e7eb", lineHeight: 1.8, fontSize: 15 }}>
-                <div style={{ marginBottom: 12, fontWeight: 700, color: "#fff" }}>Conversa simulada</div>
-                <div style={{ display: "grid", gap: 10 }}>
-                  {whatsappItems.map((item) => (
-                    <div key={item} style={{ background: "rgba(255,255,255,0.08)", borderRadius: 18, padding: "12px 14px", border: "1px solid rgba(255,255,255,0.08)" }}>{item}</div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 40 }}>
-          {beforeAfter.map((block) => (
-            <div key={block.title} style={{ background: block.bg, border: block.border, borderRadius: 28, padding: 28, minHeight: 240, boxShadow: "0 18px 42px rgba(0,0,0,0.12)" }}>
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 18, color: "#fff" }}>{block.title}</div>
-              <div style={{ display: "grid", gap: 12 }}>
-                {block.items.map((item) => (
-                  <div key={item} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 15, color: "rgba(255,255,255,0.9)" }}>
-                    <span style={{ width: 24, textAlign: "center" }}>{item.startsWith("❌") ? "❌" : "✅"}</span>
-                    <span>{item.slice(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <div style={{ textAlign: "center", padding: "32px 20px", borderRadius: 32, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.75)", marginBottom: 18 }}>Exiba um atendimento premium e fale direto com a equipe OrganizaPro via WhatsApp.</p>
-          <a
-            href="https://wa.me/5541988379119"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              background: "linear-gradient(135deg,#6366f1,#2563eb)",
-              color: "#fff",
-              textDecoration: "none",
-              padding: "16px 28px",
-              borderRadius: 999,
-              fontSize: 16,
-              fontWeight: 800,
-              boxShadow: "0 18px 40px rgba(37,99,235,0.28)",
-              transition: "transform .2s, box-shadow .2s",
-            }}
-          >
-            Agendar Demonstração
-          </a>
-        </div>
+      <div className="dc" style={{display:"inline-flex",alignItems:"center",gap:10,padding:"10px 16px",borderRadius:12,marginBottom:20,background:"rgba(74,155,176,.08)",border:"1px solid rgba(74,155,176,.2)"}}>
+        <span style={{fontSize:18}}>📅</span>
+        <div><div style={{fontSize:10,fontWeight:800,color:"#4a9bb0",textTransform:"uppercase",letterSpacing:".06em"}}>Hoje</div><div style={{fontSize:14,fontWeight:700,color:"#f1f5f9"}}>Segunda-feira, 13 de julho</div></div>
       </div>
-    </div>
+
+      <div className="dc" style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:20}}>
+        {recursos.map(([icon,label])=><span key={label} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 13px",borderRadius:999,background:"rgba(74,155,176,.07)",border:"1px solid rgba(74,155,176,.18)",color:"#cbd5e1",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}><span style={{color:"#4ade80"}}>✔</span> {icon} {label}</span>)}
+      </div>
+
+      <section className="dc" style={{background:"linear-gradient(135deg,rgba(74,155,176,.12),rgba(31,78,95,.22))",border:"1px solid rgba(74,155,176,.3)",borderRadius:16,padding:"22px 24px",marginBottom:20,boxShadow:"0 8px 24px rgba(0,0,0,.15)"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:36,height:36,borderRadius:10,background:"rgba(74,155,176,.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>🎯</div><strong style={{fontSize:16,color:"#f1f5f9"}}>Seu Plano para Hoje</strong></div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:800,color:"#64748b",letterSpacing:".08em",textTransform:"uppercase"}}>Status Operacional</span><span style={{padding:"5px 12px",borderRadius:999,background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.3)",color:"#fbbf24",fontSize:12,fontWeight:700}}>🟡 Atenção</span></div>
+        </div>
+        <div style={{fontSize:14,fontWeight:600,color:"#cbd5e1",margin:"6px 0 4px"}}>👋 Bom dia!<br/>Bem-vindo ao OrganizaPro.</div>
+        <p style={{fontSize:13,color:"#94a3b8",lineHeight:1.6,margin:"0 0 20px"}}>Acompanhe suas prioridades e mantenha sua empresa organizada durante todo o dia.</p>
+        <div className="demo-grid">
+          {[
+            ["Prioridades","2","clientes aguardando retorno.","#f87171"],
+            ["Agenda","5","compromissos agendados.","#4a9bb0"],
+            ["Oportunidades","3","clientes podem voltar a fazer negócio.","#4ade80"],
+          ].map(([titulo,numero,texto,cor])=><div key={titulo} style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:16}}><div style={{fontSize:10,fontWeight:800,color:"#94a3b8",letterSpacing:".08em",textTransform:"uppercase",marginBottom:8}}>{titulo}</div><div style={{fontSize:30,fontWeight:900,lineHeight:1,color:cor,marginBottom:6}}>{numero}</div><p style={{fontSize:12,color:"#94a3b8",margin:0}}>{texto}</p></div>)}
+        </div>
+        <div style={{marginTop:20,paddingTop:20,borderTop:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"flex-start",gap:12}}>
+          <div style={{width:40,height:40,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#1F4E5F,#0d3547)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>👔</div>
+          <div style={{flex:1}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}><strong style={{fontSize:14,color:"#f1f5f9"}}>Diretor Digital</strong><span style={{fontSize:9.5,fontWeight:700,textTransform:"uppercase",color:"#4a9bb0",background:"rgba(74,155,176,.12)",border:"1px solid rgba(74,155,176,.25)",borderRadius:999,padding:"2px 8px"}}>OrganizaPro Intelligence</span></div><p style={{fontSize:13,color:"#cbd5e1",lineHeight:1.55,margin:"0 0 12px"}}>Bom dia. Analisei a rotina da Empresa Demonstração e identifiquei a ação mais importante para hoje.</p><div style={{background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.3)",borderRadius:12,padding:"14px 16px"}}><div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:".08em",color:"#fbbf24",marginBottom:6}}>🎯 Prioridade do Diretor</div><strong style={{fontSize:14,color:"#f1f5f9"}}>Confirmar a apresentação da tarde</strong><p style={{fontSize:12,color:"#94a3b8",lineHeight:1.45,margin:"5px 0 0"}}>O compromisso com a Comercial Aurora ainda aguarda confirmação. Antecipar esse contato reduz imprevistos para a equipe.</p></div></div>
+        </div>
+      </section>
+
+      <div className="bottom-grid dc">
+        <section style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.07)",borderRadius:14,padding:"18px 20px"}}><div style={{fontSize:11,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:14}}>Agenda de hoje</div>{agenda.map((item,i)=><div key={item.hora} style={{display:"grid",gridTemplateColumns:"52px 1.4fr .8fr .8fr",gap:12,alignItems:"center",padding:"10px 0",borderBottom:i<agenda.length-1?"1px solid rgba(255,255,255,.05)":"none"}}><span style={{fontSize:12,color:"#64748b"}}>{item.hora}</span><div><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.cliente}</div><div style={{fontSize:11,color:"#64748b"}}>{item.servico}</div></div><span style={{fontSize:11,color:"#94a3b8"}}>{item.responsavel}</span><span style={{fontSize:11,fontWeight:700,color:item.cor,textAlign:"right"}}>{item.status}</span></div>)}</section>
+        <section style={{background:"linear-gradient(135deg,rgba(31,78,95,.18),rgba(13,53,71,.25))",border:"1px solid rgba(31,78,95,.35)",borderRadius:14,padding:"20px 22px"}}><div style={{fontSize:11,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:16}}>Panorama do dia</div>{[["🟢","5","compromissos hoje","#4ade80"],["🟡","2","aguardando confirmação","#fbbf24"],["🔴","0","em atraso","#64748b"]].map(([icon,n,label,cor])=><div key={label} style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}><span>{icon}</span><strong style={{fontSize:25,color:cor,minWidth:30}}>{n}</strong><span style={{fontSize:13,color:"#94a3b8"}}>{label}</span></div>)}</section>
+      </div>
+    </AdminShell>
   );
 }

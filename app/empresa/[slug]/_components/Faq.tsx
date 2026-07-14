@@ -28,7 +28,7 @@ function FaqItem({ p, r, isFirst }: { p: string; r: string; isFirst: boolean }) 
 export default function Faq({ faqs }: { faqs: DBFaq[] }) {
   if (faqs.length === 0) return null;
   return (
-    <section style={{ padding: "112px 24px", background: color.ink }}>
+    <section id="faq" style={{ padding: "112px 24px", background: color.ink }}>
       <Reveal>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>

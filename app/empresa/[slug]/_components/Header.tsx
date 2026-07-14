@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { IcWa, IcMenu, IcClose } from "./icons";
-import { NAV_LINKS } from "../_lib/content";
 import { initials } from "../_lib/helpers";
 import { color, gradient, radius, shadow } from "../_lib/theme";
 
-export default function Header({ nome, logoUrl, waLink, whatsappNumber }: { nome: string; logoUrl?: string; waLink: string; whatsappNumber?: string }) {
+export type SiteNavItem = readonly [string, string];
+
+export default function Header({ nome, logoUrl, waLink, whatsappNumber, navItems }: { nome: string; logoUrl?: string; waLink: string; whatsappNumber?: string; navItems: SiteNavItem[] }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function Header({ nome, logoUrl, waLink, whatsappNumber }: { nome
             <span style={{ fontSize: 15, fontWeight: 800, color: color.text }}>{nome}</span>
           </a>
           <nav className="nav-links" style={{ display: "flex", alignItems: "center", gap: 30 }}>
-            {NAV_LINKS.map(([href, label]) => (
+            {navItems.map(([href, label]) => (
               <a key={href} href={href} className="nav-link-item" style={{ fontSize: 14, color: color.textBody, textDecoration: "none", fontWeight: 500, opacity: 0.72 }}>{label}</a>
             ))}
             {whatsappNumber && (
@@ -79,7 +80,7 @@ export default function Header({ nome, logoUrl, waLink, whatsappNumber }: { nome
           </button>
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "24px 28px", gap: 26 }}>
-          {NAV_LINKS.map(([href, label]) => (
+          {navItems.map(([href, label]) => (
             <a key={href} href={href} onClick={() => setOpen(false)} style={{ fontSize: 23, fontWeight: 700, color: color.text, textDecoration: "none" }}>{label}</a>
           ))}
         </div>
