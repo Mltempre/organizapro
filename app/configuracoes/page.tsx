@@ -179,16 +179,15 @@ export default function ConfiguracoesPage() {
         setTesteMsg('sucesso:Mensagem enviada com sucesso.');
       } else {
         console.error(data);
-        // DIAGNÓSTICO TEMPORÁRIO — remover após confirmar o comportamento em produção.
-        setTesteMsg('erro:' + `[DIAGNÓSTICO] status=${res.status} ${res.statusText} | body=${JSON.stringify(data)}`);
+        const detalhe = data.error || data.detalhe;
+        setTesteMsg('erro:' + (detalhe ? `${MSG_ERRO_PADRAO} (${res.status}: ${detalhe})` : MSG_ERRO_PADRAO));
       }
     } catch (e) {
       console.error(e);
-      // DIAGNÓSTICO TEMPORÁRIO — remover após confirmar o comportamento em produção.
-      setTesteMsg('erro:' + `[DIAGNÓSTICO] exceção: ${e instanceof Error ? e.message : String(e)}`);
+      setTesteMsg('erro:' + MSG_ERRO_PADRAO);
     } finally {
       setTestando(false);
-      setTimeout(() => setTesteMsg(''), 20000);
+      setTimeout(() => setTesteMsg(''), 4000);
     }
   }
 
