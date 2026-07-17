@@ -154,9 +154,18 @@ export default function ConfiguracoesPage() {
         return;
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setTesteMsg('erro:Sessão expirada. Recarregue a página e tente novamente.');
+        return;
+      }
+
       const res = await fetch('/api/whatsapp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           clinica_id: cu.clinica_id,
           user_id: user.id,
@@ -170,14 +179,16 @@ export default function ConfiguracoesPage() {
         setTesteMsg('sucesso:Mensagem enviada com sucesso.');
       } else {
         console.error(data);
-        setTesteMsg('erro:' + MSG_ERRO_PADRAO);
+        // DIAGNÓSTICO TEMPORÁRIO — remover após confirmar o comportamento em produção.
+        setTesteMsg('erro:' + `[DIAGNÓSTICO] status=${res.status} ${res.statusText} | body=${JSON.stringify(data)}`);
       }
     } catch (e) {
       console.error(e);
-      setTesteMsg('erro:' + MSG_ERRO_PADRAO);
+      // DIAGNÓSTICO TEMPORÁRIO — remover após confirmar o comportamento em produção.
+      setTesteMsg('erro:' + `[DIAGNÓSTICO] exceção: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setTestando(false);
-      setTimeout(() => setTesteMsg(''), 4000);
+      setTimeout(() => setTesteMsg(''), 20000);
     }
   }
 
@@ -196,13 +207,13 @@ export default function ConfiguracoesPage() {
   };
 
   if (loading) return (
-    <AdminShell title="Configurações" subtitle="Personalize as informações do seu negócio">
+    <AdminShell title="⚙️ Configurações da Empresa" subtitle="Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.">
       <PageLoader title="Carregando configurações..." />
     </AdminShell>
   );
 
   return (
-    <AdminShell title="Configurações" subtitle="Personalize as informações do seu negócio">
+    <AdminShell title="⚙️ Configurações da Empresa" subtitle="Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.">
       <style>{`
         .cfg-btn-salvar:hover:not(:disabled) { filter: brightness(1.1); }
         .cfg-btn-testar:hover:not(:disabled) { background: rgba(79,70,229,0.2) !important; }
@@ -212,8 +223,8 @@ export default function ConfiguracoesPage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Configurações</h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '8px 0 0' }}>Personalize as informações do seu negócio</p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>⚙️ Configurações da Empresa</h1>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '8px 0 0' }}>Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.</p>
           </div>
           <button className="cfg-btn-salvar" onClick={salvar} disabled={salvando} style={{ padding: '12px 22px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1, transition: 'filter 0.15s' }}>
             {salvando ? 'Salvando...' : 'Salvar'}
@@ -233,10 +244,10 @@ export default function ConfiguracoesPage() {
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Informações do Negócio</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
             {[
-              { k: 'nome_clinica', l: 'Nome do Negócio', t: 'text',  p: 'Ex: Meu Negócio'         },
-              { k: 'telefone',     l: 'WhatsApp',        t: 'text',  p: '11999999999'              },
-              { k: 'email',        l: 'Email',           t: 'email', p: 'contato@seunegocio.com'   },
-              { k: 'endereco',     l: 'Endereço',        t: 'text',  p: 'Rua das Flores, 123' },
+              { k: 'nome_clinica', l: 'Nome do Negócio', t: 'text',  p: 'Ex.: Barbearia Imperial'        },
+              { k: 'telefone',     l: 'WhatsApp',        t: 'text',  p: '(00) 00000-0000'                },
+              { k: 'email',        l: 'Email',           t: 'email', p: 'contato@suaempresa.com.br'      },
+              { k: 'endereco',     l: 'Endereço',        t: 'text',  p: 'Ex.: Av. Brasil, 1250 - Centro' },
             ].map(f => (
               <div key={f.k}>
                 <label style={lbl}>{f.l}</label>
@@ -251,8 +262,8 @@ export default function ConfiguracoesPage() {
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>Google, Avaliações e Horários</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
             {[
-              { k: 'logo_url',              l: 'URL da Logo',              p: 'https://...'         },
-              { k: 'horario_funcionamento', l: 'Horário de Funcionamento', p: 'Seg a Sex: 08h-18h'  },
+              { k: 'logo_url',              l: 'Logo da Empresa',       p: 'Cole a URL da sua logo' },
+              { k: 'horario_funcionamento', l: 'Horário de Atendimento', p: 'Seg a Sex: 08h-18h'     },
             ].map(f => (
               <div key={f.k}>
                 <label style={lbl}>{f.l}</label>
@@ -260,7 +271,7 @@ export default function ConfiguracoesPage() {
               </div>
             ))}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={lbl}>Link para Avaliação no Google</label>
+              <label style={lbl}>Link do Google Meu Negócio</label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <input
                   type="text"
@@ -284,7 +295,7 @@ export default function ConfiguracoesPage() {
                 </button>
               </div>
               <p style={{ fontSize: 11, color: '#475569', margin: '6px 0 0' }}>
-                Cole aqui o link direto para que seus clientes deixem uma avaliação no Google. Esse link será utilizado nas mensagens automáticas do OrganizaPro.
+                Esse link será utilizado para solicitar avaliações automaticamente aos seus clientes.
               </p>
               {linkGoogleMsg && (
                 <div style={{ marginTop: 8 }}>
