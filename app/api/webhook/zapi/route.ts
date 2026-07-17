@@ -59,6 +59,24 @@ function iniciaCom(texto: string, palavra: string): boolean {
   return /^[\s,!.?]/.test(texto.slice(palavra.length));
 }
 
+// ─── TRAVA DE EMERGÊNCIA — automação pausada por tenant ──────────────────────
+// Ativada em 2026-07-17: o número conectado à instância Z-API do tenant
+// "OrganizaPro Oficial" é o WhatsApp pessoal do proprietário, e mensagens
+// particulares (família/amigos) estavam sendo respondidas automaticamente
+// pelo funil comercial do chatbot. Pausa TODO processamento automático
+// (chatbot e resposta de confirmação/reagendamento) para os clinica_id
+// listados aqui, até que uma instância Z-API dedicada e exclusiva para o
+// negócio seja criada (fora do escopo desta correção emergencial).
+// Reversão: remover o clinica_id deste Set. Evolução futura: substituir por
+// uma coluna clinica_config.chatbot_ativo (requer migração aprovada).
+const TENANTS_COM_AUTOMACAO_PAUSADA = new Set<string>([
+  "9b21a735-4bbb-4cbc-8666-7d941be9d35c", // OrganizaPro Oficial — número pessoal do dono
+]);
+
+function automacaoPausada(clinicaId: string | null | undefined): boolean {
+  return !!clinicaId && TENANTS_COM_AUTOMACAO_PAUSADA.has(clinicaId);
+}
+
 export function classificarResposta(texto: string): "confirmar" | "reagendar" | "ignorar" {
   const t = normalizar(texto);
   if (CONFIRMAR_EXATO.has(t)) return "confirmar";
@@ -200,17 +218,26 @@ export async function POST(req: NextRequest) {
           console.warn("[WEBHOOK] retorno antecipado: clinica_id não encontrado — chatbot não será chamado");
         }
       } else {
-        console.warn("[WEBHOOK] instanceId vazio no payload — tentando fallback pela única clínica");
-        // Fallback: se há apenas 1 clínica configurada, usa ela
-        const { data: unica } = await supabase
-          .from("clinica_config")
-          .select("clinica_id, zapi_instance")
-          .not("zapi_instance", "is", null)
-          .limit(1);
-        if (unica?.[0]?.clinica_id) {
-          chatbotClinicaId = unica[0].clinica_id;
-          console.log("[WEBHOOK] clinica_id via fallback (única clínica):", chatbotClinicaId);
-        }
+        // Etapa 3 (trava de emergência): nunca mais adivinhar a clínica quando
+        // o payload não traz instanceId — isso já causou o encaminhamento de
+        // conversas particulares para o funil comercial. Registra e encerra.
+        console.warn("[WEBHOOK] instanceId vazio no payload — evento registrado e ignorado (sem adivinhação de clínica)");
+        await supabase.from("whatsapp_logs").insert({
+          clinica_id: null,
+          telefone, mensagem, status: "recebido",
+          resposta: { acao, processado: false, motivo: "sem_instance_id" },
+        });
+        return NextResponse.json({ sucesso: true, ignorado: "sem_instance_id" });
+      }
+
+      if (chatbotClinicaId && automacaoPausada(chatbotClinicaId)) {
+        console.warn("[WEBHOOK] automação pausada para este tenant — chatbot não será chamado:", { clinica_id: chatbotClinicaId });
+        await supabase.from("whatsapp_logs").insert({
+          clinica_id: chatbotClinicaId,
+          telefone, mensagem, status: "recebido",
+          resposta: { acao, processado: false, motivo: "chatbot_pausado_manualmente" },
+        });
+        return NextResponse.json({ sucesso: true, recebido: true, ignorado: "automacao_pausada" });
       }
 
       if (chatbotClinicaId) {
@@ -280,6 +307,16 @@ export async function POST(req: NextRequest) {
       instanceId: instanceId || "vazio",
       clinicaIdHint: clinicaIdHint ?? "não encontrado",
     });
+
+    if (automacaoPausada(clinicaIdHint)) {
+      console.warn("[webhook/zapi] automação pausada para este tenant — fluxo de confirmação encerrado:", { clinica_id: clinicaIdHint });
+      await supabase.from("whatsapp_logs").insert({
+        clinica_id: clinicaIdHint,
+        telefone, mensagem, status: "recebido",
+        resposta: { acao, processado: false, motivo: "chatbot_pausado_manualmente" },
+      });
+      return NextResponse.json({ sucesso: true, recebido: true, ignorado: "automacao_pausada" });
+    }
 
     // ── Passo 2: buscar agendamento por telefone ─────────────────────────────
     // Tenta três formatos: telefone exato (com DDI), sufixo8, sufixo9.
@@ -383,7 +420,9 @@ export async function POST(req: NextRequest) {
       // Sem agendamento pendente: a mensagem (mesmo que sim/não) vai para o chatbot.
       // O chatbot tem guarda interna que descarta confirmações sem contexto.
       const clinicaParaChatbot = clinicaIdHint;
-      if (clinicaParaChatbot) {
+      if (clinicaParaChatbot && automacaoPausada(clinicaParaChatbot)) {
+        console.warn("[WEBHOOK] automação pausada para este tenant — fallback para chatbot não será chamado:", { clinica_id: clinicaParaChatbot });
+      } else if (clinicaParaChatbot) {
         console.log("[WEBHOOK] sem agendamento — roteando para chatbot:", { clinica_id: clinicaParaChatbot, acao });
         try {
           const baseUrl = new URL(req.url).origin;
@@ -440,6 +479,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Passo 4: resposta automática ─────────────────────────────────────────
+    if (automacaoPausada(clinicaId)) {
+      console.warn("[webhook/zapi] automação pausada para este tenant — resposta automática não será enviada:", { clinica_id: clinicaId });
+      await supabase.from("whatsapp_logs").insert({
+        clinica_id: clinicaId,
+        telefone, mensagem, status: "recebido",
+        resposta: { acao, agendamento_id: ag.id, processado: false, motivo: "chatbot_pausado_manualmente" },
+      });
+      return NextResponse.json({ sucesso: true, recebido: true, ignorado: "automacao_pausada" });
+    }
     try {
       const { data: clinicaConfig } = await supabase
         .from("clinica_config")
@@ -460,9 +508,16 @@ export async function POST(req: NextRequest) {
       });
 
       const baseUrl = new URL(req.url).origin;
+      const cronSecret = process.env.CRON_SECRET;
+      if (!cronSecret) {
+        throw new Error("CRON_SECRET não configurado para envio interno");
+      }
       await fetch(`${baseUrl}/api/whatsapp`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${cronSecret}`,
+        },
         body: JSON.stringify({ clinica_id: clinicaId, telefone, mensagem: mensagemResposta }),
       });
       console.log("[webhook/zapi] passo 4 — resposta automática enviada");
