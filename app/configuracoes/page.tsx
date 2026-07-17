@@ -175,11 +175,11 @@ export default function ConfiguracoesPage() {
       });
 
       const data = await res.json();
-      if (data.sucesso) {
-        setTesteMsg('sucesso:Mensagem enviada com sucesso.');
+      if (res.ok && data?.sucesso === true) {
+        setTesteMsg('sucesso:Mensagem de teste enviada com sucesso.');
       } else {
         console.error(data);
-        const detalhe = data.error || data.detalhe;
+        const detalhe = data?.error || data?.detalhe;
         setTesteMsg('erro:' + (detalhe ? `${MSG_ERRO_PADRAO} (${res.status}: ${detalhe})` : MSG_ERRO_PADRAO));
       }
     } catch (e) {
