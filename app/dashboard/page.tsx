@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 import OnboardingCard from "../components/onboarding/OnboardingCard";
+import WelcomeModal from "../components/onboarding/WelcomeModal";
 import { gerarPrioridadeDoDia, type CategoriaRecomendacao, type Recomendacao } from "../../lib/recomendacoes";
 
 type AgItem = {
@@ -492,6 +493,7 @@ export default function Dashboard() {
 
   return (
     <AdminShell title="Painel Executivo">
+      {clinicaId && <WelcomeModal clinicaId={clinicaId} />}
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         .dc  { animation: fadeUp 0.35s ease both; }
