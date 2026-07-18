@@ -54,6 +54,16 @@ function ehConfirmacaoDeConsulta(msg: string): boolean {
   return REGEX_CONFIRMACAO.test(t);
 }
 
+// ─── Isolamento por tenant: funil comercial do OrganizaPro ────────────────────
+// O funil de qualificação de leads (SDR) abaixo e a saudação/fallback de
+// montarResposta foram escritos para qualificar leads interessados em
+// comprar o OrganizaPro — só fazem sentido para o tenant "OrganizaPro
+// Oficial". Sem esse isolamento, qualquer tenant recebia o mesmo funil de
+// vendas do OrganizaPro quando um cliente final usava frases comuns como
+// "quanto custa" ou "como funciona". Ver app/api/webhook/zapi/route.ts
+// (TENANTS_COM_AUTOMACAO_PAUSADA) para o mesmo tenant isolado por outro motivo.
+const TENANT_SDR_ORGANIZAPRO = "9b21a735-4bbb-4cbc-8666-7d941be9d35c";
+
 // ─── Classificador de tópico (regras fixas) ───────────────────────────────────
 
 function classificarTopico(msg: string): Topico {
@@ -73,20 +83,22 @@ function classificarTopico(msg: string): Topico {
 
 // ─── Montagem de resposta (regras fixas) ──────────────────────────────────────
 
-function montarResposta(topico: Topico, config: Config): string {
+function montarResposta(topico: Topico, config: Config, ehTenantSdrOrganizaPro: boolean): string {
   const link = config.link_humano
     ? `\n\nFale diretamente com nossa equipe: ${config.link_humano}`
     : "";
   switch (topico) {
     case "saudacao":
-      return (
-        `Olá! Sou o Assistente Virtual do OrganizaPro. 👋\n\n` +
-        `Ajudamos pequenos negócios a:\n• Reduzir faltas com confirmações automáticas\n` +
-        `• Automatizar atendimentos via WhatsApp\n• Aumentar avaliações no Google\n\n` +
-        `Posso te ajudar com:\n• Valores e planos\n• Demonstração gratuita\n` +
-        `• WhatsApp automático\n• Avaliações Google\n• Sites profissionais\n\n` +
-        `Como posso te ajudar hoje?`
-      );
+      return ehTenantSdrOrganizaPro
+        ? (
+            `Olá! Sou o Assistente Virtual do OrganizaPro. 👋\n\n` +
+            `Ajudamos pequenos negócios a:\n• Reduzir faltas com confirmações automáticas\n` +
+            `• Automatizar atendimentos via WhatsApp\n• Aumentar avaliações no Google\n\n` +
+            `Posso te ajudar com:\n• Valores e planos\n• Demonstração gratuita\n` +
+            `• WhatsApp automático\n• Avaliações Google\n• Sites profissionais\n\n` +
+            `Como posso te ajudar hoje?`
+          )
+        : `Olá! 👋 Como posso te ajudar hoje?${link}`;
     case "horario":
       return config.horario_funcionamento
         ? `Nosso horário de atendimento:\n\n${config.horario_funcionamento}`
@@ -122,12 +134,14 @@ function montarResposta(topico: Topico, config: Config): string {
         ? `Claro! Para falar com um de nossos atendentes:\n\n${config.link_humano}`
         : `Vou te conectar com nossa equipe em breve.`;
     default:
-      return (
-        `Posso ajudar com:\n\n` +
-        `• Valores\n• Demonstração\n• WhatsApp automático\n` +
-        `• Avaliações Google\n• Sites profissionais\n\n` +
-        `Qual assunto você gostaria de conhecer?`
-      );
+      return ehTenantSdrOrganizaPro
+        ? (
+            `Posso ajudar com:\n\n` +
+            `• Valores\n• Demonstração\n• WhatsApp automático\n` +
+            `• Avaliações Google\n• Sites profissionais\n\n` +
+            `Qual assunto você gostaria de conhecer?`
+          )
+        : `Não entendi sua pergunta. Posso ajudar com horários, endereço, agendamento ou dúvidas frequentes.${link}`;
   }
 }
 
@@ -577,8 +591,10 @@ export async function POST(req: NextRequest) {
     let topico:        string;
     let leadUpdates:   LeadUpdates = { score };
 
+    const ehTenantSdrOrganizaPro = clinica_id === TENANT_SDR_ORGANIZAPRO;
+
     // ── GOLDEN RULE: mensagem QUENTE sem coleta ativa → CTA direto ───────────
-    if (novoScore >= 100 && !emColeta && !match) {
+    if (ehTenantSdrOrganizaPro && novoScore >= 100 && !emColeta && !match) {
       resposta      = respostaLeadQuente(leadAtual);
       processadoPor = "sdr_quente";
       topico        = "cta_quente";
@@ -614,14 +630,14 @@ export async function POST(req: NextRequest) {
         console.log("[CHATBOT] treinamento:", match.id.slice(0, 8));
       } else {
         topico        = classificarTopico(mensagem);
-        resposta      = montarResposta(topico as Topico, config as Config);
+        resposta      = montarResposta(topico as Topico, config as Config, ehTenantSdrOrganizaPro);
         processadoPor = "regras";
         console.log("[CHATBOT] regras:", topico);
       }
 
-      // ── SDR: iniciar qualificação em mensagens de interesse ───────────────
+      // ── SDR: iniciar qualificação em mensagens de interesse (apenas no tenant de vendas do OrganizaPro) ───
       const highIntent     = isHighIntent(match?.palavras_chave ?? "", mensagem);
-      const deveQualificar = highIntent;
+      const deveQualificar = highIntent && ehTenantSdrOrganizaPro;
 
       if (deveQualificar) {
         leadUpdates.etapa             = "qualificacao_nome";
@@ -644,9 +660,16 @@ export async function POST(req: NextRequest) {
     console.log("[CHATBOT] enviando resposta via /api/whatsapp");
     try {
       const baseUrl = new URL(req.url).origin;
+      const cronSecret = process.env.CRON_SECRET;
+      if (!cronSecret) {
+        throw new Error("CRON_SECRET não configurado para envio interno");
+      }
       const r       = await fetch(`${baseUrl}/api/whatsapp`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${cronSecret}`,
+        },
         body:    JSON.stringify({ clinica_id, telefone, mensagem: resposta }),
       });
       let rBody: unknown = null;

@@ -242,13 +242,14 @@ export default function ClientesPage() {
       const telefoneSalvo = normalizar(form.telefone);
       const payload = {
         ...form,
-        telefone:    telefoneSalvo,
-        whatsapp:    form.whatsapp    ? normalizar(form.whatsapp) : null,
-        endereco:    form.endereco    || null,
-        site_link:   form.site_link    || null,
-        observacoes: form.observacoes || null,
-        user_id:     user?.id,
-        clinica_id:  clinicaId,
+        telefone:         telefoneSalvo,
+        whatsapp:         form.whatsapp         ? normalizar(form.whatsapp) : null,
+        endereco:         form.endereco         || null,
+        site_link:        form.site_link        || null,
+        observacoes:      form.observacoes      || null,
+        proxima_consulta: form.proxima_consulta || null,
+        user_id:          user?.id,
+        clinica_id:       clinicaId,
       };
       let error;
       if (editando) { ({ error } = await supabase.from('pacientes').update(payload).eq('id', editando.id).eq('clinica_id', clinicaId)); }
