@@ -28,15 +28,29 @@
 
 export type CategoriaRecomendacao = "atencao" | "oportunidade" | "organizacao" | "sugestao";
 
+// Prioridade explícita da missão — Intelligence 2.1 ("Missão do Dia" /
+// "Central de Oportunidades"). Não é redundante com `categoria`: categoria
+// descreve a NATUREZA da recomendação (por que ela existe), prioridade
+// descreve a URGÊNCIA de agir (quando) — é o campo que agrupa os cartões da
+// Central de Oportunidades em 🔴 Alta / 🟡 Média / 🔵 Baixa.
+export type PrioridadeMissao = "alta" | "media" | "baixa";
+
 export type Recomendacao = {
-  id:            string;
-  categoria:     CategoriaRecomendacao;
-  titulo:        string;
-  explicacao:    string;
-  motivo:        string;
-  acao:          string;
-  destino?:      string;
-  destinoLabel?: string;
+  id:             string;
+  categoria:      CategoriaRecomendacao;
+  titulo:         string;
+  explicacao:     string;
+  motivo:         string;
+  acao:           string;
+  destino?:       string;
+  destinoLabel?:  string;
+  prioridade:     PrioridadeMissao;
+  impacto:        string;
+  tempoEstimado:  string;
+  // Quantidade de ocorrências que originaram a recomendação (ex.: 3 clientes,
+  // 2 horários vagos). Regras de reforço positivo (categoria "organizacao")
+  // não têm ocorrência a contar — usam 0.
+  quantidade:     number;
 };
 
 export type ContextoNegocio = {
@@ -47,6 +61,9 @@ export type ContextoNegocio = {
   atrasados:            number;
   proximosSemana:       number;
   clientesParaReativar: number;
+  cancelamentosHoje:    number;
+  horariosVagosHoje:    number;
+  avaliacoesPendentes:  number;
   temEmail:             boolean;
   temTelefone:          boolean;
   temEndereco:          boolean;
@@ -63,17 +80,40 @@ type Regra = {
 const REGRAS: Regra[] = [
   // 🔴 Atenção — risco imediato, precisa de ação hoje.
   {
-    id: "compromissos-atrasados",
+    id: "cancelamento-hoje",
     categoria: "atencao",
     avaliar: (ctx) => {
-      if (ctx.atrasados <= 0) return null;
-      const plural = ctx.atrasados > 1;
+      if (ctx.cancelamentosHoje <= 0) return null;
+      const plural = ctx.cancelamentosHoje > 1;
       return {
-        titulo: `Analisei sua agenda e encontrei ${ctx.atrasados} compromisso${plural ? "s" : ""} em atraso.`,
-        explicacao: "Compromissos atrasados costumam virar clientes esquecidos se não forem resolvidos rápido. Vale sua atenção agora.",
-        motivo: `${ctx.atrasados} compromisso${plural ? "s" : ""} passou da data sem ser concluído, cancelado ou reagendado.`,
-        acao: "Resolver agora",
+        titulo: `Percebi ${ctx.cancelamentosHoje} cancelamento${plural ? "s" : ""} hoje.`,
+        explicacao: "Um horário cancelado é receita parada. Vale a pena tentar preencher essa vaga ainda hoje.",
+        motivo: `${ctx.cancelamentosHoje} compromisso${plural ? "s" : ""} de hoje foi${plural ? "ram" : ""} cancelado${plural ? "s" : ""}.`,
+        acao: "Tentar preencher o horário",
         destino: "/agendamentos", destinoLabel: "Ver agenda",
+        prioridade: "alta",
+        impacto: "Recupera a receita do horário que ficou livre",
+        tempoEstimado: "10 min",
+        quantidade: ctx.cancelamentosHoje,
+      };
+    },
+  },
+  {
+    id: "horario-vago-hoje",
+    categoria: "atencao",
+    avaliar: (ctx) => {
+      if (ctx.horariosVagosHoje <= 0) return null;
+      const plural = ctx.horariosVagosHoje > 1;
+      return {
+        titulo: `Encontrei ${ctx.horariosVagosHoje} horário${plural ? "s" : ""} vago${plural ? "s" : ""} nas próximas 24 horas.`,
+        explicacao: "Cada horário vazio hoje é uma venda que não vai acontecer sozinha. Vale tentar preencher agora.",
+        motivo: `${ctx.horariosVagosHoje} horário${plural ? "s" : ""} livre${plural ? "s" : ""} identificado${plural ? "s" : ""} na agenda de hoje.`,
+        acao: "Oferecer o horário a um cliente",
+        destino: "/agendamentos", destinoLabel: "Ver agenda",
+        prioridade: "alta",
+        impacto: "Reduz horários ociosos e aumenta a receita do dia",
+        tempoEstimado: "10 min",
+        quantidade: ctx.horariosVagosHoje,
       };
     },
   },
@@ -89,6 +129,29 @@ const REGRAS: Regra[] = [
         motivo: `${ctx.pendentesHoje} cliente${plural ? "s" : ""} ainda não confirmou presença para hoje.`,
         acao: "Confirmar agora",
         destino: "/agendamentos", destinoLabel: "Confirmar",
+        prioridade: "alta",
+        impacto: "Reduz o risco de falta e vaga ociosa hoje",
+        tempoEstimado: "5 min",
+        quantidade: ctx.pendentesHoje,
+      };
+    },
+  },
+  {
+    id: "compromissos-atrasados",
+    categoria: "atencao",
+    avaliar: (ctx) => {
+      if (ctx.atrasados <= 0) return null;
+      const plural = ctx.atrasados > 1;
+      return {
+        titulo: `Analisei sua agenda e encontrei ${ctx.atrasados} compromisso${plural ? "s" : ""} em atraso.`,
+        explicacao: "Compromissos atrasados costumam virar clientes esquecidos se não forem resolvidos rápido. Vale sua atenção agora.",
+        motivo: `${ctx.atrasados} compromisso${plural ? "s" : ""} passou da data sem ser concluído, cancelado ou reagendado.`,
+        acao: "Resolver agora",
+        destino: "/agendamentos", destinoLabel: "Ver agenda",
+        prioridade: "alta",
+        impacto: "Evita perder o cliente e a receita do atendimento",
+        tempoEstimado: "5 min",
+        quantidade: ctx.atrasados,
       };
     },
   },
@@ -104,11 +167,34 @@ const REGRAS: Regra[] = [
         motivo: `${ctx.clientesParaReativar} cliente${plural ? "s" : ""} sem próximo compromisso agendado.`,
         acao: "Entrar em contato hoje",
         destino: "/clientes", destinoLabel: "Ver clientes",
+        prioridade: "media",
+        impacto: "Recupera clientes antes que esfriem de vez",
+        tempoEstimado: "15 min",
+        quantidade: ctx.clientesParaReativar,
       };
     },
   },
 
   // 🟡 Oportunidade — não é urgente, mas vale aproveitar.
+  {
+    id: "avaliacao-pendente",
+    categoria: "oportunidade",
+    avaliar: (ctx) => {
+      if (ctx.avaliacoesPendentes <= 0) return null;
+      const plural = ctx.avaliacoesPendentes > 1;
+      return {
+        titulo: `Notei ${ctx.avaliacoesPendentes} avaliação${plural ? "ões" : ""} do Google ainda pendente${plural ? "s" : ""}.`,
+        explicacao: "Cada avaliação respondida fortalece sua reputação online e ajuda a atrair novos clientes.",
+        motivo: `${ctx.avaliacoesPendentes} solicitação${plural ? "ões" : ""} de avaliação enviada${plural ? "s" : ""} ainda sem retorno do cliente.`,
+        acao: "Acompanhar avaliações",
+        destino: "/reputacao", destinoLabel: "Ver Reputação",
+        prioridade: "media",
+        impacto: "Fortalece a reputação online e atrai novos clientes",
+        tempoEstimado: "10 min",
+        quantidade: ctx.avaliacoesPendentes,
+      };
+    },
+  },
   {
     id: "agenda-proximos-dias-vazia",
     categoria: "oportunidade",
@@ -120,6 +206,10 @@ const REGRAS: Regra[] = [
         motivo: "Nenhum compromisso encontrado nos próximos 7 dias.",
         acao: "Agendar novos compromissos",
         destino: "/agendamentos", destinoLabel: "Agendar",
+        prioridade: "media",
+        impacto: "Preenche a semana e aumenta a receita prevista",
+        tempoEstimado: "20 min",
+        quantidade: 7,
       };
     },
   },
@@ -134,6 +224,10 @@ const REGRAS: Regra[] = [
         motivo: `Apenas ${ctx.proximosSemana} compromisso${ctx.proximosSemana > 1 ? "s" : ""} nos próximos 7 dias.`,
         acao: "Preencher a agenda",
         destino: "/agendamentos", destinoLabel: "Ver agenda",
+        prioridade: "media",
+        impacto: "Aumenta a ocupação da agenda nos próximos dias",
+        tempoEstimado: "15 min",
+        quantidade: ctx.proximosSemana,
       };
     },
   },
@@ -148,6 +242,10 @@ const REGRAS: Regra[] = [
         motivo: "Nenhuma credencial de WhatsApp foi encontrada nas configurações.",
         acao: "Configurar WhatsApp",
         destino: "/configuracoes", destinoLabel: "Configurações",
+        prioridade: "media",
+        impacto: "Automatiza lembretes e reduz faltas",
+        tempoEstimado: "10 min",
+        quantidade: 1,
       };
     },
   },
@@ -162,11 +260,17 @@ const REGRAS: Regra[] = [
         motivo: "Faltam dados como e-mail, telefone ou endereço nas configurações.",
         acao: "Completar cadastro",
         destino: "/configuracoes", destinoLabel: "Configurações",
+        prioridade: "baixa",
+        impacto: "Aumenta a confiança do cliente no primeiro contato",
+        tempoEstimado: "5 min",
+        quantidade: 1,
       };
     },
   },
 
-  // 🟢 Organização — reforço positivo, sem ação pendente.
+  // 🟢 Organização — reforço positivo, sem ação pendente. Não aparecem na
+  // Central de Oportunidades (não são ações a executar), só na Missão do Dia
+  // quando não há nada mais importante para fazer.
   {
     id: "cadastro-completo",
     categoria: "organizacao",
@@ -177,6 +281,10 @@ const REGRAS: Regra[] = [
         explicacao: "Isso passa mais confiança aos seus clientes. Excelente trabalho de organização.",
         motivo: "E-mail, telefone e endereço já estão preenchidos nas configurações.",
         acao: "Excelente trabalho",
+        prioridade: "baixa",
+        impacto: "Nenhuma ação necessária",
+        tempoEstimado: "—",
+        quantidade: 0,
       };
     },
   },
@@ -190,6 +298,10 @@ const REGRAS: Regra[] = [
         explicacao: "Sem atrasos, sem confirmações pendentes — a operação está sob controle.",
         motivo: "Não há compromissos atrasados nem sem confirmação hoje.",
         acao: "Continue assim",
+        prioridade: "baixa",
+        impacto: "Nenhuma ação necessária",
+        tempoEstimado: "—",
+        quantidade: 0,
       };
     },
   },
@@ -206,6 +318,10 @@ const REGRAS: Regra[] = [
         motivo: "Nenhum compromisso foi cadastrado ainda.",
         acao: "Criar primeiro compromisso",
         destino: "/agendamentos", destinoLabel: "Agendar",
+        prioridade: "media",
+        impacto: "Começa a alimentar o sistema com dados reais",
+        tempoEstimado: "5 min",
+        quantidade: 1,
       };
     },
   },
@@ -220,6 +336,10 @@ const REGRAS: Regra[] = [
         motivo: "Nenhum cliente foi cadastrado ainda.",
         acao: "Cadastrar cliente",
         destino: "/clientes", destinoLabel: "Cadastrar",
+        prioridade: "media",
+        impacto: "Base para todas as próximas recomendações",
+        tempoEstimado: "5 min",
+        quantidade: 1,
       };
     },
   },
@@ -260,13 +380,12 @@ export function gerarRecomendacoes(ctx: ContextoNegocio, limite = 3): Recomendac
 // como a interface vai desenhar o resultado.
 //
 // Hoje a decisão é simples porque REGRAS já nasce na ordem certa: dentro de
-// "atencao", compromissos atrasados (crítico) vêm antes de confirmação
-// pendente e clientes parados (cliente aguardando ação); dentro de
-// "oportunidade", agenda vazia/ociosa (compromissos) vem antes de
-// whatsapp/perfil. Combinado com PESO_CATEGORIA, isso já reproduz a ordem
-// de importância do Diretor: 1) atenção crítica, 2) cliente aguardando
-// ação, 3) compromissos, 4) organização, 5) sugestões. `gerarRecomendacoes`
-// entrega a lista nessa ordem — a prioridade principal é sempre a primeira.
+// "atencao", cancelamento/horário vago/confirmação pendente/atraso (crítico)
+// vêm antes de clientes parados; dentro de "oportunidade", avaliação
+// pendente vem antes de agenda vazia/whatsapp/perfil. Combinado com
+// PESO_CATEGORIA, isso já reproduz a ordem de importância do Diretor.
+// `gerarRecomendacoes` entrega a lista nessa ordem — a prioridade principal
+// é sempre a primeira.
 
 export type PrioridadeDoDia = {
   prioridade: Recomendacao | null;
@@ -290,4 +409,32 @@ export function escolherPrioridadePrincipal(recomendacoes: Recomendacao[]): Prio
  */
 export function gerarPrioridadeDoDia(ctx: ContextoNegocio, limiteTotal = 4): PrioridadeDoDia {
   return escolherPrioridadePrincipal(gerarRecomendacoes(ctx, limiteTotal));
+}
+
+// ── OrganizaPro Intelligence 2.2 · Central de Oportunidades ─────────────────
+//
+// Diferente da Missão do Dia (que escolhe UMA prioridade), a Central de
+// Oportunidades mostra TODAS as ações disponíveis agrupadas por urgência —
+// o empresário vê o quadro completo, não só o próximo passo. Reaproveita
+// 100% das mesmas regras e do mesmo campo `prioridade`; a única diferença é
+// que aqui nada é escolhido/descartado, e recomendações de reforço positivo
+// (categoria "organizacao", sem ação real a executar) ficam de fora.
+
+export type CentralOportunidades = {
+  alta:  Recomendacao[];
+  media: Recomendacao[];
+  baixa: Recomendacao[];
+};
+
+/**
+ * Atalho para o Dashboard: gera todas as recomendações acionáveis (exclui
+ * reforço positivo) e agrupa por prioridade para a Central de Oportunidades.
+ */
+export function gerarCentralOportunidades(ctx: ContextoNegocio): CentralOportunidades {
+  const todas = gerarRecomendacoes(ctx, REGRAS.length).filter(r => r.categoria !== "organizacao");
+  return {
+    alta:  todas.filter(r => r.prioridade === "alta"),
+    media: todas.filter(r => r.prioridade === "media"),
+    baixa: todas.filter(r => r.prioridade === "baixa"),
+  };
 }

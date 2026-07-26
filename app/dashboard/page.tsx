@@ -6,14 +6,32 @@ import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 import OnboardingCard from "../components/onboarding/OnboardingCard";
 import WelcomeModal from "../components/onboarding/WelcomeModal";
-import { gerarPrioridadeDoDia, type CategoriaRecomendacao, type Recomendacao } from "../../lib/recomendacoes";
+import { gerarPrioridadeDoDia, gerarCentralOportunidades, type CategoriaRecomendacao, type Recomendacao } from "../../lib/recomendacoes";
+import { obterHorariosVagos } from "../../lib/horarios";
+import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 
 type AgItem = {
   id: string;
   hora: string;
   paciente_nome: string;
+  telefone?: string;
   tipo_consulta?: string;
   status: string;
+  data: string;
+};
+
+type ClienteSemProximoRow = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  whatsapp: string | null;
+  proxima_consulta: string | null;
+};
+
+type CancelamentoSemReagendamentoRow = {
+  id: string;
+  nome: string;
+  telefone: string | null;
   data: string;
 };
 
@@ -27,12 +45,17 @@ type DashData = {
   totalPacientes:   number;
   clientesParaReativar: number;
   totalAgendamentos: number;
+  cancelamentosHoje: number;
+  horariosVagosHoje: number;
+  avaliacoesPendentes: number;
   nomeNegocio:      string;
   temLogo:          boolean;
   temEmail:         boolean;
   temTelefone:      boolean;
   temEndereco:      boolean;
   temWhatsapp:      boolean;
+  clientesSemProximoRows: ClienteSemProximoRow[];
+  cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[];
 };
 
 type IdeiaDodia = {
@@ -296,6 +319,21 @@ const stCategoria: Record<CategoriaRecomendacao, { emoji: string; label: string;
   sugestao:     { emoji: "💡", label: "Sugestão",     tom: "neutro"   },
 };
 
+// Prioridade da Missão do Dia (lib/recomendacoes.ts) → estilo visual.
+const stPrioridade: Record<"alta" | "media" | "baixa", { label: string; tom: keyof typeof stTom }> = {
+  alta:  { label: "Prioridade Alta",  tom: "critico" },
+  media: { label: "Prioridade Média", tom: "atencao" },
+  baixa: { label: "Prioridade Baixa", tom: "neutro"  },
+};
+
+// Central de Oportunidades: mesmos três níveis de `stPrioridade`, com os
+// emojis 🔴🟡🔵 usados para agrupar visualmente os cartões por urgência.
+const stTierOportunidade: Record<"alta" | "media" | "baixa", { emoji: string; label: string; tom: keyof typeof stTom }> = {
+  alta:  { emoji: "🔴", label: "Alta prioridade",  tom: "critico" },
+  media: { emoji: "🟡", label: "Média prioridade", tom: "atencao" },
+  baixa: { emoji: "🔵", label: "Baixa prioridade", tom: "neutro"  },
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -303,8 +341,10 @@ export default function Dashboard() {
   const [dash, setDash] = useState<DashData>({
     compromissosHoje: 0, pendentes: 0, atrasados: 0,
     agendaHoje: [], proximos: [], atrasadosList: [],
-    totalPacientes: 0, clientesParaReativar: 0, totalAgendamentos: 0, nomeNegocio: "",
+    totalPacientes: 0, clientesParaReativar: 0, totalAgendamentos: 0,
+    cancelamentosHoje: 0, horariosVagosHoje: 0, avaliacoesPendentes: 0, nomeNegocio: "",
     temLogo: false, temEmail: false, temTelefone: false, temEndereco: false, temWhatsapp: false,
+    clientesSemProximoRows: [], cancelamentosSemReagendamentoRows: [],
   });
 
   const carregarDados = useCallback(async () => {
@@ -323,6 +363,7 @@ export default function Dashboard() {
       const [ano, mes, dia] = hoje.split("-").map(Number);
       const amanha  = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
       const fimSete = new Date(Date.UTC(ano, mes - 1, dia + 6)).toISOString().split("T")[0];
+      const trintaDiasAtras = new Date(Date.UTC(ano, mes - 1, dia - 30)).toISOString().split("T")[0];
 
       const [
         { data: agHoje },
@@ -331,10 +372,13 @@ export default function Dashboard() {
         { count: pacCount },
         { count: reativarCount },
         { count: agTotalCount },
+        { count: avaliacoesPendentesCount },
         { data: cfg },
+        { data: semProximoData },
+        { data: canceladosRecentes },
       ] = await Promise.all([
         supabase.from("agendamentos")
-          .select("id, hora, paciente_nome, tipo_consulta, status, data")
+          .select("id, hora, paciente_nome, telefone, tipo_consulta, status, data")
           .eq("clinica_id", cid).eq("data", hoje)
           .order("hora"),
         supabase.from("agendamentos")
@@ -361,16 +405,60 @@ export default function Dashboard() {
         supabase.from("agendamentos")
           .select("id", { count: "exact", head: true })
           .eq("clinica_id", cid),
+        // Central de Oportunidades: avaliações do Google já solicitadas e ainda sem resposta do cliente
+        supabase.from("avaliacoes")
+          .select("id", { count: "exact", head: true })
+          .eq("clinica_id", cid)
+          .eq("respondeu", false),
         supabase.from("clinica_config")
-          .select("logo_url, email, telefone, endereco, nome_clinica, zapi_instance, zapi_token")
+          .select("logo_url, email, telefone, endereco, nome_clinica, zapi_instance, zapi_token, horario_funcionamento")
           .eq("clinica_id", cid)
           .maybeSingle(),
+        // Agenda Autônoma de Receita · sinal "sem próximo compromisso"
+        supabase.from("pacientes")
+          .select("id, nome, telefone, whatsapp, proxima_consulta")
+          .eq("clinica_id", cid).eq("status", "ativo")
+          .or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`)
+          .order("nome").limit(20),
+        // Agenda Autônoma de Receita · candidatos ao sinal "cancelamento sem reagendamento"
+        supabase.from("agendamentos")
+          .select("id, paciente_nome, telefone, data")
+          .eq("clinica_id", cid).eq("status", "cancelado")
+          .gte("data", trintaDiasAtras)
+          .order("data", { ascending: false }).limit(50),
       ]);
+
+      // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
+      // mesmo telefone não tiver nenhum compromisso futuro já remarcado.
+      const canceladosComTelefone = (canceladosRecentes || []).filter(a => a.telefone) as
+        { id: string; paciente_nome: string; telefone: string; data: string }[];
+      const telefonesCancelados = Array.from(new Set(canceladosComTelefone.map(a => a.telefone)));
+      let telefonesComReagendamento = new Set<string>();
+      if (telefonesCancelados.length > 0) {
+        const { data: futuros } = await supabase
+          .from("agendamentos")
+          .select("telefone")
+          .eq("clinica_id", cid)
+          .in("telefone", telefonesCancelados)
+          .gte("data", hoje)
+          .not("status", "in", '("cancelado","faltou")');
+        telefonesComReagendamento = new Set((futuros || []).map(f => f.telefone));
+      }
+      // Um cliente pode ter cancelado mais de uma vez em 30 dias — mantém só o cancelamento mais recente.
+      const cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[] = [];
+      const telefonesJaIncluidos = new Set<string>();
+      for (const a of canceladosComTelefone) {
+        if (telefonesComReagendamento.has(a.telefone) || telefonesJaIncluidos.has(a.telefone)) continue;
+        telefonesJaIncluidos.add(a.telefone);
+        cancelamentosSemReagendamentoRows.push({ id: a.id, nome: a.paciente_nome, telefone: a.telefone, data: a.data });
+      }
 
       const lista         = (agHoje       || []) as AgItem[];
       const ativos        = lista.filter(a => !["cancelado", "faltou"].includes(a.status));
       const pendentesHoje = lista.filter(a => a.status === "agendado");
       const atrasadosList = (atrasados    || []) as AgItem[];
+      const cancelamentosHoje = lista.filter(a => a.status === "cancelado").length;
+      const horariosVagosHoje = obterHorariosVagos(lista, cfg?.horario_funcionamento).length;
 
       setDash({
         compromissosHoje: ativos.length,
@@ -382,12 +470,17 @@ export default function Dashboard() {
         totalPacientes:   pacCount ?? 0,
         clientesParaReativar: reativarCount ?? 0,
         totalAgendamentos: agTotalCount ?? 0,
+        cancelamentosHoje,
+        horariosVagosHoje,
+        avaliacoesPendentes: avaliacoesPendentesCount ?? 0,
         nomeNegocio:      cfg?.nome_clinica || "",
         temLogo:          !!cfg?.logo_url,
         temEmail:         !!cfg?.email,
         temTelefone:      !!cfg?.telefone,
         temEndereco:      !!cfg?.endereco,
         temWhatsapp:      !!cfg?.zapi_instance && !!cfg?.zapi_token,
+        clientesSemProximoRows: (semProximoData || []) as ClienteSemProximoRow[],
+        cancelamentosSemReagendamentoRows,
       });
     } catch (err) {
       console.error(err);
@@ -461,22 +554,54 @@ export default function Dashboard() {
   // Intelligence 2.0 — o Diretor Digital não só percebe, decide: escolhe UMA
   // prioridade principal para o dia (docs/organizapro-intelligence-engine-
   // v1.html). Regras determinísticas, sem IA generativa; usa só dados já
-  // carregados acima.
+  // carregados acima. O mesmo contexto alimenta a Central de Oportunidades
+  // (Intelligence 2.2) logo abaixo — uma única fonte de verdade.
+  const ctxNegocio = {
+    totalPacientes:       dash.totalPacientes,
+    totalAgendamentos:    dash.totalAgendamentos,
+    compromissosHoje:     dash.compromissosHoje,
+    pendentesHoje:        dash.pendentes,
+    atrasados:            dash.atrasados,
+    proximosSemana:       dash.proximos.length,
+    clientesParaReativar: dash.clientesParaReativar,
+    cancelamentosHoje:    dash.cancelamentosHoje,
+    horariosVagosHoje:    dash.horariosVagosHoje,
+    avaliacoesPendentes:  dash.avaliacoesPendentes,
+    temEmail:             dash.temEmail,
+    temTelefone:          dash.temTelefone,
+    temEndereco:          dash.temEndereco,
+    temWhatsapp:          dash.temWhatsapp,
+  };
+
   const { prioridade, demais: outrasRecomendacoes }: { prioridade: Recomendacao | null; demais: Recomendacao[] } = insights.temDados
-    ? gerarPrioridadeDoDia({
-        totalPacientes:       dash.totalPacientes,
-        totalAgendamentos:    dash.totalAgendamentos,
-        compromissosHoje:     dash.compromissosHoje,
-        pendentesHoje:        dash.pendentes,
-        atrasados:            dash.atrasados,
-        proximosSemana:       dash.proximos.length,
-        clientesParaReativar: dash.clientesParaReativar,
-        temEmail:             dash.temEmail,
-        temTelefone:          dash.temTelefone,
-        temEndereco:          dash.temEndereco,
-        temWhatsapp:          dash.temWhatsapp,
-      })
+    ? gerarPrioridadeDoDia(ctxNegocio)
     : { prioridade: null, demais: [] };
+
+  const centralOportunidades = insights.temDados
+    ? gerarCentralOportunidades(ctxNegocio)
+    : { alta: [], media: [], baixa: [] };
+
+  // Agenda Autônoma de Receita — diferente da Central de Oportunidades (que
+  // conta), aqui cada card é UM cliente nomeado, com o motivo real que o
+  // trouxe até aqui. Mesmos dados já carregados acima; zero consulta nova.
+  const oportunidadesClientes: OportunidadeCliente[] = insights.temDados
+    ? gerarOportunidadesClientes({
+        hoje: hojeStr,
+        clientesSemProximoCompromisso: dash.clientesSemProximoRows.map(c => ({
+          id: c.id, nome: c.nome, telefone: c.telefone, whatsapp: c.whatsapp, proximaConsulta: c.proxima_consulta,
+        })),
+        cancelamentosSemReagendamento: dash.cancelamentosSemReagendamentoRows.map(a => ({
+          id: a.id, nome: a.nome, telefone: a.telefone, data: a.data,
+        })),
+        confirmacoesPendentes: dash.agendaHoje
+          .filter(a => a.status === "agendado")
+          .map(a => ({ id: a.id, nome: a.paciente_nome, telefone: a.telefone || null, data: a.data })),
+      })
+    : [];
+
+  // Radar de Oportunidades — frase de abertura na voz do Diretor Digital,
+  // consistente com gerarBriefingDiretor usado na Missão do Dia acima.
+  const resumoRadar = gerarResumoRadar(oportunidadesClientes.length);
 
   // V2: ambienteProducao virá de um sinal real de conta/ambiente. Mantido
   // desligado em V1 para nunca personalizar em contas de demonstração.
@@ -560,10 +685,10 @@ export default function Dashboard() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 17, flexShrink: 0,
             }}>
-              🎯
+              🧭
             </div>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-              Seu Plano para Hoje
+              Missão do Dia
             </div>
           </div>
           {insights.temDados && (
@@ -593,34 +718,8 @@ export default function Dashboard() {
           {saudacaoCard.subtitulo}
         </p>
 
-        {!insights.temDados ? (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-            }}>
-              👔
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9" }}>Diretor Digital</span>
-                <span style={{
-                  fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
-                  color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
-                  borderRadius: 999, padding: "2px 8px",
-                }}>
-                  OrganizaPro Intelligence
-                </span>
-              </div>
-              <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
-                {gerarBriefingDiretor(false, false)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="insights-grid">
+        {insights.temDados && (
+          <div className="insights-grid">
               {/* Prioridades */}
               <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
@@ -683,126 +782,374 @@ export default function Dashboard() {
                   </button>
                 )}
               </div>
-            </div>
+          </div>
+        )}
+      </div>
 
-            {/* ── Diretor Digital ──────────────────────────────────────────── */}
+      {/* ── PRÓXIMA MELHOR AÇÃO ──────────────────────────────────────────────
+          Módulo próprio (V2) — antes vivia dentro de "Seu Plano para Hoje",
+          onde a identidade acabava se diluindo em meio à saudação e aos
+          blocos de métricas. Mesma lógica de sempre (escolherPrioridadePrincipal
+          em lib/recomendacoes.ts): UMA recomendação, a de maior impacto agora,
+          com tempo estimado, motivo e um botão de execução — nada foi alterado
+          no algoritmo, só onde e como isso é exibido. */}
+      <div className="dc" style={{
+        background: "#12151f", border: "1px solid rgba(245,158,11,0.22)",
+        borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "rgba(245,158,11,0.16)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+          }}>
+            🚀
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
+            Próxima Melhor Ação
+          </div>
+        </div>
+
+        {!insights.temDados ? (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
             <div style={{
-              marginTop: 20, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.08)",
-              display: "flex", alignItems: "flex-start", gap: 12,
+              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+              background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
             }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-                background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-              }}>
-                👔
+              👔
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                <span style={{
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+                  color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
+                  borderRadius: 999, padding: "2px 8px",
+                }}>
+                  OrganizaPro Intelligence
+                </span>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9" }}>Diretor Digital</span>
-                  <span style={{
-                    fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
-                    color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
-                    borderRadius: 999, padding: "2px 8px",
+              <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
+                {gerarBriefingDiretor(false, false)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+              background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+            }}>
+              👔
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                <span style={{
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+                  color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
+                  borderRadius: 999, padding: "2px 8px",
+                }}>
+                  OrganizaPro Intelligence
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: "0 0 16px" }}>
+                {gerarBriefingDiretor(!!prioridade, true)}
+              </p>
+
+              {/* Intelligence 2.0 · Prioridade do Diretor — a escolha em si vem
+                  pronta de lib/recomendacoes.ts (escolherPrioridadePrincipal);
+                  aqui só desenhamos o resultado. Trocar a lógica de decisão no
+                  futuro (ex.: IA generativa) não exige mexer neste bloco. */}
+              {prioridade && (() => {
+                const cat = stCategoria[prioridade.categoria];
+                const cor = stTom[cat.tom];
+                return (
+                  <div style={{
+                    background: cor.bg, border: `1px solid ${cor.border}`,
+                    borderRadius: 14, padding: "18px 20px",
+                    marginBottom: outrasRecomendacoes.length > 0 ? 16 : 0,
                   }}>
-                    OrganizaPro Intelligence
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 6 }}>
+                      {prioridade.titulo}
+                    </div>
+                    <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, margin: "0 0 12px" }}>
+                      {prioridade.explicacao}
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                      {(() => {
+                        const pr = stPrioridade[prioridade.prioridade];
+                        const prCor = stTom[pr.tom];
+                        return (
+                          <span style={{
+                            padding: "4px 10px", borderRadius: 999,
+                            background: prCor.bg, border: `1px solid ${prCor.border}`,
+                            color: prCor.color, fontSize: 11, fontWeight: 700,
+                          }}>
+                            {pr.label}
+                          </span>
+                        );
+                      })()}
+                      <span style={{
+                        padding: "4px 10px", borderRadius: 999,
+                        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                        color: "#cbd5e1", fontSize: 11, fontWeight: 600,
+                      }}>
+                        💡 {prioridade.impacto}
+                      </span>
+                      <span style={{
+                        padding: "4px 10px", borderRadius: 999,
+                        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                        color: "#cbd5e1", fontSize: 11, fontWeight: 600,
+                      }}>
+                        ⏱ {prioridade.tempoEstimado}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 14px", fontStyle: "italic" }}>
+                      Por quê: {prioridade.motivo}
+                    </p>
+                    {prioridade.destino ? (
+                      <button
+                        onClick={() => router.push(prioridade.destino!)}
+                        style={{ padding: "8px 18px", borderRadius: 9, border: "none", background: cor.color, color: "#0a0d14", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        Executar agora →
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: cor.color }}>
+                        ✓ {prioridade.acao}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── CENTRAL DE OPORTUNIDADES ──────────────────────────────────────────
+          Intelligence 2.2. Diferente da Próxima Melhor Ação (uma única
+          prioridade), aqui mostramos TODAS as ações disponíveis agrupadas
+          por urgência — o quadro completo. Mesmo motor, mesmos dados já carregados acima;
+          zero consulta nova além da já feita para `ctxNegocio`. */}
+      {insights.temDados && (centralOportunidades.alta.length + centralOportunidades.media.length + centralOportunidades.baixa.length > 0) && (
+        <div className="dc" style={{
+          background: "#12151f", border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(74,222,128,0.12)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+            }}>
+              💰
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
+                Central de Oportunidades
+              </div>
+              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+                Ações que podem melhorar seu negócio hoje
+              </div>
+            </div>
+          </div>
+
+          {(["alta", "media", "baixa"] as const).map(tier => {
+            const itens = centralOportunidades[tier];
+            if (itens.length === 0) return null;
+            const meta = stTierOportunidade[tier];
+            const cor = stTom[meta.tom];
+            return (
+              <div key={tier} style={{ marginBottom: 22 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 13 }}>{meta.emoji}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: cor.color }}>
+                    {meta.label}
                   </span>
                 </div>
-                <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: "0 0 16px" }}>
-                  {gerarBriefingDiretor(!!prioridade, true)}
-                </p>
-
-                {/* Intelligence 2.0 · Prioridade do Diretor — a escolha em si vem
-                    pronta de lib/recomendacoes.ts (escolherPrioridadePrincipal);
-                    aqui só desenhamos o resultado. Trocar a lógica de decisão no
-                    futuro (ex.: IA generativa) não exige mexer neste bloco. */}
-                {prioridade && (() => {
-                  const cat = stCategoria[prioridade.categoria];
-                  const cor = stTom[cat.tom];
-                  return (
-                    <div style={{
-                      background: cor.bg, border: `1px solid ${cor.border}`,
-                      borderRadius: 14, padding: "18px 20px",
-                      marginBottom: outrasRecomendacoes.length > 0 ? 16 : 0,
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
+                  {itens.map(op => (
+                    <div key={op.id} style={{
+                      background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
+                      borderRadius: 12, padding: "16px 18px",
                     }}>
-                      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: cor.color, marginBottom: 10 }}>
-                        🎯 Prioridade do Diretor
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
+                          {op.titulo}
+                        </div>
+                        <span style={{
+                          flexShrink: 0, minWidth: 22, height: 22, padding: "0 6px",
+                          borderRadius: 999, background: cor.bg, border: `1px solid ${cor.border}`,
+                          color: cor.color, fontSize: 11, fontWeight: 800,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {op.quantidade}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 6 }}>
-                        {prioridade.titulo}
+                      <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 8px" }}>
+                        {op.explicacao}
+                      </p>
+                      <p style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, margin: "0 0 10px", fontStyle: "italic" }}>
+                        Por quê: {op.motivo}
+                      </p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                        <span style={{
+                          padding: "3px 9px", borderRadius: 999,
+                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
+                        }}>
+                          💡 {op.impacto}
+                        </span>
+                        <span style={{
+                          padding: "3px 9px", borderRadius: 999,
+                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
+                        }}>
+                          ⏱ {op.tempoEstimado}
+                        </span>
                       </div>
-                      <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, margin: "0 0 8px" }}>
-                        {prioridade.explicacao}
-                      </p>
-                      <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 14px", fontStyle: "italic" }}>
-                        Por quê: {prioridade.motivo}
-                      </p>
-                      {prioridade.destino ? (
+                      {op.destino ? (
                         <button
-                          onClick={() => router.push(prioridade.destino!)}
-                          style={{ padding: "8px 18px", borderRadius: 9, border: "none", background: cor.color, color: "#0a0d14", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                          onClick={() => router.push(op.destino!)}
+                          style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
                         >
-                          Executar agora →
+                          Resolver agora →
                         </button>
                       ) : (
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: cor.color }}>
-                          ✓ {prioridade.acao}
+                        <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
+                          ✓ {op.acao}
                         </span>
                       )}
                     </div>
-                  );
-                })()}
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-                {/* Demais recomendações da Intelligence 1.5 — tudo que não virou
-                    a prioridade principal continua listado aqui, na mesma ordem
-                    de importância. */}
-                {outrasRecomendacoes.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {outrasRecomendacoes.map(r => {
-                      const cat = stCategoria[r.categoria];
-                      const cor = stTom[cat.tom];
-                      return (
-                        <div key={r.id} style={{
-                          background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
-                          borderRadius: 12, padding: "14px 16px",
-                        }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                            <span style={{ fontSize: 13 }}>{cat.emoji}</span>
-                            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: cor.color }}>
-                              {cat.label}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
-                            {r.titulo}
-                          </div>
-                          <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 6px" }}>
-                            {r.explicacao}
-                          </p>
-                          <p style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.4, margin: "0 0 12px", fontStyle: "italic" }}>
-                            Por quê: {r.motivo}
-                          </p>
-                          {r.destino ? (
-                            <button
-                              onClick={() => router.push(r.destino!)}
-                              style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${cor.border}`, background: cor.bg, color: cor.color, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                            >
-                              {r.acao} →
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
-                              ✓ {r.acao}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+      {/* ── RADAR DE OPORTUNIDADES (V2) ──────────────────────────────────────
+          V1 se chamava "Agenda Autônoma de Receita" — mesma base, mesmos
+          dados já carregados acima, nenhum envio automático. Diferente da
+          Central de Oportunidades (mostra o panorama em contadores), aqui
+          cada card é UM cliente nomeado: quem merece atenção primeiro, por
+          quê, e há quanto tempo — a resposta direta à pergunta que o
+          OrganizaPro existe para responder ("o que eu faço hoje?"), nunca um
+          CRM com lista de tudo. Ordem: cancelamento > confirmação pendente
+          > sem retorno (um cancelamento já é uma venda perdida de fato; uma
+          confirmação pendente ainda pode se resolver sozinha) — dentro do
+          mesmo tipo, quem espera há mais tempo aparece primeiro. */}
+      {insights.temDados && (
+        <div className="dc" style={{
+          background: "#12151f", border: "1px solid rgba(124,58,237,0.22)",
+          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(124,58,237,0.16)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+            }}>
+              🎯
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
+                Radar de Oportunidades
+              </div>
+              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+                {oportunidadesClientes.length > 0
+                  ? resumoRadar
+                  : "Nenhuma oportunidade urgente encontrada hoje. Continue acompanhando seus clientes e compromissos."}
               </div>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+
+          {oportunidadesClientes.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, marginTop: 16 }}>
+              {oportunidadesClientes.map(op => {
+                const meta = stTierOportunidade[op.prioridade];
+                const cor = stTom[meta.tom];
+                const numeroWpp = op.telefone ? (op.telefone.length > 11 ? op.telefone : `55${op.telefone}`) : null;
+                return (
+                  <div key={op.chave} style={{
+                    background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
+                    borderRadius: 12, padding: "16px 18px",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
+                        {op.nome}
+                      </div>
+                      <span style={{
+                        padding: "3px 9px", borderRadius: 999, flexShrink: 0,
+                        background: cor.bg, border: `1px solid ${cor.border}`,
+                        color: cor.color, fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap",
+                      }}>
+                        {meta.emoji} {meta.label}
+                      </span>
+                    </div>
+
+                    <p style={{ margin: "0 0 6px", fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5 }}>
+                      {op.motivoPrincipal}
+                    </p>
+
+                    {(op.tempoDecorrido || op.sinaisAdicionais > 0) && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                        {op.tempoDecorrido && (
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 999,
+                            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                            color: "#94a3b8", fontSize: 10.5, fontWeight: 600,
+                          }}>
+                            ⏱ {op.tempoDecorrido}
+                          </span>
+                        )}
+                        {op.sinaisAdicionais > 0 && (
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 999,
+                            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                            color: "#94a3b8", fontSize: 10.5, fontWeight: 600,
+                          }}>
+                            +{op.sinaisAdicionais} outro{op.sinaisAdicionais > 1 ? "s" : ""} sinal{op.sinaisAdicionais > 1 ? "is" : ""}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 600, marginBottom: 12 }}>
+                      ✓ {op.acaoSugerida}
+                    </div>
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                      <button
+                        onClick={() => router.push("/clientes")}
+                        style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(74,155,176,0.35)", background: "rgba(74,155,176,0.1)", color: "#4a9bb0", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        Abrir cliente
+                      </button>
+                      {numeroWpp ? (
+                        <a
+                          href={`https://wa.me/${numeroWpp}?text=${encodeURIComponent(`Olá, ${op.nome}! Tudo bem?`)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12.5, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}
+                        >
+                          💬 Entrar em contato
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: 11.5, color: "#64748b", fontStyle: "italic" }}>
+                          Sem telefone cadastrado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── CARD PRINCIPAL ──────────────────────────────────────────────────── */}
       <div className="dc" style={{
