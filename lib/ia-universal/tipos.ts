@@ -21,15 +21,19 @@ export type IntencaoUniversal =
   | "fora_do_escopo"
   | "intencao_especifica_segmento";
 
-// Dados da empresa autenticada — nunca de outro tenant. Adaptador mínimo
-// desta fase: só os campos que já existem hoje em `clinica_config` +
-// `clinicas.especialidade`. Nenhum campo novo, nenhuma tabela nova.
+// Dados da empresa autenticada — nunca de outro tenant. Fase 1: só
+// `clinica_config` + `clinicas.especialidade`. Fase 3 (segmentos) acrescentou
+// `servicos`, lido de `clinica_servicos` — tabela que já existe (usada hoje
+// pelo Site Premium), nenhuma migração nova. `servicos` undefined = dado não
+// carregado (resolver não deve afirmar nem negar); array vazio = carregado e
+// realmente não há nenhum serviço cadastrado (resposta negativa é honesta).
 export type DadosEmpresaUniversal = {
   nome:        string;
   segmento:    string;        // clinicas.especialidade (texto livre)
   horario?:    string | null;
   endereco?:   string | null;
   linkHumano?: string | null;
+  servicos?:   { nome: string; descricao: string | null }[];
 };
 
 export type SinalSegmento = {

@@ -562,8 +562,8 @@ export async function POST(req: NextRequest) {
 
     console.log("[CHATBOT] config encontrada e ativa — prosseguindo");
 
-    // Busca treinamentos + estado do lead + especialidade (IA Universal · Camada 2) em paralelo
-    const [treinaResult, leadAtual, clinicaResult] = await Promise.all([
+    // Busca treinamentos + estado do lead + especialidade + serviços (IA Universal · Camadas 2 e 3) em paralelo
+    const [treinaResult, leadAtual, clinicaResult, servicosResult] = await Promise.all([
       supabase
         .from("chatbot_treinamento")
         .select("id, palavras_chave, resposta")
@@ -571,6 +571,10 @@ export async function POST(req: NextRequest) {
         .eq("ativo", true),
       fetchLead(clinica_id, telefone),
       supabase.from("clinicas").select("especialidade").eq("id", clinica_id).maybeSingle(),
+      // Fase 3: já usada hoje pelo Site Premium — nenhuma tabela nova. Permite
+      // que um módulo de segmento responda "sim/não" sobre um serviço a
+      // partir do que a empresa realmente cadastrou, nunca por suposição.
+      supabase.from("clinica_servicos").select("nome, descricao").eq("clinica_id", clinica_id),
     ]);
 
     // ── LOG 2: estado do lead lido do banco ──────────────────────────────────
@@ -644,6 +648,7 @@ export async function POST(req: NextRequest) {
             horario:     config?.horario_funcionamento ?? null,
             endereco:    config?.endereco ?? null,
             linkHumano:  config?.link_humano ?? null,
+            servicos:    (servicosResult.data ?? []) as { nome: string; descricao: string | null }[],
           } as DadosEmpresaUniversal,
           resolverModuloSegmento(clinicaResult.data?.especialidade),
         );
