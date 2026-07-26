@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { resolverComCamadaUniversal, resolverModuloSegmento, type DadosEmpresaUniversal } from "../../../../lib/ia-universal";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -561,14 +562,15 @@ export async function POST(req: NextRequest) {
 
     console.log("[CHATBOT] config encontrada e ativa — prosseguindo");
 
-    // Busca treinamentos + estado do lead em paralelo
-    const [treinaResult, leadAtual] = await Promise.all([
+    // Busca treinamentos + estado do lead + especialidade (IA Universal · Camada 2) em paralelo
+    const [treinaResult, leadAtual, clinicaResult] = await Promise.all([
       supabase
         .from("chatbot_treinamento")
         .select("id, palavras_chave, resposta")
         .eq("clinica_id", clinica_id)
         .eq("ativo", true),
       fetchLead(clinica_id, telefone),
+      supabase.from("clinicas").select("especialidade").eq("id", clinica_id).maybeSingle(),
     ]);
 
     // ── LOG 2: estado do lead lido do banco ──────────────────────────────────
@@ -622,17 +624,41 @@ export async function POST(req: NextRequest) {
       }
 
     } else {
-      // ── Resposta normal (treinamento ou regras fixas) ─────────────────────
+      // ── Resposta normal (treinamento, IA Universal ou regras fixas) ───────
       if (match) {
         resposta      = match.resposta;
         processadoPor = "treinamento";
         topico        = "treinamento";
         console.log("[CHATBOT] treinamento:", match.id.slice(0, 8));
       } else {
-        topico        = classificarTopico(mensagem);
-        resposta      = montarResposta(topico as Topico, config as Config, ehTenantSdrOrganizaPro);
-        processadoPor = "regras";
-        console.log("[CHATBOT] regras:", topico);
+        // IA Universal (Fase 1) — roda em paralelo ao sistema atual, nunca no
+        // tenant de vendas do OrganizaPro (isolamento explícito: o funil
+        // comercial do OrganizaPro não pode se misturar com o atendimento das
+        // empresas clientes, e vice-versa). Quando não resolve com segurança,
+        // cai no comportamento atual sem nenhuma mudança de resultado.
+        const resultadoUniversal = ehTenantSdrOrganizaPro ? null : resolverComCamadaUniversal(
+          mensagem,
+          {
+            nome:        config?.nome_clinica || "nossa empresa",
+            segmento:    clinicaResult.data?.especialidade ?? "",
+            horario:     config?.horario_funcionamento ?? null,
+            endereco:    config?.endereco ?? null,
+            linkHumano:  config?.link_humano ?? null,
+          } as DadosEmpresaUniversal,
+          resolverModuloSegmento(clinicaResult.data?.especialidade),
+        );
+
+        if (resultadoUniversal) {
+          resposta      = resultadoUniversal.resposta;
+          topico        = resultadoUniversal.intencao;
+          processadoPor = resultadoUniversal.modulo ? `ia_universal:${resultadoUniversal.modulo}` : "ia_universal";
+          console.log("[CHATBOT] ia_universal:", { intencao: resultadoUniversal.intencao, modulo: resultadoUniversal.modulo });
+        } else {
+          topico        = classificarTopico(mensagem);
+          resposta      = montarResposta(topico as Topico, config as Config, ehTenantSdrOrganizaPro);
+          processadoPor = "regras";
+          console.log("[CHATBOT] regras:", topico);
+        }
       }
 
       // ── SDR: iniciar qualificação em mensagens de interesse (apenas no tenant de vendas do OrganizaPro) ───
