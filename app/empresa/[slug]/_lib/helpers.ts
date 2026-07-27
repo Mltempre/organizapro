@@ -43,14 +43,14 @@ export function gerarSobre(empresa: Empresa, qtdEquipe: number): string[] {
   } else if (local) {
     blocos.push(`${empresa.nome} está em ${local}.`);
   } else {
-    blocos.push(`${empresa.nome} valoriza um atendimento próximo, do primeiro contato ao resultado final.`);
+    blocos.push(`Conheça ${empresa.nome} e a forma como transformamos necessidades em soluções bem conduzidas.`);
   }
 
   const segundo: string[] = [];
   if (qtdEquipe > 0) {
     segundo.push(`Uma equipe de ${qtdEquipe} ${qtdEquipe > 1 ? "profissionais dedicados" : "profissional dedicado"} cuida de cada atendimento pessoalmente.`);
   }
-  segundo.push("Organização e transparência guiam cada etapa, sem letras miúdas.");
+  segundo.push("Qualidade, transparência e atenção aos detalhes orientam cada etapa do atendimento.");
   blocos.push(segundo.join(" "));
   return blocos;
 }
@@ -66,7 +66,7 @@ export function gerarTituloHero(empresa: Empresa): string {
 
 export function gerarSubtituloHero(empresa: Empresa, local: string): string {
   if (local) return `Atendimento ágil e transparente em ${local}.`;
-  return "Ágil, transparente e feito sob medida para o seu momento.";
+  return "Soluções personalizadas, comunicação clara e atenção em cada detalhe.";
 }
 
 // Indicadores de confiança do hero — só dado real cadastrado.
@@ -87,7 +87,7 @@ export function gerarIndicadoresConfianca(empresa: Empresa, local: string): { ic
 export function gerarTituloSobre(empresa: Empresa): string {
   const especialidade = normalizarEspecialidade(empresa.especialidade);
   if (especialidade) return `${tituloCase(especialidade)}, do jeito certo.`;
-  return "Conheça nossa empresa";
+  return "Uma empresa comprometida com a sua experiência";
 }
 
 export function gerarTituloServicos(empresa: Empresa): string {
@@ -103,7 +103,7 @@ export function gerarTituloGaleria(empresa: Empresa): string {
 }
 
 export function gerarTituloDepoimentos(): string {
-  return "O que dizem sobre o atendimento";
+  return "Experiências de quem confia em nosso trabalho";
 }
 
 export function gerarTituloContato(local: string): string {
@@ -114,5 +114,5 @@ export function gerarTituloContato(local: string): string {
 export function gerarTituloCtaFinal(empresa: Empresa): string {
   const especialidade = normalizarEspecialidade(empresa.especialidade);
   if (especialidade) return `Quer saber mais sobre ${especialidade.toLowerCase()}?`;
-  return "Vamos conversar sobre o que você precisa?";
+  return "Pronto para encontrar a solução ideal para você?";
 }

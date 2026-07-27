@@ -77,9 +77,11 @@ export default function Site() {
   const [clinicaId, setClinicaId]               = useState("");
   const [userId, setUserId]                     = useState("");
   const [salvando, setSalvando]                 = useState(false);
+  const salvandoRef = useRef(false); // trava síncrona de submissão — ver salvar()
   const [sucesso, setSucesso]                   = useState("");
   const [erro, setErro]                         = useState("");
   const [slugEdited, setSlugEdited]             = useState(false);
+  const [publishedSlug, setPublishedSlug]       = useState("");
   const [origin, setOrigin]                     = useState("");
   const [uploadingLogo, setUploadingLogo]       = useState(false);
   const [uploadingHero, setUploadingHero]       = useState(false);
@@ -144,6 +146,7 @@ export default function Site() {
         .eq("user_id", user.id)
         .maybeSingle();
       if (configBasic) {
+        setPublishedSlug(configBasic.slug || "");
         setForm(prev => ({
           ...prev,
           slug:     configBasic.slug     || "",
@@ -152,6 +155,7 @@ export default function Site() {
       }
     } else if (config) {
       setMigrationPending(false);
+      setPublishedSlug(config.slug || "");
       setForm(prev => ({
         ...prev,
         slug:                  config.slug                       || "",
@@ -179,7 +183,7 @@ export default function Site() {
   }, []);
 
   const computedSlug = form.slug || generateSlug(form.nome);
-  const siteUrl = computedSlug ? `${origin}/empresa/${computedSlug}` : "";
+  const siteUrl = publishedSlug ? `${origin}/empresa/${publishedSlug}` : "";
 
   // ── PROGRESS BAR ─────────────────────────────────────────────────────────────
   const progressItems = [
@@ -203,7 +207,7 @@ export default function Site() {
   const progressColor = progressPct === 100 ? "#00c896" : progressPct >= 70 ? "#34d399" : progressPct >= 40 ? "#fbbf24" : "#f87171";
 
   const copyLink = async () => {
-    if (!computedSlug) return;
+    if (!siteUrl) return;
     try {
       await navigator.clipboard.writeText(siteUrl);
       setSucesso("Link copiado para a área de transferência!");
@@ -228,7 +232,7 @@ export default function Site() {
 
   function abrirMeuSite() {
     if (!siteUrl) {
-      setErro("Seu site ainda não está configurado. Preencha o nome do negócio para gerar o endereço público.");
+      setErro("Seu site ainda não possui um endereço publicado. Revise os dados e publique as alterações primeiro.");
       return;
     }
     window.open(siteUrl, "_blank", "noopener,noreferrer");
@@ -283,6 +287,12 @@ export default function Site() {
   }
 
   async function salvar() {
+    // Trava síncrona (ref, não state) — ver docs/kensa-premium-dashboard-relatorio.md, K-03.
+    // O try/catch/finally externo também evita que uma exceção inesperada
+    // (ex.: falha de rede) deixe o botão travado em "Publicando..." para sempre.
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
+    try {
     setSalvando(true);
     setErro("");
 
@@ -371,8 +381,16 @@ export default function Site() {
     }
 
     setForm(prev => ({ ...prev, whatsapp: normalizePhone(prev.whatsapp), slug: normalizedSlug }));
+    setPublishedSlug(normalizedSlug);
     setSalvando(false);
     setFeedbackModal(true);
+    } catch (e) {
+      console.error(e);
+      setErro("Não foi possível salvar as configurações do site. Tente novamente.");
+      setSalvando(false);
+    } finally {
+      salvandoRef.current = false;
+    }
   }
 
   const uploadAreaStyle = (hasImg: boolean): React.CSSProperties => ({
@@ -506,7 +524,7 @@ export default function Site() {
         <div>
           <div style={{ fontSize:13, fontWeight:600, color:"var(--accent)" }}>🔗 URL pública</div>
           <div style={{ fontSize:12, color:"var(--muted)", marginTop:4 }}>
-            {siteUrl || "Seu site ainda não está configurado — preencha o nome do negócio abaixo para gerar o endereço."}
+            {siteUrl || "Seu site ainda não possui um endereço publicado — revise os dados e publique as alterações."}
           </div>
         </div>
         <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>

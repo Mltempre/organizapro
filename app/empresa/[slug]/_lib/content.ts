@@ -11,12 +11,12 @@ export const NAV_LINKS: [string, string][] = [
 ];
 
 export const DIFERENCIAIS = [
-  { icone: "handshake", titulo: "Atendimento próximo",        desc: "Cada cliente é ouvido com atenção real, do primeiro contato ao pós-atendimento." },
-  { icone: "grid",      titulo: "Processo claro",             desc: "Etapas bem definidas, sem enrolação, do início ao fim do atendimento." },
-  { icone: "bolt",      titulo: "Resposta ágil",               desc: "Prazos que respeitam o seu tempo e retorno rápido em cada contato." },
-  { icone: "shield",    titulo: "Transparência total",         desc: "Informações claras em cada etapa, sem letras miúdas ou surpresas." },
-  { icone: "target",    titulo: "Atendimento sob medida",      desc: "Cada solução é construída para a sua necessidade específica, não um pacote genérico." },
-  { icone: "check",     titulo: "Compromisso com resultado",   desc: "O foco é entregar exatamente o que foi combinado, com qualidade." },
+  { icone: "handshake", titulo: "Atendimento personalizado",   desc: "Cada cliente recebe atenção genuína, do primeiro contato ao acompanhamento final." },
+  { icone: "grid",      titulo: "Processo bem definido",       desc: "Etapas organizadas e comunicação objetiva para uma experiência segura do início ao fim." },
+  { icone: "bolt",      titulo: "Agilidade com qualidade",     desc: "Respostas eficientes e prazos conduzidos com respeito ao seu tempo." },
+  { icone: "shield",    titulo: "Transparência em cada etapa", desc: "Informações claras para que você acompanhe todo o processo com confiança." },
+  { icone: "target",    titulo: "Soluções sob medida",         desc: "Cada proposta considera o seu contexto, suas prioridades e o resultado que você busca." },
+  { icone: "check",     titulo: "Compromisso com a entrega",   desc: "Cuidado em cada detalhe para entregar o que foi combinado com excelência." },
 ];
 
 export const PROCESSO = [

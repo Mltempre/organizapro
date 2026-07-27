@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import AdminShell from '../components/AdminShell'
@@ -128,6 +128,7 @@ export default function ChatbotPage() {
   const [form, setForm]             = useState<TreinamentoForm>(formVazio)
   const [modoEdicao, setModoEdicao] = useState(false)
   const [salvandoT, setSalvandoT]   = useState(false)
+  const salvandoTRef = useRef(false) // trava síncrona de submissão — ver salvarTreinamento()
   const [msgT, setMsgT]             = useState('')
 
   useEffect(() => {
@@ -185,29 +186,36 @@ export default function ChatbotPage() {
   }
 
   async function salvarTreinamento() {
-    if (!clinicaId || !form.pergunta.trim() || !form.resposta.trim()) {
-      setMsgT('erro:Pergunta e Resposta são obrigatórias')
-      setTimeout(() => setMsgT(''), 3000)
-      return
-    }
-    setSalvandoT(true); setMsgT('')
+    // Trava síncrona (ref, não state) — ver docs/kensa-premium-dashboard-relatorio.md, K-03.
+    if (salvandoTRef.current) return
+    salvandoTRef.current = true
     try {
-      const method = modoEdicao ? 'PUT' : 'POST'
-      const payload = modoEdicao
-        ? { id: form.id, pergunta: form.pergunta, resposta: form.resposta, palavras_chave: form.palavras_chave }
-        : { clinica_id: clinicaId, pergunta: form.pergunta, resposta: form.resposta, palavras_chave: form.palavras_chave }
-      const r = await fetch('/api/chatbot/treinamento', {
-        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      })
-      const j = await r.json()
-      if (j.sucesso) {
-        setMsgT('ok:' + (modoEdicao ? 'Treinamento atualizado!' : 'Treinamento salvo!'))
-        setForm(formVazio); setModoEdicao(false)
-        await carregarTreinamentos(clinicaId)
-      } else {
-        setMsgT('erro:' + (j.error ?? 'Erro desconhecido'))
+      if (!clinicaId || !form.pergunta.trim() || !form.resposta.trim()) {
+        setMsgT('erro:Pergunta e Resposta são obrigatórias')
+        setTimeout(() => setMsgT(''), 3000)
+        return
       }
-    } finally { setSalvandoT(false); setTimeout(() => setMsgT(''), 4000) }
+      setSalvandoT(true); setMsgT('')
+      try {
+        const method = modoEdicao ? 'PUT' : 'POST'
+        const payload = modoEdicao
+          ? { id: form.id, pergunta: form.pergunta, resposta: form.resposta, palavras_chave: form.palavras_chave }
+          : { clinica_id: clinicaId, pergunta: form.pergunta, resposta: form.resposta, palavras_chave: form.palavras_chave }
+        const r = await fetch('/api/chatbot/treinamento', {
+          method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+        const j = await r.json()
+        if (j.sucesso) {
+          setMsgT('ok:' + (modoEdicao ? 'Treinamento atualizado!' : 'Treinamento salvo!'))
+          setForm(formVazio); setModoEdicao(false)
+          await carregarTreinamentos(clinicaId)
+        } else {
+          setMsgT('erro:' + (j.error ?? 'Erro desconhecido'))
+        }
+      } finally { setSalvandoT(false); setTimeout(() => setMsgT(''), 4000) }
+    } finally {
+      salvandoTRef.current = false
+    }
   }
 
   async function toggleAtivo(t: Treinamento) {

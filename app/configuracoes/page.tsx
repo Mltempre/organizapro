@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
@@ -49,6 +49,7 @@ export default function ConfiguracoesPage() {
   const router = useRouter();
   const [config, setConfig]     = useState<Config>(configInicial);
   const [salvando, setSalvando] = useState(false);
+  const salvandoRef = useRef(false); // trava síncrona de submissão — ver salvar()
   const [sucesso, setSucesso]   = useState('');
   const [erro, setErro]         = useState('');
   const [loading, setLoading]   = useState(true);
@@ -99,29 +100,36 @@ export default function ConfiguracoesPage() {
   useEffect(() => { carregar(); }, []);
 
   async function salvar() {
-    setErro(''); setSucesso('');
-    const link = config.link_google.trim();
-    if (link && !/^https?:\/\//i.test(link)) {
-      setErro('Informe um link válido do Google.');
-      return;
-    }
-    setSalvando(true);
+    // Trava síncrona (ref, não state) — ver docs/kensa-premium-dashboard-relatorio.md, K-03.
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) { router.push('/login'); return; }
-      const { error } = await supabase
-        .from('clinica_config')
-        .upsert(
-          { ...config, user_id: user.id, clinica_id: clinicaId, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id' }
-        );
-      if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
-      else { setSucesso('Configuração salva.'); setTimeout(() => setSucesso(''), 4000); }
-    } catch (e) {
-      console.error(e);
-      setErro(MSG_ERRO_PADRAO);
+      setErro(''); setSucesso('');
+      const link = config.link_google.trim();
+      if (link && !/^https?:\/\//i.test(link)) {
+        setErro('Informe um link válido do Google.');
+        return;
+      }
+      setSalvando(true);
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) { router.push('/login'); return; }
+        const { error } = await supabase
+          .from('clinica_config')
+          .upsert(
+            { ...config, user_id: user.id, clinica_id: clinicaId, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id' }
+          );
+        if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
+        else { setSucesso('Configuração salva.'); setTimeout(() => setSucesso(''), 4000); }
+      } catch (e) {
+        console.error(e);
+        setErro(MSG_ERRO_PADRAO);
+      } finally {
+        setSalvando(false);
+      }
     } finally {
-      setSalvando(false);
+      salvandoRef.current = false;
     }
   }
 

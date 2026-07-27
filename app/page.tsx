@@ -49,25 +49,67 @@ const COMPARACAO_OUTROS = ["Apenas armazenam dados.", "Esperam comandos.", "Most
 const COMPARACAO_ORGANIZAPRO = ["Analisa informações.", "Identifica prioridades.", "Recomenda ações.", "Atua como Diretor Digital."];
 
 const FRENTES = [
-  { icon: "👥", texto: "Organiza clientes."             },
-  { icon: "📅", texto: "Controla a agenda."              },
-  { icon: "📊", texto: "Analisa indicadores."            },
-  { icon: "🌐", texto: "Fortalece a presença digital."   },
-  { icon: "⭐", texto: "Cuida da reputação online."      },
-  { icon: "🤖", texto: "Produz conteúdo com IA."         },
+  { icon: "👥", texto: "Todos os seus clientes organizados em um único lugar." },
+  { icon: "📅", texto: "Nunca mais esqueça um compromisso importante."         },
+  { icon: "📊", texto: "Saiba em segundos como está o seu negócio."           },
+  { icon: "🌐", texto: "Presença profissional que atrai mais clientes."       },
+  { icon: "⭐", texto: "Peça avaliações automaticamente e reduza faltas."     },
+  { icon: "🤖", texto: "Economize horas criando conteúdo para sua empresa."   },
+];
+
+const NICHOS = [
+  { icon: "⚖️", label: "Advogados",  dores: ["Nunca mais perca um prazo importante.", "Organize clientes e honorários.", "Controle compromissos com segurança."] },
+  { icon: "✂️", label: "Barbearias", dores: ["Reduza faltas.", "Agenda sempre organizada.", "Clientes lembrados automaticamente."] },
+  { icon: "🧠", label: "Psicólogos", dores: ["Agenda organizada.", "Menos esquecimentos.", "Atendimento mais tranquilo."] },
+  { icon: "💅", label: "Estética",   dores: ["Mais confirmações.", "Mais retorno de clientes.", "Mais avaliações positivas."] },
+  { icon: "🧾", label: "Contadores", dores: ["Nunca mais esqueça um prazo.", "Organize clientes.", "Centralize compromissos."] },
 ];
 
 const AUDIENCE = [
-  { icon: "⚖️", label: "Advogados"               },
-  { icon: "🧠", label: "Psicólogos"              },
-  { icon: "🦴", label: "Fisioterapeutas"         },
-  { icon: "✂️", label: "Barbearias"              },
-  { icon: "💅", label: "Estéticas"               },
-  { icon: "💼", label: "Consultores"             },
-  { icon: "🔧", label: "Prestadores de serviço"  },
+  { icon: "⚖️", label: "Advogados"       },
+  { icon: "✂️", label: "Barbearias"      },
+  { icon: "🏥", label: "Clínicas"        },
+  { icon: "🧠", label: "Psicólogos"      },
+  { icon: "🦴", label: "Fisioterapeutas" },
+  { icon: "🧾", label: "Contadores"      },
+  { icon: "💅", label: "Estéticas"       },
+  { icon: "🔧", label: "Oficinas"        },
+  { icon: "🍽️", label: "Restaurantes"    },
+  { icon: "🐾", label: "Pet Shops"       },
+  { icon: "🏋️", label: "Academias"       },
+  { icon: "🏠", label: "Imobiliárias"    },
 ];
 
-const VALOR_OFERTA = ["Diretor Digital", "Dashboard Inteligente", "Atualizações", "IA integrada", "Suporte"];
+const VALOR_OFERTA = ["Diretor Digital", "Controle em tempo real", "Sempre atualizado", "Economia de tempo com IA", "Suporte quando precisar"];
+
+const RENDA_PUBLICO = ["Agências", "Social Media", "Designers", "Freelancers", "Marketing Digital"];
+
+const PLANOS = [
+  {
+    medalha: "🥉",
+    nome: "OrganizaPro",
+    tagline: "Organize o seu próprio negócio.",
+    itens: ["Sistema completo", "1 Empresa", "1 Site Premium Profissional"],
+    publico: "Ideal para empresários e profissionais liberais.",
+    destaque: false,
+  },
+  {
+    medalha: "🥈",
+    nome: "OrganizaPro Agência",
+    tagline: "Crie uma nova fonte de renda.",
+    itens: ["Sistema completo", "Até 10 Empresas com Sites Premium Profissionais"],
+    publico: "Ideal para: Agências, Social Media, Designers, Freelancers, Marketing Digital.",
+    destaque: true,
+  },
+  {
+    medalha: "🥇",
+    nome: "OrganizaPro Revenda",
+    tagline: "Transforme o OrganizaPro na sua plataforma de negócios.",
+    itens: ["Sistema completo", "Empresas ilimitadas", "Sites Premium Profissionais ilimitados"],
+    publico: "Voltado para quem deseja escalar um negócio baseado na criação de sites.",
+    destaque: false,
+  },
+];
 
 export default function Page() {
   const [isMobile, setIsMobile] = useState(false);
@@ -88,6 +130,8 @@ export default function Page() {
   const [refFrent, classFrent]   = useReveal<HTMLDivElement>();
   const [refProva, classProva]   = useReveal<HTMLDivElement>();
   const [refOferta, classOferta] = useReveal<HTMLDivElement>();
+  const [refRenda, classRenda]   = useReveal<HTMLDivElement>();
+  const [refNichos, classNichos] = useReveal<HTMLDivElement>();
 
   return (
     <div style={{ fontFamily: "Inter, -apple-system, sans-serif", background: "#0f1117", color: "#e2e8f0", overflowX: "hidden", maxWidth: "100vw" }}>
@@ -465,18 +509,145 @@ export default function Page() {
         </div>
       </section>
 
+      {/* ── DORES POR NICHO ───────────────────────────────────────── */}
+      <section style={{ padding: isMobile ? "64px 20px" : "90px 40px", background: "#0c0e14" }}>
+        <div ref={refNichos} className={classNichos} style={{ maxWidth: 1100, margin: "0 auto" }}>
+
+          <div style={{ textAlign: "center", marginBottom: isMobile ? 36 : 52 }}>
+            <span className="section-tag">Feito para o seu negócio</span>
+            <h2 style={{ fontSize: isMobile ? 26 : 40, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.15, margin: "0 0 14px" }}>
+              Esse sistema entende o seu negócio
+            </h2>
+            <p style={{ fontSize: isMobile ? 15 : 17, color: "#94a3b8", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
+              As dores mudam de negócio para negócio. A forma de resolver, também.
+            </p>
+          </div>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 16,
+          }}>
+            {NICHOS.map(n => (
+              <div key={n.label} className="card-soft" style={{ padding: isMobile ? "24px 20px" : "26px 22px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <span style={{ fontSize: 26 }}>{n.icon}</span>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9" }}>{n.label}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {n.dores.map(d => (
+                    <div key={d} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13.5, color: "#cbd5e1", lineHeight: 1.5 }}>
+                      <span style={{ flexShrink: 0, color: "#4a9bb0" }}>✔</span>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ textAlign: "center", marginTop: 28, fontSize: 14, color: "#64748b" }}>
+            E qualquer outro negócio que atende clientes com hora marcada.
+          </p>
+        </div>
+      </section>
+
+      {/* ── NOVA FONTE DE RENDA ────────────────────────────────────── */}
+      <section style={{ padding: isMobile ? "64px 20px" : "90px 40px", background: "#0f1117" }}>
+        <div ref={refRenda} className={classRenda} style={{ maxWidth: 860, margin: "0 auto" }}>
+          <div style={{
+            borderRadius: 22, background: "linear-gradient(135deg, rgba(74,155,176,0.14), rgba(31,78,95,0.26))",
+            border: "1px solid rgba(74,155,176,0.35)", padding: isMobile ? "36px 24px" : "48px 56px",
+            textAlign: "center",
+          }}>
+            <span className="section-tag">Nova oportunidade</span>
+            <h2 style={{ fontSize: isMobile ? 24 : 34, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2, margin: "0 0 16px" }}>
+              💰 Crie uma Nova Fonte de Renda
+            </h2>
+            <p style={{ fontSize: isMobile ? 15 : 17, color: "#cbd5e1", lineHeight: 1.7, maxWidth: 620, margin: "0 auto 10px" }}>
+              Além de organizar sua empresa, o OrganizaPro permite oferecer Sites Premium Profissionais para pequenas empresas e prestadores de serviço.
+            </p>
+            <p style={{ fontSize: isMobile ? 14 : 15, color: "#94a3b8", lineHeight: 1.7, maxWidth: 560, margin: "0 auto 28px" }}>
+              Ideal para quem deseja empreender ou ampliar sua atuação no mercado digital.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 30 }}>
+              {RENDA_PUBLICO.map(v => (
+                <span key={v} style={{
+                  display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999,
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)",
+                  color: "#e2e8f0", fontSize: 13, fontWeight: 700,
+                }}>
+                  {v}
+                </span>
+              ))}
+            </div>
+            <a href="#oferta" className="btn-main" style={{ fontSize: isMobile ? 14 : 15, padding: isMobile ? "13px 22px" : "14px 30px" }}>
+              Quero saber mais
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* ── OFERTA ─────────────────────────────────────────────────── */}
       <section id="oferta" style={{ padding: isMobile ? "64px 20px" : "90px 40px", background: "#0c0e14" }}>
-        <div ref={refOferta} className={classOferta} style={{ maxWidth: 860, margin: "0 auto" }}>
+        <div ref={refOferta} className={classOferta} style={{ maxWidth: 1080, margin: "0 auto" }}>
 
           <div style={{ textAlign: "center", marginBottom: isMobile ? 28 : 36 }}>
-            <span className="section-tag">Investimento</span>
+            <span className="section-tag">Planos</span>
             <h2 style={{ fontSize: isMobile ? 26 : 40, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.15, margin: "0 0 14px" }}>
-              Ter um Diretor Digital custa menos que um estagiário
+              Um plano para o seu negócio. Outro para quem quer construir um negócio com sites.
             </h2>
-            <p style={{ fontSize: isMobile ? 15 : 17, color: "#94a3b8", lineHeight: 1.7, maxWidth: 480, margin: "0 auto" }}>
+            <p style={{ fontSize: isMobile ? 15 : 17, color: "#94a3b8", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
               Sem mensalidades surpresa. Sem letras miúdas.
             </p>
+          </div>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gap: 18, marginBottom: isMobile ? 32 : 44, alignItems: "stretch",
+          }}>
+            {PLANOS.map(plano => (
+              <div key={plano.nome} style={{
+                borderRadius: 18, padding: isMobile ? "28px 22px" : "32px 26px",
+                background: plano.destaque ? "linear-gradient(135deg,#1F4E5F,#0d3547)" : "rgba(255,255,255,0.03)",
+                border: plano.destaque ? "1px solid rgba(74,155,176,0.5)" : "1px solid rgba(255,255,255,0.1)",
+                display: "flex", flexDirection: "column",
+              }}>
+                <div style={{ fontSize: 30, marginBottom: 10 }}>{plano.medalha}</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: "#f1f5f9", marginBottom: 6 }}>{plano.nome}</div>
+                <div style={{ fontSize: 14, color: plano.destaque ? "rgba(255,255,255,0.75)" : "#94a3b8", marginBottom: 20, lineHeight: 1.5 }}>
+                  {plano.tagline}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20, flex: 1 }}>
+                  {plano.itens.map(item => (
+                    <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13.5, color: plano.destaque ? "#fff" : "#e2e8f0", fontWeight: 500, lineHeight: 1.5 }}>
+                      <span style={{ flexShrink: 0, color: plano.destaque ? "#fff" : "#4a9bb0" }}>✓</span>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: 12.5, color: plano.destaque ? "rgba(255,255,255,0.6)" : "#64748b", lineHeight: 1.6, margin: "0 0 20px" }}>
+                  {plano.publico}
+                </p>
+                <button
+                  className={plano.destaque ? "btn-main" : undefined}
+                  onClick={() => wpp(`Quero saber mais sobre o plano ${plano.nome}`)}
+                  style={plano.destaque ? { width: "100%", fontSize: 14 } : {
+                    width: "100%", padding: "13px 22px", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                    background: "transparent", border: "1.5px solid rgba(255,255,255,0.16)", color: "#e2e8f0",
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  {plano.nome === "OrganizaPro" ? "Quero começar" : "Fale com nosso time"}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: "center", marginBottom: isMobile ? 28 : 36 }}>
+            <span className="section-tag">Investimento — plano OrganizaPro</span>
+            <h3 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2, margin: "0 0 8px" }}>
+              Ter um Diretor Digital custa menos que um estagiário
+            </h3>
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: isMobile ? 32 : 44 }}>
@@ -503,12 +674,12 @@ export default function Page() {
                 <span style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: "#fff" }}>997</span>
               </div>
               <p style={{ fontSize: 14, color: "rgba(255,255,255,0.58)", margin: "0 0 28px", lineHeight: 1.65 }}>
-                Pago uma única vez. Inclui configuração completa, landing page e orientação de Google.
+                Pago uma única vez. Inclui configuração completa, Site Premium Profissional e orientação de Google.
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {[
                   "Diretor Digital configurado",
-                  "Landing page do seu negócio",
+                  "Site Premium Profissional",
                   "Configuração do Perfil Google",
                   "SEO inicial básico",
                   "Treinamento incluso",
@@ -566,7 +737,7 @@ export default function Page() {
               <div style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: "#4a9bb0" }}>
                 R$997 + 12 × R$99,90 = <span style={{ color: "#f1f5f9" }}>R$2.195,80</span>
               </div>
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Diretor Digital + landing page + Google + suporte por 12 meses</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Diretor Digital + Site Premium Profissional + Google + suporte por 12 meses</div>
             </div>
             <button className="btn-main" style={{ fontSize: isMobile ? 14 : 15, padding: isMobile ? "13px 22px" : "14px 30px", flexShrink: 0 }}
               onClick={() => wpp("Quero saber mais sobre o OrganizaPro — Implantação + Mensalidade")}>

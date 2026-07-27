@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
@@ -111,6 +111,7 @@ export default function ClientesPage() {
   const [editando, setEditando]           = useState<Paciente | null>(null);
   const [form, setForm]                   = useState<FormData>(formInicial);
   const [salvando, setSalvando]           = useState(false);
+  const salvandoRef = useRef(false); // trava síncrona de submissão — ver salvar()
   const [excluindo, setExcluindo]         = useState<string | null>(null);
   const [carregando, setCarregando]       = useState(true);
   const [erro, setErro]                   = useState('');
@@ -229,46 +230,55 @@ export default function ClientesPage() {
   // ── Salvar ──
 
   async function salvar() {
-    if (!form.nome.trim()) { setErro('Nome é obrigatório.'); return; }
-    if (!editando && form.telefone.trim()) {
-      const tel = normalizar(form.telefone);
-      const { data: ex } = await supabase.from('pacientes').select('id, nome')
-        .eq('clinica_id', clinicaId).or(`telefone.eq.${tel},whatsapp.eq.${tel}`).maybeSingle();
-      if (ex) { setErro(`Já existe um cliente com este telefone: ${ex.nome}`); return; }
-    }
-    setSalvando(true); setErro('');
+    // Trava síncrona (ref, não state) — bloqueia cliques/Enter repetidos mesmo
+    // antes do primeiro re-render, quando `salvando` (state) ainda não teria
+    // efeito. Ver docs/kensa-premium-dashboard-relatorio.md, achado K-03.
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const telefoneSalvo = normalizar(form.telefone);
-      const payload = {
-        ...form,
-        telefone:         telefoneSalvo,
-        whatsapp:         form.whatsapp         ? normalizar(form.whatsapp) : null,
-        endereco:         form.endereco         || null,
-        site_link:        form.site_link        || null,
-        observacoes:      form.observacoes      || null,
-        proxima_consulta: form.proxima_consulta || null,
-        user_id:          user?.id,
-        clinica_id:       clinicaId,
-      };
-      let error;
-      if (editando) { ({ error } = await supabase.from('pacientes').update(payload).eq('id', editando.id).eq('clinica_id', clinicaId)); }
-      else          { ({ error } = await supabase.from('pacientes').insert(payload)); }
-      if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
-      else {
-        if (form.proxima_consulta) {
-          const telefoneAnterior = editando ? normalizar(editando.telefone) : undefined;
-          await sincronizarAgendamento(user?.id, form.nome, telefoneSalvo, form.proxima_consulta, telefoneAnterior);
-        }
-        setModal(false); carregar();
-        setSucesso(editando ? 'Cliente atualizado.' : 'Cliente cadastrado com sucesso.');
-        setTimeout(() => setSucesso(''), 3500);
+      if (!form.nome.trim()) { setErro('Nome é obrigatório.'); return; }
+      if (!editando && form.telefone.trim()) {
+        const tel = normalizar(form.telefone);
+        const { data: ex } = await supabase.from('pacientes').select('id, nome')
+          .eq('clinica_id', clinicaId).or(`telefone.eq.${tel},whatsapp.eq.${tel}`).maybeSingle();
+        if (ex) { setErro(`Já existe um cliente com este telefone: ${ex.nome}`); return; }
       }
-    } catch (e) {
-      console.error(e);
-      setErro(MSG_ERRO_PADRAO);
+      setSalvando(true); setErro('');
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const telefoneSalvo = normalizar(form.telefone);
+        const payload = {
+          ...form,
+          telefone:         telefoneSalvo,
+          whatsapp:         form.whatsapp         ? normalizar(form.whatsapp) : null,
+          endereco:         form.endereco         || null,
+          site_link:        form.site_link        || null,
+          observacoes:      form.observacoes      || null,
+          proxima_consulta: form.proxima_consulta || null,
+          user_id:          user?.id,
+          clinica_id:       clinicaId,
+        };
+        let error;
+        if (editando) { ({ error } = await supabase.from('pacientes').update(payload).eq('id', editando.id).eq('clinica_id', clinicaId)); }
+        else          { ({ error } = await supabase.from('pacientes').insert(payload)); }
+        if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
+        else {
+          if (form.proxima_consulta) {
+            const telefoneAnterior = editando ? normalizar(editando.telefone) : undefined;
+            await sincronizarAgendamento(user?.id, form.nome, telefoneSalvo, form.proxima_consulta, telefoneAnterior);
+          }
+          setModal(false); carregar();
+          setSucesso(editando ? 'Cliente atualizado.' : 'Cliente cadastrado com sucesso.');
+          setTimeout(() => setSucesso(''), 3500);
+        }
+      } catch (e) {
+        console.error(e);
+        setErro(MSG_ERRO_PADRAO);
+      } finally {
+        setSalvando(false);
+      }
     } finally {
-      setSalvando(false);
+      salvandoRef.current = false;
     }
   }
 

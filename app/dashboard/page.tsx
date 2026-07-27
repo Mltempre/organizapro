@@ -6,7 +6,7 @@ import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 import OnboardingCard from "../components/onboarding/OnboardingCard";
 import WelcomeModal from "../components/onboarding/WelcomeModal";
-import { gerarPrioridadeDoDia, gerarCentralOportunidades, type CategoriaRecomendacao, type Recomendacao } from "../../lib/recomendacoes";
+import { gerarCentralOportunidades, type Recomendacao } from "../../lib/recomendacoes";
 import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 
@@ -252,19 +252,6 @@ function gerarSaudacaoCard(ctx: { nomeNegocio: string; ambienteProducao: boolean
   return { linha1: `👋 ${saudacao()}!`, linha2: "Bem-vindo ao OrganizaPro.", subtitulo };
 }
 
-// Intelligence 2.0 · "Prioridade do Diretor" — a fala do briefing que abre
-// o bloco de recomendações. Puramente apresentação: não decide nada, só
-// narra em primeira pessoa o que `gerarPrioridadeDoDia` já escolheu.
-function gerarBriefingDiretor(temPrioridade: boolean, temDados: boolean): string {
-  if (!temDados) {
-    return `${saudacao()}. Ainda estou conhecendo o seu negócio — continue usando o OrganizaPro para que eu possa trazer recomendações cada vez mais precisas.`;
-  }
-  if (!temPrioridade) {
-    return `${saudacao()}. Revisei sua rotina com calma — está tudo em ordem por aqui.`;
-  }
-  return `${saudacao()}. Enquanto você cuidava do seu negócio, analisei sua rotina. Se eu estivesse administrando sua empresa hoje, começaria exatamente por esta ação.`;
-}
-
 function formatarDataBR(d: string): string {
   const [y, m, dd] = d.split("-");
   return `${dd}/${m}/${y}`;
@@ -310,28 +297,93 @@ const RECURSOS_INCLUIDOS = [
   { icon: "📊", label: "Raio-X Inteligente" },
 ];
 
-// Categoria da recomendação (lib/recomendacoes.ts) → estilo visual + emoji.
-// Reaproveita as mesmas cores de `stTom` já usadas nos tiles acima.
-const stCategoria: Record<CategoriaRecomendacao, { emoji: string; label: string; tom: keyof typeof stTom }> = {
-  atencao:      { emoji: "🔴", label: "Atenção",      tom: "critico"  },
-  oportunidade: { emoji: "🟡", label: "Oportunidade", tom: "atencao"  },
-  organizacao:  { emoji: "🟢", label: "Organização",  tom: "positivo" },
-  sugestao:     { emoji: "💡", label: "Sugestão",     tom: "neutro"   },
+// ── Pulso do Negócio ─────────────────────────────────────────────────────
+// Reaproveita 100% a mesma condição já calculada em `gerarInsights`
+// (insights.situacao) — nenhuma lógica nova, só uma frase executiva em vez
+// do rótulo curto usado no antigo badge "Status Operacional".
+const FRASE_PULSO: Record<"critico" | "atencao" | "positivo", string> = {
+  critico:  "Há prioridades críticas que precisam ser resolvidas imediatamente.",
+  atencao:  "Existem algumas pendências que merecem atenção hoje.",
+  positivo: "Seu negócio está operando normalmente.",
 };
 
-// Prioridade da Missão do Dia (lib/recomendacoes.ts) → estilo visual.
-const stPrioridade: Record<"alta" | "media" | "baixa", { label: string; tom: keyof typeof stTom }> = {
-  alta:  { label: "Prioridade Alta",  tom: "critico" },
-  media: { label: "Prioridade Média", tom: "atencao" },
-  baixa: { label: "Prioridade Baixa", tom: "neutro"  },
+// ── "O que fazer agora" ──────────────────────────────────────────────────
+// Mescla, só para apresentação, os dois motores que já existem — nenhuma
+// regra de priorização nova. Prioridade primeiro; dentro da mesma
+// prioridade, clientes nomeados (mais acionáveis agora) antes de
+// recomendações agregadas por contagem. Nunca completa com item inventado:
+// se houver menos de 5 sinais reais, mostra só os que existem.
+type AcaoPrioritaria = {
+  id:           string;
+  titulo:       string;
+  prioridade:   "alta" | "media" | "baixa";
+  destino?:     string;
+  destinoLabel?: string;
 };
 
-// Central de Oportunidades: mesmos três níveis de `stPrioridade`, com os
-// emojis 🔴🟡🔵 usados para agrupar visualmente os cartões por urgência.
+function gerarProximasAcoes(
+  recomendacoesAcionaveis: Recomendacao[],
+  oportunidadesClientes: OportunidadeCliente[],
+): AcaoPrioritaria[] {
+  const doClientes: AcaoPrioritaria[] = oportunidadesClientes.map(op => ({
+    id: `cliente-${op.chave}`,
+    titulo: `${op.nome} — ${op.acaoSugerida}`,
+    prioridade: op.prioridade,
+    destino: "/clientes",
+    destinoLabel: "Ver cliente",
+  }));
+  const dasRecomendacoes: AcaoPrioritaria[] = recomendacoesAcionaveis.map(r => ({
+    id: `rec-${r.id}`,
+    titulo: r.titulo,
+    prioridade: r.prioridade,
+    destino: r.destino,
+    destinoLabel: r.destinoLabel,
+  }));
+  const peso: Record<"alta" | "media" | "baixa", number> = { alta: 0, media: 1, baixa: 2 };
+  return [...doClientes, ...dasRecomendacoes]
+    .sort((a, b) => peso[a.prioridade] - peso[b.prioridade])
+    .slice(0, 5);
+}
+
+// ── Resumo da IA ─────────────────────────────────────────────────────────
+// Texto curto, determinístico, sobre dados já calculados no Dashboard —
+// nenhum valor financeiro (ver docs/dashboard-executivo-ia-v1-diagnostico-
+// proposta.md, seção 2: honestidade absoluta sobre ticket médio/receita).
+function gerarResumoIA(ctx: { ocupacaoPct: number | null; horariosVagosHoje: number; pendentes: number }): string {
+  if (ctx.ocupacaoPct === null) {
+    return "Ainda não há agenda suficiente hoje para gerar um resumo.";
+  }
+  const partes: string[] = [
+    ctx.ocupacaoPct >= 70
+      ? `Hoje sua agenda está com boa ocupação (${ctx.ocupacaoPct}%).`
+      : `Hoje sua agenda está com ${ctx.ocupacaoPct}% de ocupação.`,
+  ];
+  if (ctx.horariosVagosHoje > 0) {
+    partes.push(
+      ctx.horariosVagosHoje === 1
+        ? "Existe 1 horário livre."
+        : `Existem ${ctx.horariosVagosHoje} horários livres.`
+    );
+  }
+  if (ctx.pendentes > 0) {
+    partes.push(
+      ctx.pendentes === 1
+        ? "1 cliente ainda não confirmou presença."
+        : `${ctx.pendentes} clientes ainda não confirmaram presença.`
+    );
+  }
+  return partes.join(" ");
+}
+
+// Central de Oportunidades e "O que fazer agora" (mesma paleta) — os
+// emojis 🔴🟡🟢 usados para agrupar visualmente os cartões por urgência.
+// Paleta unificada em todo o Dashboard (2026-07-27): "baixa" deixou de usar
+// azul (🔵/neutro) para usar verde (🟢/positivo) — um único vocabulário de
+// cor em toda a tela, em vez de dois esquemas parecidos.
 const stTierOportunidade: Record<"alta" | "media" | "baixa", { emoji: string; label: string; tom: keyof typeof stTom }> = {
-  alta:  { emoji: "🔴", label: "Alta prioridade",  tom: "critico" },
-  media: { emoji: "🟡", label: "Média prioridade", tom: "atencao" },
-  baixa: { emoji: "🔵", label: "Baixa prioridade", tom: "neutro"  },
+  alta:  { emoji: "🔴", label: "Alta prioridade",  tom: "critico"  },
+  media: { emoji: "🟡", label: "Média prioridade", tom: "atencao"  },
+  baixa: { emoji: "🟢", label: "Baixa prioridade", tom: "positivo" },
 };
 
 export default function Dashboard() {
@@ -525,10 +577,15 @@ export default function Dashboard() {
     ...dash.agendaHoje.filter(a => a.status === "agendado"),
   ];
 
+  // Botões Rápidos (v2, 2026-07-27): WhatsApp e Relatórios ainda não têm uma
+  // página própria com esse nome — direcionam para /chatbot e /metricas, as
+  // páginas reais mais próximas hoje. Quando módulos dedicados existirem,
+  // só o destino muda, sem alterar a interface.
   const botoesRapidos = [
-    { icon: "➕", label: "Novo Cliente",      action: () => router.push("/clientes")    },
-    { icon: "📅", label: "Novo Compromisso",  action: () => router.push("/agendamentos") },
-    { icon: "🔍", label: "Pesquisar Cliente", action: () => router.push("/clientes")    },
+    { icon: "➕", label: "Novo Cliente",     action: () => router.push("/clientes")     },
+    { icon: "📅", label: "Novo Agendamento", action: () => router.push("/agendamentos") },
+    { icon: "💬", label: "WhatsApp",         action: () => router.push("/chatbot")      },
+    { icon: "📊", label: "Relatórios",       action: () => router.push("/metricas")     },
   ];
 
   const ideia = gerarIdeia({
@@ -573,10 +630,6 @@ export default function Dashboard() {
     temWhatsapp:          dash.temWhatsapp,
   };
 
-  const { prioridade, demais: outrasRecomendacoes }: { prioridade: Recomendacao | null; demais: Recomendacao[] } = insights.temDados
-    ? gerarPrioridadeDoDia(ctxNegocio)
-    : { prioridade: null, demais: [] };
-
   const centralOportunidades = insights.temDados
     ? gerarCentralOportunidades(ctxNegocio)
     : { alta: [], media: [], baixa: [] };
@@ -599,8 +652,7 @@ export default function Dashboard() {
       })
     : [];
 
-  // Radar de Oportunidades — frase de abertura na voz do Diretor Digital,
-  // consistente com gerarBriefingDiretor usado na Missão do Dia acima.
+  // Radar de Oportunidades — frase de abertura na voz do Diretor Digital.
   const resumoRadar = gerarResumoRadar(oportunidadesClientes.length);
 
   // V2: ambienteProducao virá de um sinal real de conta/ambiente. Mantido
@@ -610,43 +662,63 @@ export default function Dashboard() {
     ambienteProducao: false,
   });
 
+  // ── Dashboard Executivo IA v1 (2026-07-27) ───────────────────────────────
+  // Ocupação da agenda — só um cálculo sobre dados já carregados, nenhuma
+  // consulta nova. null quando não há base para calcular (evita 0/0).
+  const totalSlotsHoje = dash.compromissosHoje + dash.horariosVagosHoje;
+  const ocupacaoPct = insights.temDados && totalSlotsHoje > 0
+    ? Math.round((dash.compromissosHoje / totalSlotsHoje) * 100)
+    : null;
+
+  // "O que fazer agora" — mescla de Central de Oportunidades + Radar,
+  // nenhuma regra de negócio nova (ver gerarProximasAcoes acima).
+  const todasRecomendacoesAcionaveis = [
+    ...centralOportunidades.alta, ...centralOportunidades.media, ...centralOportunidades.baixa,
+  ];
+  const proximasAcoes = insights.temDados
+    ? gerarProximasAcoes(todasRecomendacoesAcionaveis, oportunidadesClientes)
+    : [];
+
+  const resumoIA = gerarResumoIA({
+    ocupacaoPct,
+    horariosVagosHoje: dash.horariosVagosHoje,
+    pendentes: dash.pendentes,
+  });
+
+  // Oportunidades encontradas — contagem por categoria, sem valor em R$
+  // (ver docs/dashboard-executivo-ia-v1-diagnostico-proposta.md, seção 2).
+  const oportunidadesResumo = [
+    dash.clientesParaReativar > 0 ? `${dash.clientesParaReativar} cliente${dash.clientesParaReativar > 1 ? "s" : ""} sem retorno` : null,
+    dash.horariosVagosHoje    > 0 ? `${dash.horariosVagosHoje} horário${dash.horariosVagosHoje > 1 ? "s" : ""} livre${dash.horariosVagosHoje > 1 ? "s" : ""}` : null,
+    dash.avaliacoesPendentes > 0 ? `${dash.avaliacoesPendentes} avaliaç${dash.avaliacoesPendentes > 1 ? "ões" : "ão"} pendente${dash.avaliacoesPendentes > 1 ? "s" : ""}` : null,
+  ].filter((s): s is string => s !== null);
+
+  // Objetivos do Dia — checklist real, derivado de dados já calculados.
+  const objetivosDoDia = [
+    { label: "Confirmar todos os atendimentos", feito: dash.pendentes === 0 && dash.atrasados === 0 },
+    { label: "Preencher horários livres",       feito: dash.horariosVagosHoje === 0 },
+    { label: "Solicitar avaliações",            feito: dash.avaliacoesPendentes === 0 },
+    { label: "Encerrar o dia sem pendências",   feito: lembretes.length === 0 },
+  ];
+
+  // Conta nova vs. madura — mesma condição já usada pelo OnboardingCard
+  // (temEmpresa/temWhatsapp/temCliente/temCompromisso), decide só a
+  // POSIÇÃO de Onboarding/Recursos/Consultoria (topo vs. rodapé), sem
+  // nenhuma consulta nova.
+  const contaMadura = dash.temEmail && dash.temTelefone && dash.temEndereco
+    && dash.temWhatsapp && dash.totalPacientes > 0 && dash.totalAgendamentos > 0;
+
   if (loading) return (
     <AdminShell title="Painel Executivo">
       <PageLoader title="Preparando seu painel..." />
     </AdminShell>
   );
 
-  return (
-    <AdminShell title="Painel Executivo">
-      {clinicaId && <WelcomeModal clinicaId={clinicaId} />}
-      <style>{`
-        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        .dc  { animation: fadeUp 0.35s ease both; }
-        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
-        .insights-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-        @media (max-width: 860px) { .insights-grid { grid-template-columns: 1fr; } }
-        .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
-      `}</style>
-
-      {/* ── DATA DE HOJE ──────────────────────────────────────────────────────── */}
-      <div className="dc" style={{
-        display: "inline-flex", alignItems: "center", gap: 10,
-        padding: "10px 16px", borderRadius: 12, marginBottom: 20,
-        background: "rgba(74,155,176,0.08)", border: "1px solid rgba(74,155,176,0.2)",
-      }}>
-        <span style={{ fontSize: 18 }}>📅</span>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Hoje
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
-            {dataStr}
-          </div>
-        </div>
-      </div>
-
-      {/* ── ONBOARDING ────────────────────────────────────────────────────────── */}
+  // Onboarding + Recursos Incluídos + Consultoria do Dia — mesmo grupo,
+  // uma única posição por vez: topo para conta nova, rodapé para conta
+  // madura (Homologação do Diretor, 2026-07-27).
+  const blocoOnboardingRecursosConsultoria = (
+    <>
       <OnboardingCard
         clinicaId={clinicaId}
         temEmpresa={dash.temEmail && dash.temTelefone && dash.temEndereco}
@@ -656,7 +728,6 @@ export default function Dashboard() {
         onNavigate={(path) => router.push(path)}
       />
 
-      {/* ── RECURSOS INCLUÍDOS ───────────────────────────────────────────────── */}
       <div className="dc" style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
         {RECURSOS_INCLUIDOS.map(r => (
           <span key={r.label} style={{
@@ -670,378 +741,491 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── SEU PLANO PARA HOJE ──────────────────────────────────────────────── */}
+      <div className="dc" style={{
+        background: "linear-gradient(135deg, rgba(74,155,176,0.07), rgba(31,78,95,0.12))",
+        border: "1px solid rgba(74,155,176,0.2)",
+        borderRadius: 14, padding: "20px 22px", marginBottom: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: "rgba(74,155,176,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, flexShrink: 0,
+          }}>
+            {ideia.icone}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
+              💡 Consultoria do Dia
+            </div>
+            <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 12px" }}>
+              {ideia.texto}
+            </p>
+            <div style={{
+              marginBottom: 10,
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(74,155,176,0.14)",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                🧭 Por que isso importa
+              </div>
+              <div style={{
+                fontSize: 13,
+                color: "#cbd5e1",
+                lineHeight: 1.45,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}>
+                {ideia.porQueImporta}
+              </div>
+            </div>
+            {ideia.impactoEsperado && (
+              <div style={{
+                marginBottom: 10,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(74,155,176,0.06)",
+                border: "1px solid rgba(74,155,176,0.12)",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                  📈 Impacto esperado
+                </div>
+                <div style={{
+                  fontSize: 13,
+                  color: "#cbd5e1",
+                  lineHeight: 1.45,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}>
+                  {ideia.impactoEsperado}
+                </div>
+              </div>
+            )}
+            {ideia.tempoEstimado && (
+              <div style={{
+                marginBottom: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 10px",
+                borderRadius: 999,
+                background: "rgba(74,155,176,0.1)",
+                border: "1px solid rgba(74,155,176,0.18)",
+                color: "#4a9bb0",
+                fontSize: 12,
+                fontWeight: 700,
+              }}>
+                <span>⏱</span>
+                <span>Tempo estimado</span>
+                <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{ideia.tempoEstimado}</span>
+              </div>
+            )}
+            {ideia.destino && (
+              <button
+                onClick={() => router.push(ideia.destino!)}
+                style={{
+                  padding: "7px 16px", borderRadius: 8,
+                  border: "1px solid rgba(74,155,176,0.3)",
+                  background: "rgba(74,155,176,0.1)",
+                  color: "#4a9bb0", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                {ideia.destino_label} →
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <AdminShell title="Painel Executivo">
+      {clinicaId && <WelcomeModal clinicaId={clinicaId} />}
+      <style>{`
+        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .dc  { animation: fadeUp 0.35s ease both; }
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
+        .indicadores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        @media (max-width: 860px) { .indicadores-grid { grid-template-columns: repeat(2, 1fr); } }
+        .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
+        .indicador-tile:hover { border-color: rgba(74,155,176,0.4) !important; }
+      `}</style>
+
+      {/* ── 1. CABEÇALHO INTELIGENTE ───────────────────────────────────────────
+          Funde as duas saudações que existiam antes ("Seu Plano para Hoje" +
+          "Card Principal") numa só, e acrescenta o Pulso do Negócio — mesma
+          condição já calculada em insights.situacao (gerarInsights), só em
+          frase completa (FRASE_PULSO acima), sem lógica nova. */}
       <div className="dc" style={{
         background: "linear-gradient(135deg, rgba(74,155,176,0.12), rgba(31,78,95,0.22))",
         border: "1px solid rgba(74,155,176,0.3)",
-        borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        borderRadius: 16, padding: "22px 24px", marginBottom: 16,
         boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+          {dataStr}
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: "#f1f5f9" }}>
+          {saudacaoCard.linha1}
+          {saudacaoCard.linha2 && <><br />{saudacaoCard.linha2}</>}
+        </div>
+
+        {insights.temDados ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <span style={{ fontSize: 15 }}>{insights.situacao.emoji}</span>
+            <span style={{ fontSize: 14, color: "#cbd5e1", fontWeight: 600 }}>
+              {FRASE_PULSO[insights.situacao.tom]}
+            </span>
+            {ocupacaoPct !== null && (
+              <span style={{
+                marginLeft: "auto", padding: "4px 12px", borderRadius: 999,
+                background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.3)",
+                color: "#4a9bb0", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+              }}>
+                Agenda: {ocupacaoPct}%
+              </span>
+            )}
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: "8px 0 0" }}>
+            {saudacaoCard.subtitulo}
+          </p>
+        )}
+      </div>
+
+      {/* ── 2. BOTÕES RÁPIDOS ─────────────────────────────────────────────── */}
+      <div className="dc" style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+        {botoesRapidos.map(b => (
+          <button key={b.label} className="btn-rapido" onClick={b.action} style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "10px 18px", borderRadius: 10,
+            border: "1px solid rgba(31,78,95,0.35)",
+            background: "rgba(31,78,95,0.12)",
+            color: "#4a9bb0", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+            <span>{b.icon}</span>
+            {b.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── ONBOARDING / RECURSOS / CONSULTORIA — topo (só contas novas) ──── */}
+      {!contaMadura && blocoOnboardingRecursosConsultoria}
+
+      {/* ── 3. O QUE FAZER AGORA ───────────────────────────────────────────
+          Mescla visual de Central de Oportunidades + Radar de Oportunidades
+          (gerarProximasAcoes acima) — nenhuma regra de negócio nova. Nunca
+          completa com item inventado: menos de 5 sinais reais = menos de 5
+          itens na tela. */}
+      {insights.temDados && (
+        <div className="dc" style={{
+          background: "#12151f", border: "1px solid rgba(245,158,11,0.22)",
+          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 10,
-              background: "rgba(74,155,176,0.18)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 17, flexShrink: 0,
+              background: "rgba(245,158,11,0.16)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
             }}>
               🧭
             </div>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-              Missão do Dia
+              O que fazer agora
             </div>
           </div>
-          {insights.temDados && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: "#64748b", letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                Status Operacional
-              </span>
+
+          {proximasAcoes.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
+              Nenhuma ação urgente identificada agora. Continue acompanhando sua agenda.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {proximasAcoes.map(acao => {
+                const meta = stTierOportunidade[acao.prioridade];
+                const cor = stTom[meta.tom];
+                return (
+                  <div key={acao.id} style={{
+                    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                    background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
+                    borderRadius: 12, padding: "12px 16px",
+                  }}>
+                    <span style={{ fontSize: 15 }}>{meta.emoji}</span>
+                    <span style={{ fontSize: 13.5, color: "#f1f5f9", fontWeight: 600, flex: 1, minWidth: 160 }}>
+                      {acao.titulo}
+                    </span>
+                    {acao.destino && (
+                      <button
+                        onClick={() => router.push(acao.destino!)}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                      >
+                        {acao.destinoLabel || "Ver"} →
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 4. INDICADORES EXECUTIVOS ───────────────────────────────────────
+          Cada indicador leva a uma ação (regra de UX do Diretor, 2026-07-27)
+          — nunca some quando o valor é zero, só mostra "0". */}
+      <div className="dc indicadores-grid" style={{ marginBottom: 20 }}>
+        {[
+          { label: "Clientes hoje",         valor: dash.compromissosHoje,          destino: "/agendamentos" },
+          { label: "Horários vagos",        valor: dash.horariosVagosHoje,         destino: "/agendamentos" },
+          { label: "Pendências",            valor: dash.pendentes + dash.atrasados, destino: "/agendamentos" },
+          { label: "Avaliações aguardando", valor: dash.avaliacoesPendentes,       destino: "/reputacao"    },
+        ].map(ind => (
+          <button
+            key={ind.label}
+            className="indicador-tile"
+            onClick={() => router.push(ind.destino)}
+            style={{
+              textAlign: "left", cursor: "pointer",
+              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 12, padding: "16px", transition: "border-color 0.15s",
+            }}
+          >
+            <div style={{ fontSize: 26, fontWeight: 900, color: "#f1f5f9", lineHeight: 1, marginBottom: 6 }}>
+              {ind.valor}
+            </div>
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>{ind.label}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* ── 5. RESUMO DA IA ─────────────────────────────────────────────── */}
+      <div className="dc" style={{
+        background: "rgba(74,155,176,0.06)", border: "1px solid rgba(74,155,176,0.18)",
+        borderRadius: 14, padding: "18px 20px", marginBottom: 20,
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
+          💬 Resumo da IA
+        </div>
+        <p style={{ fontSize: 13.5, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
+          {resumoIA}
+        </p>
+      </div>
+
+      {/* ── 6. AGENDA / PRÓXIMOS COMPROMISSOS ──────────────────────────────── */}
+      <div className="dash-grid dc" style={{ marginBottom: 20 }}>
+
+        {/* FOCO DO DIA */}
+        <div style={{
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 14, padding: "20px",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 16 }}>
+            🎯 Foco do Dia
+          </div>
+          {focoDoDia ? (
+            <div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#4a9bb0", lineHeight: 1, marginBottom: 10 }}>
+                {focoDoDia.hora}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
+                {focoDoDia.paciente_nome}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
+                {focoDoDia.tipo_consulta || "Compromisso"}
+              </div>
               <span style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "5px 12px", borderRadius: 999,
-                background: stTom[insights.situacao.tom].bg,
-                border: `1px solid ${stTom[insights.situacao.tom].border}`,
-                color: stTom[insights.situacao.tom].color,
-                fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                display: "inline-flex",
+                fontSize: 11, padding: "3px 10px", borderRadius: 10,
+                background: stStatus[focoDoDia.status]?.bg || "#1a1a2e",
+                color:      stStatus[focoDoDia.status]?.color || "#64748b",
+                fontWeight: 600,
               }}>
-                {insights.situacao.emoji} {insights.situacao.texto}
+                {stStatus[focoDoDia.status]?.label || focoDoDia.status}
+              </span>
+            </div>
+          ) : (
+            <div style={{ color: "#475569", fontSize: 13 }}>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>📅</div>
+              Sua agenda está livre hoje.{" "}
+              <span
+                style={{ color: "#4a9bb0", cursor: "pointer", fontWeight: 600 }}
+                onClick={() => router.push("/agendamentos")}
+              >
+                Agendar um compromisso →
               </span>
             </div>
           )}
         </div>
 
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#cbd5e1", margin: "6px 0 4px" }}>
-          {saudacaoCard.linha1}
-          {saudacaoCard.linha2 && <><br />{saudacaoCard.linha2}</>}
-        </div>
-        <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: "0 0 20px" }}>
-          {saudacaoCard.subtitulo}
-        </p>
-
-        {insights.temDados && (
-          <div className="insights-grid">
-              {/* Prioridades */}
-              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-                  Prioridades
-                </div>
-                <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, margin: "0 0 6px", color: stTom[insights.prioridades.tom].color }}>
-                  {insights.prioridades.numero}
-                </div>
-                <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 12px" }}>
-                  {insights.prioridades.label}
-                </p>
-                {insights.prioridades.destino && (
-                  <button
-                    onClick={() => router.push(insights.prioridades.destino!)}
-                    style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.1)", color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    {insights.prioridades.destino_label} →
-                  </button>
-                )}
-              </div>
-
-              {/* Agenda */}
-              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-                  Agenda
-                </div>
-                <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, margin: "0 0 6px", color: stTom[insights.agenda.tom].color }}>
-                  {insights.agenda.numero}
-                </div>
-                <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 12px" }}>
-                  {insights.agenda.label}
-                </p>
-                {insights.agenda.destino && (
-                  <button
-                    onClick={() => router.push(insights.agenda.destino!)}
-                    style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(74,155,176,0.3)", background: "rgba(74,155,176,0.1)", color: "#4a9bb0", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    {insights.agenda.destino_label} →
-                  </button>
-                )}
-              </div>
-
-              {/* Oportunidades */}
-              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-                  Oportunidades
-                </div>
-                <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, margin: "0 0 6px", color: stTom[insights.oportunidades.tom].color }}>
-                  {insights.oportunidades.numero}
-                </div>
-                <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 12px" }}>
-                  {insights.oportunidades.label}
-                </p>
-                {insights.oportunidades.destino && (
-                  <button
-                    onClick={() => router.push(insights.oportunidades.destino!)}
-                    style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.1)", color: "#4ade80", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    {insights.oportunidades.destino_label} →
-                  </button>
-                )}
-              </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── PRÓXIMA MELHOR AÇÃO ──────────────────────────────────────────────
-          Módulo próprio (V2) — antes vivia dentro de "Seu Plano para Hoje",
-          onde a identidade acabava se diluindo em meio à saudação e aos
-          blocos de métricas. Mesma lógica de sempre (escolherPrioridadePrincipal
-          em lib/recomendacoes.ts): UMA recomendação, a de maior impacto agora,
-          com tempo estimado, motivo e um botão de execução — nada foi alterado
-          no algoritmo, só onde e como isso é exibido. */}
-      <div className="dc" style={{
-        background: "#12151f", border: "1px solid rgba(245,158,11,0.22)",
-        borderRadius: 16, padding: "22px 24px", marginBottom: 20,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: "rgba(245,158,11,0.16)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
-          }}>
-            🚀
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-            Próxima Melhor Ação
-          </div>
-        </div>
-
-        {!insights.temDados ? (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-            }}>
-              👔
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                <span style={{
-                  fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
-                  color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
-                  borderRadius: 999, padding: "2px 8px",
-                }}>
-                  OrganizaPro Intelligence
-                </span>
-              </div>
-              <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
-                {gerarBriefingDiretor(false, false)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-            }}>
-              👔
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                <span style={{
-                  fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
-                  color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
-                  borderRadius: 999, padding: "2px 8px",
-                }}>
-                  OrganizaPro Intelligence
-                </span>
-              </div>
-              <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6, margin: "0 0 16px" }}>
-                {gerarBriefingDiretor(!!prioridade, true)}
-              </p>
-
-              {/* Intelligence 2.0 · Prioridade do Diretor — a escolha em si vem
-                  pronta de lib/recomendacoes.ts (escolherPrioridadePrincipal);
-                  aqui só desenhamos o resultado. Trocar a lógica de decisão no
-                  futuro (ex.: IA generativa) não exige mexer neste bloco. */}
-              {prioridade && (() => {
-                const cat = stCategoria[prioridade.categoria];
-                const cor = stTom[cat.tom];
-                return (
-                  <div style={{
-                    background: cor.bg, border: `1px solid ${cor.border}`,
-                    borderRadius: 14, padding: "18px 20px",
-                    marginBottom: outrasRecomendacoes.length > 0 ? 16 : 0,
-                  }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 6 }}>
-                      {prioridade.titulo}
-                    </div>
-                    <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, margin: "0 0 12px" }}>
-                      {prioridade.explicacao}
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                      {(() => {
-                        const pr = stPrioridade[prioridade.prioridade];
-                        const prCor = stTom[pr.tom];
-                        return (
-                          <span style={{
-                            padding: "4px 10px", borderRadius: 999,
-                            background: prCor.bg, border: `1px solid ${prCor.border}`,
-                            color: prCor.color, fontSize: 11, fontWeight: 700,
-                          }}>
-                            {pr.label}
-                          </span>
-                        );
-                      })()}
-                      <span style={{
-                        padding: "4px 10px", borderRadius: 999,
-                        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                        color: "#cbd5e1", fontSize: 11, fontWeight: 600,
-                      }}>
-                        💡 {prioridade.impacto}
-                      </span>
-                      <span style={{
-                        padding: "4px 10px", borderRadius: 999,
-                        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                        color: "#cbd5e1", fontSize: 11, fontWeight: 600,
-                      }}>
-                        ⏱ {prioridade.tempoEstimado}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 14px", fontStyle: "italic" }}>
-                      Por quê: {prioridade.motivo}
-                    </p>
-                    {prioridade.destino ? (
-                      <button
-                        onClick={() => router.push(prioridade.destino!)}
-                        style={{ padding: "8px 18px", borderRadius: 9, border: "none", background: cor.color, color: "#0a0d14", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
-                      >
-                        Executar agora →
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: cor.color }}>
-                        ✓ {prioridade.acao}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── CENTRAL DE OPORTUNIDADES ──────────────────────────────────────────
-          Intelligence 2.2. Diferente da Próxima Melhor Ação (uma única
-          prioridade), aqui mostramos TODAS as ações disponíveis agrupadas
-          por urgência — o quadro completo. Mesmo motor, mesmos dados já carregados acima;
-          zero consulta nova além da já feita para `ctxNegocio`. */}
-      {insights.temDados && (centralOportunidades.alta.length + centralOportunidades.media.length + centralOportunidades.baixa.length > 0) && (
-        <div className="dc" style={{
-          background: "#12151f", border: "1px solid rgba(255,255,255,0.06)",
-          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        {/* PRÓXIMOS 7 DIAS */}
+        <div style={{
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 14, padding: "20px",
+          maxHeight: 340, overflowY: "auto",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: "rgba(74,222,128,0.12)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
-            }}>
-              💰
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase" }}>
+              📆 Próximos 7 Dias
             </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-                Central de Oportunidades
-              </div>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
-                Ações que podem melhorar seu negócio hoje
-              </div>
-            </div>
+            <button
+              onClick={() => router.push("/agendamentos")}
+              style={{ fontSize: 11, color: "#4a9bb0", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+            >
+              Ver agenda →
+            </button>
           </div>
 
-          {(["alta", "media", "baixa"] as const).map(tier => {
-            const itens = centralOportunidades[tier];
-            if (itens.length === 0) return null;
-            const meta = stTierOportunidade[tier];
-            const cor = stTom[meta.tom];
-            return (
-              <div key={tier} style={{ marginBottom: 22 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ fontSize: 13 }}>{meta.emoji}</span>
-                  <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: cor.color }}>
-                    {meta.label}
+          {diasOrdenados.length === 0 ? (
+            <div style={{ color: "#475569", fontSize: 13, textAlign: "center", paddingTop: 16 }}>
+              Nenhum compromisso agendado para os próximos 7 dias.<br />
+              Bom momento para planejar a semana.
+            </div>
+          ) : diasOrdenados.map((d, di) => (
+            <div key={d}>
+              <div style={{
+                fontSize: 10, fontWeight: 700,
+                color: d === hojeStr ? "#4a9bb0" : "#64748b",
+                textTransform: "uppercase", letterSpacing: "0.06em",
+                marginTop: di > 0 ? 14 : 0, marginBottom: 6,
+                paddingBottom: 4,
+                borderBottom: "1px solid rgba(255,255,255,0.05)",
+              }}>
+                {labelDia(d, hojeStr, amanhaStr)}
+              </div>
+              {gruposDias[d].map((a, ai) => (
+                <div key={a.id} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  paddingTop: ai === 0 ? 2 : 6,
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4a9bb0", minWidth: 44 }}>{a.hora}</span>
+                  <span style={{ fontSize: 13, color: "#cbd5e1", flex: 1 }}>{a.paciente_nome}</span>
+                  <span style={{
+                    fontSize: 10, padding: "2px 8px", borderRadius: 8,
+                    background: stStatus[a.status]?.bg || "#1a1a2e",
+                    color:      stStatus[a.status]?.color || "#64748b",
+                    fontWeight: 600, whiteSpace: "nowrap",
+                  }}>
+                    {stStatus[a.status]?.label || a.status}
                   </span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
-                  {itens.map(op => (
-                    <div key={op.id} style={{
-                      background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
-                      borderRadius: 12, padding: "16px 18px",
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
-                          {op.titulo}
-                        </div>
-                        <span style={{
-                          flexShrink: 0, minWidth: 22, height: 22, padding: "0 6px",
-                          borderRadius: 999, background: cor.bg, border: `1px solid ${cor.border}`,
-                          color: cor.color, fontSize: 11, fontWeight: 800,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                          {op.quantidade}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 8px" }}>
-                        {op.explicacao}
-                      </p>
-                      <p style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, margin: "0 0 10px", fontStyle: "italic" }}>
-                        Por quê: {op.motivo}
-                      </p>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                        <span style={{
-                          padding: "3px 9px", borderRadius: 999,
-                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
-                        }}>
-                          💡 {op.impacto}
-                        </span>
-                        <span style={{
-                          padding: "3px 9px", borderRadius: 999,
-                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
-                        }}>
-                          ⏱ {op.tempoEstimado}
-                        </span>
-                      </div>
-                      {op.destino ? (
-                        <button
-                          onClick={() => router.push(op.destino!)}
-                          style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
-                        >
-                          Resolver agora →
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
-                          ✓ {op.acao}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          ))}
+        </div>
+
+      </div>
+
+      {lembretes.length > 0 && (
+        <div className="dc" style={{
+          background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.18)",
+          borderRadius: 14, padding: "20px", marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>
+            ⚠️ Lembretes
+          </div>
+          {lembretes.map((a, i) => (
+            <div key={`${a.id}-${i}`} style={{
+              display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+              borderBottom: i < lembretes.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+            }}>
+              <span style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 6, fontWeight: 700, whiteSpace: "nowrap",
+                background: a.data < hojeStr ? "rgba(248,113,113,0.15)" : "rgba(245,158,11,0.15)",
+                color:      a.data < hojeStr ? "#f87171" : "#fbbf24",
+              }}>
+                {a.data < hojeStr ? "ATRASADO" : "PENDENTE"}
+              </span>
+              <span style={{ fontSize: 12, color: "#64748b", minWidth: 60 }}>
+                {a.data < hojeStr ? formatarDataBR(a.data) : a.hora}
+              </span>
+              <span style={{ fontSize: 13, color: "#f1f5f9", flex: 1, fontWeight: 500 }}>{a.paciente_nome}</span>
+              <span style={{ fontSize: 11, color: "#64748b" }}>{a.tipo_consulta || ""}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 14 }}>
+            <button
+              onClick={() => router.push("/agendamentos")}
+              style={{
+                padding: "8px 16px", borderRadius: 8,
+                border: "1px solid rgba(245,158,11,0.3)",
+                background: "rgba(245,158,11,0.08)",
+                color: "#f59e0b", fontSize: 12, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              Gerenciar na agenda →
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── RADAR DE OPORTUNIDADES (V2) ──────────────────────────────────────
+      {/* ── 7. OPORTUNIDADES ENCONTRADAS ─────────────────────────────────────
+          Contagem por categoria, nunca valor em R$ (Honestidade Absoluta —
+          ver docs/dashboard-executivo-ia-v1-diagnostico-proposta.md, §2). */}
+      {insights.temDados && (
+        <div className="dc" style={{
+          background: "#12151f", border: "1px solid rgba(124,58,237,0.22)",
+          borderRadius: 16, padding: "20px 24px", marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(124,58,237,0.16)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+            }}>
+              💡
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
+              Oportunidades encontradas
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: "#94a3b8", margin: "10px 0 0", lineHeight: 1.6 }}>
+            {oportunidadesResumo.length > 0
+              ? oportunidadesResumo.join(" · ")
+              : "Oportunidades serão exibidas conforme o uso do sistema."}
+          </p>
+        </div>
+      )}
+
+      {/* ── 8. OBJETIVOS DO DIA ──────────────────────────────────────────── */}
+      {insights.temDados && (
+        <div className="dc" style={{
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 14, padding: "20px", marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>
+            ✅ Objetivos do Dia
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {objetivosDoDia.map(o => (
+              <div key={o.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 15, color: o.feito ? "#4ade80" : "#475569" }}>{o.feito ? "✔" : "○"}</span>
+                <span style={{ fontSize: 13.5, color: o.feito ? "#94a3b8" : "#f1f5f9", textDecoration: o.feito ? "line-through" : "none" }}>
+                  {o.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 9. RADAR DE OPORTUNIDADES (detalhe completo, por cliente) ────────
           V1 se chamava "Agenda Autônoma de Receita" — mesma base, mesmos
           dados já carregados acima, nenhum envio automático. Diferente da
           Central de Oportunidades (mostra o panorama em contadores), aqui
           cada card é UM cliente nomeado: quem merece atenção primeiro, por
-          quê, e há quanto tempo — a resposta direta à pergunta que o
-          OrganizaPro existe para responder ("o que eu faço hoje?"), nunca um
-          CRM com lista de tudo. Ordem: cancelamento > confirmação pendente
-          > sem retorno (um cancelamento já é uma venda perdida de fato; uma
-          confirmação pendente ainda pode se resolver sozinha) — dentro do
-          mesmo tipo, quem espera há mais tempo aparece primeiro. */}
+          quê, e há quanto tempo. Ordem: cancelamento > confirmação pendente
+          > sem retorno — dentro do mesmo tipo, quem espera há mais tempo
+          aparece primeiro. */}
       {insights.temDados && (
         <div className="dc" style={{
           background: "#12151f", border: "1px solid rgba(124,58,237,0.22)",
@@ -1151,319 +1335,110 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── CARD PRINCIPAL ──────────────────────────────────────────────────── */}
-      <div className="dc" style={{
-        background: "linear-gradient(135deg,rgba(31,78,95,0.18),rgba(13,53,71,0.25))",
-        border: "1px solid rgba(31,78,95,0.35)",
-        borderRadius: 16, padding: "24px 28px", marginBottom: 16,
-      }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "#f1f5f9", marginBottom: 3 }}>
-          {saudacao()}! 👋
-        </div>
-        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 22 }}>{dataStr}</div>
-
-        <div style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600, marginBottom: 14 }}>
-          Panorama do seu dia
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 16 }}>🟢</span>
-            <span style={{ fontSize: 26, fontWeight: 900, color: "#4ade80", minWidth: 36, lineHeight: 1 }}>
-              {dash.compromissosHoje}
-            </span>
-            <span style={{ fontSize: 14, color: "#94a3b8" }}>
-              compromisso{dash.compromissosHoje !== 1 ? "s" : ""} hoje
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 16 }}>🟡</span>
-            <span style={{ fontSize: 26, fontWeight: 900, color: "#fbbf24", minWidth: 36, lineHeight: 1 }}>
-              {dash.pendentes}
-            </span>
-            <span style={{ fontSize: 14, color: "#94a3b8" }}>
-              aguardando confirmação
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 16 }}>🔴</span>
-            <span style={{ fontSize: 26, fontWeight: 900, color: dash.atrasados > 0 ? "#f87171" : "#475569", minWidth: 36, lineHeight: 1 }}>
-              {dash.atrasados}
-            </span>
-            <span style={{ fontSize: 14, color: "#94a3b8" }}>
-              em atraso
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── PRÓXIMA IDEIA ────────────────────────────────────────────────────── */}
-      <div className="dc" style={{
-        background: "linear-gradient(135deg, rgba(74,155,176,0.07), rgba(31,78,95,0.12))",
-        border: "1px solid rgba(74,155,176,0.2)",
-        borderRadius: 14, padding: "20px 22px", marginBottom: 20,
-      }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: "rgba(74,155,176,0.15)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, flexShrink: 0,
-          }}>
-            {ideia.icone}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
-              💡 Consultoria do Dia
-            </div>
-            <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 12px" }}>
-              {ideia.texto}
-            </p>
+      {/* ── 10. CENTRAL DE OPORTUNIDADES (detalhe completo, por urgência) ────
+          Intelligence 2.2. Diferente do Radar (um cartão por cliente), aqui
+          mostramos TODAS as ações disponíveis agrupadas por urgência — o
+          quadro completo. Mesmo motor, mesmos dados já carregados acima. */}
+      {insights.temDados && (centralOportunidades.alta.length + centralOportunidades.media.length + centralOportunidades.baixa.length > 0) && (
+        <div className="dc" style={{
+          background: "#12151f", border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
             <div style={{
-              marginBottom: 10,
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(74,155,176,0.14)",
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(74,222,128,0.12)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
             }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-                🧭 Por que isso importa
-              </div>
-              <div style={{
-                fontSize: 13,
-                color: "#cbd5e1",
-                lineHeight: 1.45,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}>
-                {ideia.porQueImporta}
-              </div>
+              💰
             </div>
-            {ideia.impactoEsperado && (
-              <div style={{
-                marginBottom: 10,
-                padding: "10px 12px",
-                borderRadius: 10,
-                background: "rgba(74,155,176,0.06)",
-                border: "1px solid rgba(74,155,176,0.12)",
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-                  📈 Impacto esperado
-                </div>
-                <div style={{
-                  fontSize: 13,
-                  color: "#cbd5e1",
-                  lineHeight: 1.45,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}>
-                  {ideia.impactoEsperado}
-                </div>
-              </div>
-            )}
-            {ideia.tempoEstimado && (
-              <div style={{
-                marginBottom: 12,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "7px 10px",
-                borderRadius: 999,
-                background: "rgba(74,155,176,0.1)",
-                border: "1px solid rgba(74,155,176,0.18)",
-                color: "#4a9bb0",
-                fontSize: 12,
-                fontWeight: 700,
-              }}>
-                <span>⏱</span>
-                <span>Tempo estimado</span>
-                <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{ideia.tempoEstimado}</span>
-              </div>
-            )}
-            {ideia.destino && (
-              <button
-                onClick={() => router.push(ideia.destino!)}
-                style={{
-                  padding: "7px 16px", borderRadius: 8,
-                  border: "1px solid rgba(74,155,176,0.3)",
-                  background: "rgba(74,155,176,0.1)",
-                  color: "#4a9bb0", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                }}
-              >
-                {ideia.destino_label} →
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── BOTÕES RÁPIDOS ──────────────────────────────────────────────────── */}
-      <div className="dc" style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-        {botoesRapidos.map(b => (
-          <button key={b.label} className="btn-rapido" onClick={b.action} style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "10px 18px", borderRadius: 10,
-            border: "1px solid rgba(31,78,95,0.35)",
-            background: "rgba(31,78,95,0.12)",
-            color: "#4a9bb0", fontSize: 13, fontWeight: 600,
-            cursor: "pointer", whiteSpace: "nowrap",
-          }}>
-            <span>{b.icon}</span>
-            {b.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── FOCO DO DIA + PRÓXIMOS 7 DIAS ──────────────────────────────────── */}
-      <div className="dash-grid dc" style={{ marginBottom: 20 }}>
-
-        {/* FOCO DO DIA */}
-        <div style={{
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 14, padding: "20px",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 16 }}>
-            🎯 Foco do Dia
-          </div>
-          {focoDoDia ? (
             <div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#4a9bb0", lineHeight: 1, marginBottom: 10 }}>
-                {focoDoDia.hora}
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
+                Central de Oportunidades
               </div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
-                {focoDoDia.paciente_nome}
+              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+                Ações que podem melhorar seu negócio hoje
               </div>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-                {focoDoDia.tipo_consulta || "Compromisso"}
-              </div>
-              <span style={{
-                display: "inline-flex",
-                fontSize: 11, padding: "3px 10px", borderRadius: 10,
-                background: stStatus[focoDoDia.status]?.bg || "#1a1a2e",
-                color:      stStatus[focoDoDia.status]?.color || "#64748b",
-                fontWeight: 600,
-              }}>
-                {stStatus[focoDoDia.status]?.label || focoDoDia.status}
-              </span>
             </div>
-          ) : (
-            <div style={{ color: "#475569", fontSize: 13 }}>
-              <div style={{ fontSize: 28, marginBottom: 10 }}>📅</div>
-              Sua agenda está livre hoje.{" "}
-              <span
-                style={{ color: "#4a9bb0", cursor: "pointer", fontWeight: 600 }}
-                onClick={() => router.push("/agendamentos")}
-              >
-                Agendar um compromisso →
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* PRÓXIMOS 7 DIAS */}
-        <div style={{
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 14, padding: "20px",
-          maxHeight: 340, overflowY: "auto",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase" }}>
-              📆 Próximos 7 Dias
-            </div>
-            <button
-              onClick={() => router.push("/agendamentos")}
-              style={{ fontSize: 11, color: "#4a9bb0", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
-            >
-              Ver agenda →
-            </button>
           </div>
 
-          {diasOrdenados.length === 0 ? (
-            <div style={{ color: "#475569", fontSize: 13, textAlign: "center", paddingTop: 16 }}>
-              Nenhum compromisso agendado para os próximos 7 dias.<br />
-              Bom momento para planejar a semana.
-            </div>
-          ) : diasOrdenados.map((d, di) => (
-            <div key={d}>
-              <div style={{
-                fontSize: 10, fontWeight: 700,
-                color: d === hojeStr ? "#4a9bb0" : "#64748b",
-                textTransform: "uppercase", letterSpacing: "0.06em",
-                marginTop: di > 0 ? 14 : 0, marginBottom: 6,
-                paddingBottom: 4,
-                borderBottom: "1px solid rgba(255,255,255,0.05)",
-              }}>
-                {labelDia(d, hojeStr, amanhaStr)}
-              </div>
-              {gruposDias[d].map((a, ai) => (
-                <div key={a.id} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  paddingTop: ai === 0 ? 2 : 6,
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4a9bb0", minWidth: 44 }}>{a.hora}</span>
-                  <span style={{ fontSize: 13, color: "#cbd5e1", flex: 1 }}>{a.paciente_nome}</span>
-                  <span style={{
-                    fontSize: 10, padding: "2px 8px", borderRadius: 8,
-                    background: stStatus[a.status]?.bg || "#1a1a2e",
-                    color:      stStatus[a.status]?.color || "#64748b",
-                    fontWeight: 600, whiteSpace: "nowrap",
-                  }}>
-                    {stStatus[a.status]?.label || a.status}
+          {(["alta", "media", "baixa"] as const).map(tier => {
+            const itens = centralOportunidades[tier];
+            if (itens.length === 0) return null;
+            const meta = stTierOportunidade[tier];
+            const cor = stTom[meta.tom];
+            return (
+              <div key={tier} style={{ marginBottom: 22 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 13 }}>{meta.emoji}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: cor.color }}>
+                    {meta.label}
                   </span>
                 </div>
-              ))}
-            </div>
-          ))}
-        </div>
-
-      </div>
-
-      {/* ── LEMBRETES ────────────────────────────────────────────────────────── */}
-      {lembretes.length > 0 && (
-        <div className="dc" style={{
-          background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.18)",
-          borderRadius: 14, padding: "20px",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>
-            ⚠️ Lembretes
-          </div>
-          {lembretes.map((a, i) => (
-            <div key={`${a.id}-${i}`} style={{
-              display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-              borderBottom: i < lembretes.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-            }}>
-              <span style={{
-                fontSize: 10, padding: "2px 8px", borderRadius: 6, fontWeight: 700, whiteSpace: "nowrap",
-                background: a.data < hojeStr ? "rgba(248,113,113,0.15)" : "rgba(245,158,11,0.15)",
-                color:      a.data < hojeStr ? "#f87171" : "#fbbf24",
-              }}>
-                {a.data < hojeStr ? "ATRASADO" : "PENDENTE"}
-              </span>
-              <span style={{ fontSize: 12, color: "#64748b", minWidth: 60 }}>
-                {a.data < hojeStr ? formatarDataBR(a.data) : a.hora}
-              </span>
-              <span style={{ fontSize: 13, color: "#f1f5f9", flex: 1, fontWeight: 500 }}>{a.paciente_nome}</span>
-              <span style={{ fontSize: 11, color: "#64748b" }}>{a.tipo_consulta || ""}</span>
-            </div>
-          ))}
-          <div style={{ marginTop: 14 }}>
-            <button
-              onClick={() => router.push("/agendamentos")}
-              style={{
-                padding: "8px 16px", borderRadius: 8,
-                border: "1px solid rgba(245,158,11,0.3)",
-                background: "rgba(245,158,11,0.08)",
-                color: "#f59e0b", fontSize: 12, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              Gerenciar na agenda →
-            </button>
-          </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
+                  {itens.map(op => (
+                    <div key={op.id} style={{
+                      background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
+                      borderRadius: 12, padding: "16px 18px",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
+                          {op.titulo}
+                        </div>
+                        <span style={{
+                          flexShrink: 0, minWidth: 22, height: 22, padding: "0 6px",
+                          borderRadius: 999, background: cor.bg, border: `1px solid ${cor.border}`,
+                          color: cor.color, fontSize: 11, fontWeight: 800,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {op.quantidade}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 8px" }}>
+                        {op.explicacao}
+                      </p>
+                      <p style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, margin: "0 0 10px", fontStyle: "italic" }}>
+                        Por quê: {op.motivo}
+                      </p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                        <span style={{
+                          padding: "3px 9px", borderRadius: 999,
+                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
+                        }}>
+                          💡 {op.impacto}
+                        </span>
+                        <span style={{
+                          padding: "3px 9px", borderRadius: 999,
+                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
+                        }}>
+                          ⏱ {op.tempoEstimado}
+                        </span>
+                      </div>
+                      {op.destino ? (
+                        <button
+                          onClick={() => router.push(op.destino!)}
+                          style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+                        >
+                          Resolver agora →
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
+                          ✓ {op.acao}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {/* ── ONBOARDING / RECURSOS / CONSULTORIA — rodapé (contas maduras) ─── */}
+      {contaMadura && blocoOnboardingRecursosConsultoria}
 
     </AdminShell>
   );

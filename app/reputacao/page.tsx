@@ -96,8 +96,8 @@ export default function ReputacaoPage() {
 
   const cards = [
     { label: 'Avaliações Solicitadas', valor: resumo.total,    cor: '#fbbf24', icon: '⭐' },
-    { label: 'Responderam',            valor: resumo.recebidas, cor: '#4ade80', icon: '✅' },
-    { label: 'Pendentes',              valor: resumo.pendentes, cor: '#fb923c', icon: '⏳' },
+    { label: 'Avaliações Recebidas',    valor: resumo.recebidas, cor: '#4ade80', icon: '✅' },
+    { label: 'Avaliações Pendentes',    valor: resumo.pendentes, cor: '#fb923c', icon: '⏳' },
     { label: 'Taxa de Resposta',       valor: `${resumo.taxa}%`, cor: '#7c3aed', icon: '📊' },
   ]
 
@@ -138,8 +138,8 @@ export default function ReputacaoPage() {
             <EmptyState
               compact
               icon="⭐"
-              title="Nenhuma avaliação enviada ainda"
-              description="As solicitações de avaliação aparecem aqui após o envio automático via WhatsApp."
+              title="Nenhuma avaliação registrada ainda"
+              description="Assim que seus clientes responderem ao convite enviado pelo WhatsApp, todas as avaliações aparecerão automaticamente nesta tela."
             />
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -192,7 +192,7 @@ export default function ReputacaoPage() {
             disabled={carregando}
             style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#64748b', fontSize: 13, cursor: 'pointer', opacity: carregando ? 0.5 : 1, transition: 'background 0.15s, border-color 0.15s' }}
           >
-            {carregando ? 'Atualizando...' : '🔄 Atualizar'}
+            {carregando ? 'Atualizando...' : '🔄 Atualizar Dados'}
           </button>
         </div>
 

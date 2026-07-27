@@ -27,9 +27,12 @@ export default function Metricas() {
   async function carregarDados() {
     try {
       setErro("")
+      // Padrão de autenticação alinhado com chatbot/automacao/reputacao/configuracoes
+      // (ver docs/kensa-premium-dashboard-relatorio.md, K-04): antes, `authError`
+      // (AuthSessionMissingError, sem sessão) era lançado e caía num catch que só
+      // mostrava um erro genérico, sem nunca redirecionar para /login.
       const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError) throw authError
-      if (!user) { router.push('/login'); return }
+      if (authError || !user) { router.push('/login'); return }
       
       const { data: cu, error: cuError } = await supabase.from('clinica_usuarios').select('clinica_id').eq('usuario_id', user.id).maybeSingle()
       if (cuError) {

@@ -77,7 +77,7 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
             </button>
             <a className="secondary-cta" href="#como-funciona">Ver como funciona</a>
           </div>
-          <p className="product-proof">Agenda · Clientes · Dashboard · Site · Reputação · Conteúdo IA</p>
+          <p className="product-proof">Nunca esqueça um compromisso · Clientes organizados · Controle em segundos · Presença profissional · Mais avaliações · Menos trabalho manual</p>
         </div>
 
         <div className="dashboard-visual">

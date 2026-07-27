@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
+import { FileText, LoaderCircle } from 'lucide-react';
+import { obterHorariosVagos } from '../../lib/horarios';
 
 interface Agendamento {
   id: string;
@@ -20,6 +22,7 @@ interface Agendamento {
   confirmado?: boolean;
   created_at: string;
   observacao?: string;
+  valor?: number | string | null;
 }
 
 type FormData = {
@@ -64,115 +67,153 @@ type EmpresaConfig = {
   email?: string;
   endereco?: string;
   logo_url?: string;
+  horario_funcionamento?: string;
 };
 
-function buildPdfHtml(ags: Agendamento[], empresa: EmpresaConfig | null, data: string): string {
+function escaparHtml(valor: unknown): string {
+  return String(valor ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function formatarTelefonePdf(telefone?: string): string {
+  const n = (telefone || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+  if (n.length === 11) return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
+  if (n.length === 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
+  return telefone || '-';
+}
+
+function buildPdfHtml(ags: Agendamento[], empresa: EmpresaConfig | null, data: string, responsavel?: string): string {
   const [y, m, d] = data.split('-');
   const dataFmt = `${d}/${m}/${y}`;
 
+  const nomeEmpresa = empresa?.nome_clinica?.trim() || 'Empresa';
   const logo = empresa?.logo_url
-    ? `<img src="${empresa.logo_url}" style="height:48px;object-fit:contain" alt="Logo" onerror="this.style.display='none'">`
-    : `<div style="width:48px;height:48px;border-radius:10px;background:#1F4E5F;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:white;font-family:sans-serif">O</div>`;
+    ? `<img src="${escaparHtml(empresa.logo_url)}" style="max-width:150px;max-height:54px;object-fit:contain" alt="Logo da empresa" onerror="this.style.display='none'">`
+    : `<div style="width:50px;height:50px;border-radius:12px;background:#1F4E5F;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:white;font-family:sans-serif">${escaparHtml(nomeEmpresa.charAt(0).toUpperCase())}</div>`;
 
   const rodape = ([
-    empresa?.telefone ? `📱 ${empresa.telefone}` : null,
-    `📧 contato@organizaprooficial.com.br`,
-    empresa?.endereco ? `📍 ${empresa.endereco}` : null,
+    empresa?.telefone ? `Telefone: ${escaparHtml(formatarTelefonePdf(empresa.telefone))}` : null,
+    empresa?.email ? `E-mail: ${escaparHtml(empresa.email)}` : null,
+    empresa?.endereco ? `Endereço: ${escaparHtml(empresa.endereco)}` : null,
   ] as (string | null)[]).filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
 
-  const linhas = ags.map(a => {
+  const horariosVagos = obterHorariosVagos(ags, empresa?.horario_funcionamento);
+  const agendaOrdenada = [...ags].sort((a, b) => a.hora.localeCompare(b.hora));
+
+  const linhas = agendaOrdenada.map(a => {
     const stKey = (a.status === 'agendado' && a.data < data) ? 'vencido' : a.status;
-    const stLabel = statusConfig[stKey]?.label || a.status;
+    const stLabel = a.status === 'agendado' ? 'Pendente' : (statusConfig[stKey]?.label || a.status);
     return `<tr>
       <td style="font-weight:700;color:#1F4E5F;white-space:nowrap">${a.hora?.substring(0,5) || '-'}</td>
-      <td>${a.paciente_nome || '-'}</td>
-      <td>${a.tipo_consulta || '-'}</td>
-      <td>${a.profissional || '-'}</td>
-      <td class="st-${stKey}">${stLabel}</td>
-      <td style="color:#475569">${a.observacao || ''}</td>
+      <td><strong>${escaparHtml(a.paciente_nome || '-')}</strong></td>
+      <td>${escaparHtml(a.tipo_consulta || '-')}</td>
+      <td><span class="status status-${stKey}"><i></i>${escaparHtml(stLabel)}</span></td>
+      <td class="short-note">${escaparHtml(a.observacao?.trim().slice(0, 80) || '—')}</td>
     </tr>`;
   }).join('');
 
-  const total      = ags.length;
+  const total = ags.filter(a => !['cancelado', 'faltou'].includes(a.status)).length;
   const confirmados = ags.filter(a => a.status === 'confirmado' || a.confirmado).length;
-  const concluidos  = ags.filter(a => a.status === 'concluido').length;
-
-  const tableHtml = total === 0
-    ? `<div style="text-align:center;padding:40px;color:#94a3b8;font-size:14px">Nenhum compromisso agendado para este dia.</div>`
-    : `<table>
-        <thead><tr>
-          <th>Hora</th><th>Cliente</th><th>Serviço</th><th>Responsável</th><th>Status</th><th>Observação</th>
-        </tr></thead>
-        <tbody>${linhas}</tbody>
-       </table>`;
+  const pendentes   = ags.filter(a => a.status === 'agendado' && !a.confirmado).length;
+  const valores = ags
+    .filter(a => !['cancelado', 'faltou'].includes(a.status))
+    .map(a => typeof a.valor === 'string' ? Number(a.valor.replace(',', '.')) : Number(a.valor))
+    .filter(v => Number.isFinite(v) && v > 0);
+  const receitaPrevista = valores.length
+    ? valores.reduce((totalValor, valor) => totalValor + valor, 0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' })
+    : null;
+  const oportunidades = ags.filter(a => ['reagendar', 'faltou'].includes(a.status)).length;
+  const observacoes = [
+    confirmados > 0 ? `${confirmados} cliente${confirmados !== 1 ? 's confirmaram' : ' confirmou'} o compromisso.` : null,
+    pendentes > 0 ? `${pendentes} cliente${pendentes !== 1 ? 's ainda não confirmaram' : ' ainda não confirmou'} presença.` : null,
+    ...ags.filter(a => a.status === 'reagendar').slice(0, 3).map(a => `${escaparHtml(a.paciente_nome)} solicitou reagendamento.`),
+  ].filter(Boolean) as string[];
 
   const now = new Date();
-  const geradoEm = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}`;
+
+  const cabecalho = `<header class="hdr">
+    <div class="hdr-l">
+      <div class="op-logo"><span class="op-mark">O</span>OrganizaPro</div>
+      <div class="brand-divider"></div>${logo}
+      <div><div class="brand">${escaparHtml(nomeEmpresa)}</div><div class="emp">Relatório Executivo do Dia</div></div>
+    </div>
+    <div class="hdr-r"><div class="rtitle">Agenda de hoje</div><div class="rdate">${dataFmt}</div><div class="meta">Gerado às ${now.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}${responsavel ? `<br>Responsável: ${escaparHtml(responsavel)}` : ''}</div></div>
+  </header>`;
+
+  const tabela = agendaOrdenada.length === 0
+    ? `<div class="empty"><div class="empty-icon">✓</div><strong>Agenda livre para hoje.</strong><p>Nenhum compromisso pendente — pronta para novos agendamentos.</p></div>`
+    : `<table><thead><tr><th>Horário</th><th>Cliente</th><th>Assunto</th><th>Status</th><th>Observação</th></tr></thead><tbody>${linhas}</tbody></table>`;
+
+  const resumo = `<div class="section-title">Resumo executivo</div><div class="summary">
+    <div class="si">Compromissos agendados<strong>${total}</strong></div>
+    <div class="si">Confirmações pendentes<strong>${pendentes}</strong></div>
+    <div class="si">Oportunidades a recuperar<strong>${oportunidades}</strong></div>
+    <div class="si">Horários livres<strong>${horariosVagos.length}</strong></div>
+    <div class="si">Receita prevista<strong>${receitaPrevista || '—'}</strong></div>
+  </div>`;
+
+  const complementos = `${horariosVagos.length ? `<div class="vacant"><div class="vacant-title">Horários disponíveis · ${horariosVagos.length}</div><div class="vacant-list">${horariosVagos.map(h => `<span class="vacant-slot">${h}</span>`).join('')}</div></div>` : ''}
+    ${observacoes.length ? `<div class="notes"><div class="section-title">Observações importantes</div>${observacoes.map(o => `<div class="note"><span class="check">✓</span>${o}</div>`).join('')}</div>` : ''}`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Agenda ${dataFmt}</title>
+<title>Relatório Executivo do Dia — ${escaparHtml(nomeEmpresa)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;background:#fff}
-.page{max-width:860px;margin:0 auto;padding:40px 48px}
-.hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:22px;border-bottom:2px solid #1F4E5F;margin-bottom:26px}
+body{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#17212b;background:#eef2f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:210mm;min-height:297mm;margin:12px auto;padding:13mm 13mm 15mm;background:#fff;display:flex;flex-direction:column}
+.page main{flex:1}
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:25px;border-bottom:1px solid #dce4e8;margin-bottom:28px}
 .hdr-l{display:flex;align-items:center;gap:16px}
-.brand{font-size:22px;font-weight:800;color:#1F4E5F;letter-spacing:-0.5px}
-.emp{font-size:14px;color:#475569;margin-top:3px}
+.op-logo{display:flex;align-items:center;gap:7px;color:#183b49;font-size:12px;font-weight:800;letter-spacing:-.2px}.op-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#183b49;color:#fff;font-size:15px}.brand-divider{width:1px;height:45px;background:#dce4e8}
+.brand{font-size:22px;font-weight:750;color:#183b49;letter-spacing:-0.5px}
+.emp{font-size:12px;color:#64748b;margin-top:4px}
 .hdr-r{text-align:right}
 .rtitle{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:1px}
 .rdate{font-size:20px;font-weight:700;color:#1F4E5F;margin-top:4px}
-.summary{background:#f8fafc;border-radius:8px;padding:14px 20px;margin-bottom:22px;display:flex;gap:32px;flex-wrap:wrap}
-.si{font-size:13px;color:#475569}
-.si strong{color:#1F4E5F}
-table{width:100%;border-collapse:collapse;font-size:12px}
-thead tr{background:#1F4E5F;color:white}
-thead th{padding:10px 12px;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
-tbody tr:nth-child(even){background:#f8fafc}
+.meta{margin-top:7px;font-size:10px;color:#7b8b96;line-height:1.55}
+.section-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#5f707b;margin:0 0 12px}
+.summary{margin-bottom:24px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.si{min-height:72px;padding:12px;border:1px solid #e2e8ec;border-radius:10px;background:#fbfcfd;font-size:8.5px;color:#74838d;text-transform:uppercase;letter-spacing:.45px}
+.si strong{display:block;margin-top:8px;color:#173947;font-size:17px;letter-spacing:-.4px;text-transform:none;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+thead tr{background:#183b49;color:white}
+thead th{padding:11px 12px;text-align:left;font-weight:650;font-size:9px;text-transform:uppercase;letter-spacing:.8px}
+tbody tr:nth-child(even){background:#fafcfd}
 tbody tr{border-bottom:1px solid #e2e8f0}
-tbody td{padding:10px 12px;color:#334155;vertical-align:top}
-.st-agendado{color:#0ea5e9;font-weight:600}
-.st-confirmado{color:#16a34a;font-weight:600}
-.st-concluido{color:#4a9bb0;font-weight:600}
-.st-cancelado{color:#64748b;font-weight:600}
-.st-faltou{color:#dc2626;font-weight:600}
-.st-reagendar{color:#f59e0b;font-weight:600}
-.st-vencido{color:#f97316;font-weight:600}
-.footer{margin-top:34px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center}
-.f-contacts{font-size:12px;color:#64748b;margin-bottom:6px}
-.f-gen{font-size:10px;color:#cbd5e1}
-@media print{.page{padding:20px 24px}@page{margin:1.5cm}}
+tbody td{padding:11px 12px;color:#334155;vertical-align:middle}
+.short-note{max-width:160px;color:#687782;font-size:10px;overflow-wrap:anywhere}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;white-space:nowrap}.status i{width:7px;height:7px;border-radius:50%;background:#94a3b8}
+.status-confirmado{color:#16834a}.status-confirmado i{background:#22a861}.status-agendado{color:#a66b09}.status-agendado i{background:#e5a52c}
+.status-cancelado,.status-faltou{color:#b83b3b}.status-cancelado i,.status-faltou i{background:#d95050}
+.status-reagendar,.status-vencido{color:#bd650c}.status-reagendar i,.status-vencido i{background:#ee8a2d}.status-concluido{color:#28778a}.status-concluido i{background:#4a9bb0}
+.vacant{margin-top:25px;padding:18px 20px;border:1px solid #e7dfca;border-radius:10px;background:#fffdf8}
+.vacant-title{font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.vacant-list{display:flex;gap:7px;flex-wrap:wrap}
+.vacant-slot{padding:5px 9px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700}
+.empty{text-align:center;padding:30px 24px;border:1px solid #e2e8ec;border-radius:12px;background:#fbfcfd}.empty-icon{display:grid;place-items:center;width:38px;height:38px;margin:0 auto 12px;border-radius:50%;background:#edf5f2;color:#237455;font-weight:800}.empty strong{display:block;color:#173947;font-size:16px}.empty p{margin-top:7px;color:#6b7b86;font-size:12px}
+.notes{margin-top:25px;padding:18px 20px;border:1px solid #e2e8ec;border-radius:10px}.note{font-size:12px;color:#42525d;margin:8px 0}.check{color:#29915a;font-weight:800;margin-right:8px}
+.footer{margin-top:30px;padding-top:18px;border-top:1px solid #e2e8f0;text-align:center}
+.f-contacts{font-size:11px;color:#5c6773;font-weight:600;margin-bottom:8px}
+.f-gen{font-size:10px;color:#7e8c95}
+.print-help{max-width:940px;margin:18px auto 0;padding:11px 14px;border-radius:8px;background:#fff7df;color:#785b13;font:12px/1.4 "Segoe UI",Arial,sans-serif;text-align:center}
+@media screen and (max-width:850px){.page{width:100%;min-height:auto;margin:0;padding:24px 18px}.hdr{gap:14px;flex-direction:column}.hdr-l{width:100%;flex-wrap:wrap;gap:12px}.hdr-r{text-align:left}.hdr-r .meta{display:none}.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.brand-divider{display:none}thead th,tbody td{padding:9px 7px;overflow-wrap:anywhere}.status{gap:3px;white-space:normal;font-size:8px}.vacant-slot{flex:0 0 auto}.f-contacts{display:none}}
+@media print{body{background:#fff}.print-help{display:none}.page{margin:0;width:210mm;min-height:297mm;box-shadow:none}@page{size:A4;margin:1.25cm}}
 </style>
 </head>
 <body>
-<div class="page">
-  <div class="hdr">
-    <div class="hdr-l">
-      ${logo}
-      <div>
-        <div class="brand">OrganizaPro</div>
-        ${empresa?.nome_clinica ? `<div class="emp">${empresa.nome_clinica}</div>` : ''}
-      </div>
-    </div>
-    <div class="hdr-r">
-      <div class="rtitle">Relatório de Agenda</div>
-      <div class="rdate">${dataFmt}</div>
-    </div>
-  </div>
-  <div class="summary">
-    <div class="si">Total: <strong>${total} compromisso${total !== 1 ? 's' : ''}</strong></div>
-    <div class="si">Confirmados: <strong>${confirmados}</strong></div>
-    <div class="si">Concluídos: <strong>${concluidos}</strong></div>
-  </div>
-  ${tableHtml}
-  <div class="footer">
-    ${rodape ? `<div class="f-contacts">${rodape}</div>` : ''}
-    <div class="f-gen">Gerado pelo OrganizaPro em ${geradoEm}</div>
-  </div>
-</div>
+<section class="page">
+  ${cabecalho}
+  <main>${resumo}<div class="section-title">Agenda cronológica</div>${tabela}${complementos}</main>
+  <footer class="footer">${rodape ? `<div class="f-contacts">${rodape}</div>` : ''}<div class="f-gen">Relatório gerado automaticamente pelo OrganizaPro</div></footer>
+</section>
+<div class="print-help">Ao salvar como PDF no Chrome, escolha A4 e desmarque “Cabeçalhos e rodapés” para remover URL, data e título automáticos do navegador.</div>
 </body>
 </html>`;
 }
@@ -187,6 +228,7 @@ export default function AgendamentosPage() {
   const [editando, setEditando]         = useState<Agendamento | null>(null);
   const [form, setForm]                 = useState<FormData>(formInicial);
   const [salvando, setSalvando]         = useState(false);
+  const salvandoRef = useRef(false); // trava síncrona de submissão — ver salvar()
   const [excluindo, setExcluindo]       = useState<string | null>(null);
   const [carregando, setCarregando]     = useState(true);
   const [erro, setErro]                 = useState('');
@@ -248,6 +290,11 @@ export default function AgendamentosPage() {
   }
 
   async function salvar() {
+    // Trava síncrona (ref, não state) — bloqueia cliques/Enter repetidos mesmo
+    // antes do primeiro re-render. Ver docs/kensa-premium-dashboard-relatorio.md, K-03.
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
+    try {
     if (!form.paciente_nome.trim()) { setErro('Nome do cliente é obrigatório.'); return; }
     if (!form.data)  { setErro('Data é obrigatória.'); return; }
     if (!form.hora)  { setErro('Horário é obrigatório.'); return; }
@@ -316,6 +363,9 @@ export default function AgendamentosPage() {
     } finally {
       setSalvando(false);
     }
+    } finally {
+      salvandoRef.current = false;
+    }
   }
 
   async function excluir(id: string) {
@@ -375,19 +425,25 @@ export default function AgendamentosPage() {
 
     setGerandoPdf(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: cfg } = await supabase
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user || !clinicaId) throw new Error('Clínica autenticada não identificada.');
+
+      const { data: cfg, error: configError } = await supabase
         .from('clinica_config')
-        .select('nome_clinica,telefone,email,endereco,logo_url')
-        .eq('user_id', user?.id)
+        .select('nome_clinica,telefone,email,endereco,logo_url,horario_funcionamento')
+        .eq('clinica_id', clinicaId)
         .maybeSingle();
+      if (configError) throw configError;
 
       const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
       const agHoje = agendamentos
         .filter(a => a.data === hojeLocal)
         .sort((a, b) => a.hora.localeCompare(b.hora));
 
-      const html = buildPdfHtml(agHoje, cfg, hojeLocal);
+      const responsavel = user?.user_metadata?.full_name
+        || user?.user_metadata?.name
+        || undefined;
+      const html = buildPdfHtml(agHoje, cfg, hojeLocal, responsavel);
       win.document.open();
       win.document.write(html);
       win.document.close();
@@ -396,6 +452,7 @@ export default function AgendamentosPage() {
     } catch (e) {
       win.close();
       console.error('Erro ao gerar PDF:', e);
+      setErro('Não foi possível gerar o relatório com segurança. Tente novamente.');
     } finally {
       setGerandoPdf(false);
     }
@@ -468,9 +525,9 @@ export default function AgendamentosPage() {
       </div>
 
       {/* BUSCA + PDF */}
-      <div style={{ display:'flex', gap:10, marginBottom:12 }}>
+      <div style={{ display:'flex', gap:10, marginBottom:8, flexWrap:'wrap', alignItems:'stretch' }}>
         <input
-          style={{ flex:1, padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }}
+          style={{ flex:'1 1 240px', minWidth:0, padding:'10px 14px', borderRadius:8, border:'1px solid #2d3148', background:'#1e2130', color:'#e2e8f0', fontSize:13, outline:'none', boxSizing:'border-box' }}
           placeholder="Buscar por cliente ou telefone..."
           value={busca}
           onChange={e => setBusca(e.target.value)}
@@ -479,11 +536,15 @@ export default function AgendamentosPage() {
           className="ag-btn-pdf"
           onClick={gerarPDF}
           disabled={gerandoPdf}
-          style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor: gerandoPdf ? 'default' : 'pointer', whiteSpace:'nowrap', opacity: gerandoPdf ? 0.7 : 1, transition:'background 0.15s' }}
+          style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', gap:8, flex:'0 0 auto', padding:'10px 16px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:13, fontWeight:600, cursor: gerandoPdf ? 'default' : 'pointer', whiteSpace:'nowrap', opacity: gerandoPdf ? 0.7 : 1, transition:'background 0.15s' }}
         >
-          {gerandoPdf ? '⏳ Gerando...' : '📄 PDF de Hoje'}
+          {gerandoPdf ? <LoaderCircle size={16} aria-hidden="true" /> : <FileText size={16} aria-hidden="true" />}
+          {gerandoPdf ? 'Gerando...' : 'Relatório do Dia'}
         </button>
       </div>
+      <p style={{ margin:'0 0 12px', color:'#64748b', fontSize:11 }}>
+        Ao salvar em PDF, selecione A4 e desmarque “Cabeçalhos e rodapés” no Chrome.
+      </p>
 
       {/* ABAS */}
       <div style={{ display:'flex', gap:8, marginBottom:16 }}>
