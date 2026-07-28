@@ -2,11 +2,13 @@
 import { useEffect, useState } from "react";
 import { IcWa, IcMenu, IcClose } from "./icons";
 import { initials } from "../_lib/helpers";
-import { color, gradient, radius, shadow } from "../_lib/theme";
+import { radius, shadow, gradienteDe } from "../_lib/theme";
+import { font, type Tema } from "../_lib/families";
 
 export type SiteNavItem = readonly [string, string];
 
-export default function Header({ nome, logoUrl, waLink, whatsappNumber, navItems }: { nome: string; logoUrl?: string; waLink: string; whatsappNumber?: string; navItems: SiteNavItem[] }) {
+export default function Header({ nome, logoUrl, waLink, whatsappNumber, navItems, tema }: { nome: string; logoUrl?: string; waLink: string; whatsappNumber?: string; navItems: SiteNavItem[]; tema: Tema }) {
+  const color = tema; const gradient = gradienteDe(tema);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function Header({ nome, logoUrl, waLink, whatsappNumber, navItems
           </a>
           <nav className="nav-links" style={{ display: "flex", alignItems: "center", gap: 30 }}>
             {navItems.map(([href, label]) => (
-              <a key={href} href={href} className="nav-link-item" style={{ fontSize: 14, color: color.textBody, textDecoration: "none", fontWeight: 500, opacity: 0.72 }}>{label}</a>
+              <a key={href} href={href} className="nav-link-item" style={{ fontSize: 14, color: color.text, textDecoration: "none", fontWeight: 500, opacity: 0.72, fontFamily: font.body }}>{label}</a>
             ))}
             {whatsappNumber && (
               <a href={waLink} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: radius.sm, background: gradient, color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 13.5, boxShadow: shadow.ctaGlow, transition: "box-shadow 0.2s, transform 0.2s" }}
@@ -75,7 +77,7 @@ export default function Header({ nome, logoUrl, waLink, whatsappNumber, navItems
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: `1px solid ${color.line}` }}>
           <span style={{ fontSize: 15, fontWeight: 800, color: color.text }}>{nome}</span>
-          <button onClick={() => setOpen(false)} aria-label="Fechar menu" style={{ background: color.surface, border: `1px solid ${color.line}`, borderRadius: 9, width: 36, height: 36, color: color.text, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button onClick={() => setOpen(false)} aria-label="Fechar menu" style={{ background: "rgba(255,255,255,.035)", border: `1px solid ${color.line}`, borderRadius: 9, width: 36, height: 36, color: color.text, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <IcClose/>
           </button>
         </div>

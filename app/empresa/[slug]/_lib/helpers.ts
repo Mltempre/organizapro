@@ -1,4 +1,5 @@
 import type { Empresa } from "./types";
+import type { FamiliaId } from "./families";
 
 export const initials = (nome: string) =>
   nome.trim().split(" ").filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join("");
@@ -55,17 +56,36 @@ export function gerarSobre(empresa: Empresa, qtdEquipe: number): string[] {
   return blocos;
 }
 
-// Hero — headline muda de fato conforme o dado real disponível, em vez de
-// uma frase institucional fixa repetida em todo site publicado.
-export function gerarTituloHero(empresa: Empresa): string {
+// Hero — headline muda de fato conforme o dado real disponível E a família
+// visual do segmento, em vez de uma frase institucional fixa repetida em
+// todo site publicado. O tom muda (acolhimento, autoridade, energia,
+// competência), mas nunca inventa um diferencial que a empresa não informou.
+const TOM_HERO: Record<FamiliaId, (esp: string) => string> = {
+  saude:      esp => `${tituloCase(esp)}, com o cuidado que você merece.`,
+  autoridade: esp => `${tituloCase(esp)}, com clareza para decidir.`,
+  consumo:    esp => `${tituloCase(esp)}, sem complicação.`,
+  tecnica:    esp => `${tituloCase(esp)}, resolvido de verdade.`,
+  universal:  esp => `${tituloCase(esp)}, sem complicação.`,
+};
+
+export function gerarTituloHero(empresa: Empresa, familiaId: FamiliaId = "universal"): string {
   const especialidade = normalizarEspecialidade(empresa.especialidade);
-  if (especialidade) return `${tituloCase(especialidade)}, sem complicação.`;
+  if (especialidade) return TOM_HERO[familiaId](especialidade.toLowerCase());
   if (empresa.nome) return `Conheça ${empresa.nome}.`;
   return "Soluções desenvolvidas para você.";
 }
 
-export function gerarSubtituloHero(empresa: Empresa, local: string): string {
-  if (local) return `Atendimento ágil e transparente em ${local}.`;
+const TOM_SUBTITULO: Record<FamiliaId, string> = {
+  saude:      "Atendimento humano, com clareza em cada etapa",
+  autoridade: "Orientação direta, sem jargão desnecessário",
+  consumo:    "Atendimento ágil e transparente",
+  tecnica:    "Diagnóstico honesto e prazo real",
+  universal:  "Atendimento ágil e transparente",
+};
+
+export function gerarSubtituloHero(empresa: Empresa, local: string, familiaId: FamiliaId = "universal"): string {
+  const base = TOM_SUBTITULO[familiaId];
+  if (local) return `${base} em ${local}.`;
   return "Soluções personalizadas, comunicação clara e atenção em cada detalhe.";
 }
 

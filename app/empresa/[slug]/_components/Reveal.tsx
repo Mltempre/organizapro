@@ -5,10 +5,18 @@ import React, { useEffect, useRef, useState } from "react";
 // timeout de segurança que força a revelação mesmo se o observer nunca
 // disparar (navegação direta por âncora, aba em segundo plano). Uma seção
 // de venda nunca pode ficar invisível por causa de uma microinteração.
+function prefereMovimentoReduzido(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
 function useReveal<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
-  const [visible, setVisible] = useState(false);
+  // Quem prefere menos movimento já começa visível — a animação de entrada
+  // é um tempero, nunca uma barreira para ler o conteúdo.
+  const [visible, setVisible] = useState(() => prefereMovimentoReduzido());
   useEffect(() => {
+    if (prefereMovimentoReduzido()) return;
     const reveal = () => setVisible(true);
     const el = ref.current;
     if (!el) { reveal(); return; }
