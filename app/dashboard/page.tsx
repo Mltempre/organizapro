@@ -9,6 +9,8 @@ import WelcomeModal from "../components/onboarding/WelcomeModal";
 import { gerarCentralOportunidades, type Recomendacao } from "../../lib/recomendacoes";
 import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
+import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
+import DiretorDigitalCard from "../components/DiretorDigitalCard";
 
 type AgItem = {
   id: string;
@@ -741,6 +743,20 @@ export default function Dashboard() {
     pendentes: dash.pendentes,
   });
 
+  // ── IA Comercial V1 · Diretor Digital (docs/ia-comercial-v1-arquitetura.md) ──
+  // Reaproveita 100% os mesmos dados já calculados acima para o Radar e para
+  // a Central de Oportunidades — nenhuma consulta nova, nenhuma regra de
+  // priorização nova, nenhum dos dois arquivos originais foi alterado.
+  const recomendacoesConsultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: insights.temDados,
+    oportunidadesClientes,
+    recomendacoes: todasRecomendacoesAcionaveis,
+    ocupacaoPct,
+  });
+  const narrativaDiretor = insights.temDados
+    ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
+    : gerarMensagemDadosInsuficientes();
+
   // Oportunidades encontradas — contagem por categoria, sem valor em R$
   // (ver docs/dashboard-executivo-ia-v1-diagnostico-proposta.md, seção 2).
   const oportunidadesResumo = [
@@ -1153,6 +1169,19 @@ export default function Dashboard() {
           {resumoIA}
         </p>
       </div>
+
+      {/* ── 5b. IA COMERCIAL · DIRETOR DIGITAL ──────────────────────────────
+          docs/ia-comercial-v1-arquitetura.md — V1: só narração consultiva
+          sobre sinais que o Radar/Central de Oportunidades já calculam.
+          Não altera, em nenhuma linha, os arquivos do Radar ou da Próxima
+          Melhor Ação. */}
+      {insights.temDados && (
+        <DiretorDigitalCard
+          narrativa={narrativaDiretor}
+          recomendacoes={recomendacoesConsultivas}
+          onNavigate={(destino) => router.push(destino)}
+        />
+      )}
 
       {/* ── 6. AGENDA / PRÓXIMOS COMPROMISSOS ──────────────────────────────── */}
       <div className="dash-grid dc" style={{ marginBottom: 20 }}>
