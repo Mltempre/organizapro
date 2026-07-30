@@ -87,7 +87,6 @@ export default function Site() {
   const [uploadingHero, setUploadingHero]       = useState(false);
   const [uploadingBanner, setUploadingBanner]   = useState(false);
   const [uploadingSeoImg, setUploadingSeoImg]   = useState(false);
-  const [migrationPending, setMigrationPending] = useState(false);
   const [feedbackModal, setFeedbackModal]       = useState(false);
   const [showPreview, setShowPreview]           = useState(false);
   const logoInputRef   = useRef<HTMLInputElement>(null);
@@ -105,76 +104,72 @@ export default function Site() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return; }
-    setUserId(user.id);
+    setErro("");
+    // try/catch envolvendo toda a função — sem isso, uma exceção inesperada
+    // (rede instável, etc.) em qualquer chamada ao Supabase deixava
+    // setLoading(false) sem executar, e a tela ficava presa no loader para
+    // sempre, escondendo todos os botões da página (eles só existem fora
+    // do branch de loading). Ver docs/kensa relatório do módulo Site.
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      setUserId(user.id);
 
-    const { data: cu } = await supabase
-      .from("clinica_usuarios")
-      .select("clinica_id, clinicas(*)")
-      .eq("usuario_id", user.id)
-      .maybeSingle();
-
-    if (cu?.clinicas) {
-      const c = cu.clinicas as ClinicaInfo;
-      setClinicaId(cu.clinica_id);
-      setForm(prev => ({
-        ...prev,
-        nome:            c.nome            || "",
-        especialidade:   normalizarEspecialidade(c.especialidade),
-        telefone:        c.telefone        || "",
-        whatsapp:        c.whatsapp        || "",
-        endereco:        c.endereco        || "",
-        cidade:          c.cidade          || "",
-        estado:          c.estado          || "",
-        google_maps_url: c.google_maps_url || "",
-        email:           c.email           || "",
-      }));
-    }
-
-    const { data: config, error: configError } = await supabase
-      .from("clinica_config")
-      .select("slug, logo_url, hero_url, nota_google, num_avaliacoes, horario_funcionamento, banner_url, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (configError?.code === "42703") {
-      setMigrationPending(true);
-      const { data: configBasic } = await supabase
-        .from("clinica_config")
-        .select("slug, logo_url")
-        .eq("user_id", user.id)
+      const { data: cu } = await supabase
+        .from("clinica_usuarios")
+        .select("clinica_id, clinicas(*)")
+        .eq("usuario_id", user.id)
         .maybeSingle();
-      if (configBasic) {
-        setPublishedSlug(configBasic.slug || "");
+
+      if (cu?.clinicas) {
+        const c = cu.clinicas as ClinicaInfo;
+        setClinicaId(cu.clinica_id);
         setForm(prev => ({
           ...prev,
-          slug:     configBasic.slug     || "",
-          logo_url: configBasic.logo_url || "",
+          nome:            c.nome            || "",
+          especialidade:   normalizarEspecialidade(c.especialidade),
+          telefone:        c.telefone        || "",
+          whatsapp:        c.whatsapp        || "",
+          endereco:        c.endereco        || "",
+          cidade:          c.cidade          || "",
+          estado:          c.estado          || "",
+          google_maps_url: c.google_maps_url || "",
+          email:           c.email           || "",
         }));
       }
-    } else if (config) {
-      setMigrationPending(false);
-      setPublishedSlug(config.slug || "");
-      setForm(prev => ({
-        ...prev,
-        slug:                  config.slug                       || "",
-        logo_url:              config.logo_url                   || "",
-        hero_url:              config.hero_url                   || "",
-        nota_google:           config.nota_google?.toString()    || "",
-        num_avaliacoes:        config.num_avaliacoes?.toString() || "",
-        horario_funcionamento: config.horario_funcionamento      || "",
-        banner_url:            config.banner_url                 || "",
-        instagram_url:         config.instagram_url              || "",
-        facebook_url:          config.facebook_url               || "",
-        linkedin_url:          config.linkedin_url               || "",
-        tiktok_url:            config.tiktok_url                 || "",
-        seo_titulo:            config.seo_titulo                 || "",
-        seo_descricao:         config.seo_descricao              || "",
-        seo_imagem_url:        config.seo_imagem_url             || "",
-      }));
+
+      const { data: config } = await supabase
+        .from("clinica_config")
+        .select("slug, logo_url, hero_url, nota_google, num_avaliacoes, horario_funcionamento, banner_url, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (config) {
+        setPublishedSlug(config.slug || "");
+        setForm(prev => ({
+          ...prev,
+          slug:                  config.slug                       || "",
+          logo_url:              config.logo_url                   || "",
+          hero_url:              config.hero_url                   || "",
+          nota_google:           config.nota_google?.toString()    || "",
+          num_avaliacoes:        config.num_avaliacoes?.toString() || "",
+          horario_funcionamento: config.horario_funcionamento      || "",
+          banner_url:            config.banner_url                 || "",
+          instagram_url:         config.instagram_url              || "",
+          facebook_url:          config.facebook_url               || "",
+          linkedin_url:          config.linkedin_url               || "",
+          tiktok_url:            config.tiktok_url                 || "",
+          seo_titulo:            config.seo_titulo                 || "",
+          seo_descricao:         config.seo_descricao              || "",
+          seo_imagem_url:        config.seo_imagem_url             || "",
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+      setErro("Não foi possível carregar as configurações do seu site agora. Recarregue a página; se o problema continuar, tente novamente em instantes.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -194,12 +189,8 @@ export default function Site() {
     { label: "Endereço",      done: !!form.endereco      },
     { label: "Slug",          done: !!computedSlug       },
     { label: "Logo",          done: !!form.logo_url      },
-    ...(!migrationPending
-      ? [
-          { label: "Hero",       done: !!form.hero_url   },
-          { label: "Avaliações", done: !!form.nota_google },
-        ]
-      : []),
+    { label: "Hero",          done: !!form.hero_url      },
+    { label: "Avaliações",    done: !!form.nota_google   },
   ];
   const progressDone  = progressItems.filter(i => i.done).length;
   const progressTotal = progressItems.length;
@@ -348,7 +339,7 @@ export default function Site() {
         setErro(`O link do ${label} deve começar com http:// ou https://.`); setSalvando(false); return;
       }
     }
-    const configFull = migrationPending ? configBase : {
+    const configFull = {
       ...configBase,
       hero_url:              form.hero_url || null,
       nota_google:           notaGoogle,
@@ -369,15 +360,7 @@ export default function Site() {
       .upsert(configFull, { onConflict: "user_id" });
 
     if (configError) {
-      if (configError.code === "42703") {
-        setMigrationPending(true);
-        const { error: e2 } = await supabase
-          .from("clinica_config")
-          .upsert(configBase, { onConflict: "user_id" });
-        if (e2) { setErro("Não foi possível salvar as configurações do site. Tente novamente."); setSalvando(false); return; }
-      } else {
-        setErro("Não foi possível salvar as configurações do site. Tente novamente."); setSalvando(false); return;
-      }
+      setErro("Não foi possível salvar as configurações do site. Tente novamente."); setSalvando(false); return;
     }
 
     setForm(prev => ({ ...prev, whatsapp: normalizePhone(prev.whatsapp), slug: normalizedSlug }));
@@ -408,8 +391,6 @@ export default function Site() {
     background: hasImg ? "transparent" : "rgba(255,255,255,0.02)",
     transition: "border-color 0.2s",
   });
-
-  const MIGRATION_SQL = `ALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS hero_url TEXT;\nALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS nota_google NUMERIC(3,1);\nALTER TABLE clinica_config ADD COLUMN IF NOT EXISTS num_avaliacoes INTEGER;`;
 
   if (loading) {
     return (
@@ -471,26 +452,6 @@ export default function Site() {
       {/* ══════════════════════ VISÃO GERAL ══════════════════════ */}
       <SectionEyebrow>Visão Geral</SectionEyebrow>
 
-      {migrationPending && (
-        <div className="panel" style={{ borderColor:"#f59e0b", background:"rgba(245,158,11,0.06)", padding:"16px 20px" }}>
-          <div style={{ fontWeight:700, color:"#f59e0b", marginBottom:8 }}>
-            ⚠️ Configuração necessária — Hero e Avaliações
-          </div>
-          <p style={{ fontSize:13, color:"var(--muted)", margin:"0 0 10px", lineHeight:1.6 }}>
-            Execute no <strong>Supabase Dashboard → SQL Editor</strong> e recarregue a página:
-          </p>
-          <pre style={{ background:"#0f172a", color:"#00c896", padding:"12px 14px", borderRadius:8, fontSize:12, overflowX:"auto", margin:"0 0 10px", fontFamily:"monospace", lineHeight:1.7 }}>{MIGRATION_SQL}</pre>
-          <button
-            type="button"
-            onClick={() => { navigator.clipboard.writeText(MIGRATION_SQL); setSucesso("SQL copiado!"); setTimeout(() => setSucesso(""), 2000); }}
-            style={{ fontSize:12, padding:"6px 14px", borderRadius:8, background:"rgba(245,158,11,0.15)", border:"1px solid rgba(245,158,11,0.4)", color:"#f59e0b", cursor:"pointer" }}
-          >
-            Copiar SQL
-          </button>
-          <span style={{ fontSize:11, color:"var(--muted)", marginLeft:10 }}>Logo, slug e dados básicos funcionam normalmente.</span>
-        </div>
-      )}
-
       <div className="panel" style={{ padding:"14px 20px" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
           <div style={{ fontSize:13, fontWeight:600, color:"var(--text, #f1f5f9)" }}>
@@ -527,19 +488,32 @@ export default function Site() {
             {siteUrl || "Seu site ainda não possui um endereço publicado — revise os dados e publique as alterações."}
           </div>
         </div>
-        <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-          <button type="button" className="button-secondary" onClick={copyLink} disabled={!siteUrl} style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5 }}>
-            Copiar link
-          </button>
-          <button type="button" className="button-secondary" onClick={compartilhar} disabled={!siteUrl} style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5 }}>
-            🔗 Compartilhar
-          </button>
-          <button type="button" className="button-secondary" onClick={() => setShowPreview(v => !v)} disabled={!siteUrl} style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5 }}>
-            {showPreview ? "Ocultar site publicado" : "👁️ Ver site publicado"}
-          </button>
-          <button type="button" className="button-primary" onClick={abrirMeuSite} style={{ padding:"10px 16px", fontSize:13 }}>
-            Abrir meu site →
-          </button>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+            <button type="button" className="button-secondary" onClick={copyLink} disabled={!siteUrl}
+              title={siteUrl ? undefined : "Publique seu site primeiro (botão \"Publicar alterações\", no final da página) para liberar esta ação."}
+              style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5, cursor: siteUrl ? "pointer" : "not-allowed" }}>
+              Copiar link
+            </button>
+            <button type="button" className="button-secondary" onClick={compartilhar} disabled={!siteUrl}
+              title={siteUrl ? undefined : "Publique seu site primeiro (botão \"Publicar alterações\", no final da página) para liberar esta ação."}
+              style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5, cursor: siteUrl ? "pointer" : "not-allowed" }}>
+              🔗 Compartilhar
+            </button>
+            <button type="button" className="button-secondary" onClick={() => setShowPreview(v => !v)} disabled={!siteUrl}
+              title={siteUrl ? undefined : "Publique seu site primeiro (botão \"Publicar alterações\", no final da página) para liberar esta ação."}
+              style={{ padding:"10px 16px", fontSize:13, opacity: siteUrl ? 1 : 0.5, cursor: siteUrl ? "pointer" : "not-allowed" }}>
+              {showPreview ? "Ocultar site publicado" : "👁️ Ver site publicado"}
+            </button>
+            <button type="button" className="button-primary" onClick={abrirMeuSite} style={{ padding:"10px 16px", fontSize:13 }}>
+              Abrir meu site →
+            </button>
+          </div>
+          {!siteUrl && (
+            <div style={{ fontSize:11.5, color:"#f59e0b", fontWeight:600, textAlign:"right" }}>
+              💡 Publique seu site (botão &quot;Publicar alterações&quot; no final da página) para liberar estas ações.
+            </div>
+          )}
         </div>
       </div>
 
@@ -570,8 +544,8 @@ export default function Site() {
           { label:"Telefone",             key:"telefone",      placeholder:"(38) 99999-9999"       },
           { label:"WhatsApp (com DDI)",   key:"whatsapp",      placeholder:"5538999999999"         },
           { label:"Email",                key:"email",         placeholder:"contato@seunegocio.com" },
-          { label:"Endereco",             key:"endereco",      placeholder:"Rua das Flores, 123"   },
-          { label:"Cidade",               key:"cidade",        placeholder:"Cornelio Procopio"     },
+          { label:"Endereço",             key:"endereco",      placeholder:"Rua das Flores, 123"   },
+          { label:"Cidade",               key:"cidade",        placeholder:"Cornélio Procópio"     },
           { label:"Estado",               key:"estado",        placeholder:"PR"                    },
           { label:"Horário de funcionamento", key:"horario_funcionamento", placeholder:"Seg a Sex: 09h - 18h" },
         ] as const).map((f) => (
@@ -645,14 +619,7 @@ export default function Site() {
       {/* ══════════════════════ BANNER E HERO ══════════════════════ */}
       <SectionEyebrow>Banner e Hero</SectionEyebrow>
 
-      <div className="panel" style={{ opacity:migrationPending ? 0.55 : 1, position:"relative" }}>
-        {migrationPending && (
-          <div style={{ position:"absolute", inset:0, zIndex:2, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:12, background:"rgba(15,23,42,0.45)" }}>
-            <span style={{ background:"rgba(245,158,11,0.90)", color:"#000", fontWeight:700, fontSize:12, padding:"6px 14px", borderRadius:8 }}>
-              ⚠️ Execute o SQL acima para ativar
-            </span>
-          </div>
-        )}
+      <div className="panel">
         <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🌅 Imagem Principal (Hero)</div>
         <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>Imagem de destaque exibida no topo do site público.</div>
         <div
@@ -662,7 +629,7 @@ export default function Site() {
             backgroundSize: "cover", backgroundPosition: "center",
             maxWidth: 480,
           }}
-          onClick={() => !migrationPending && heroInputRef.current?.click()}
+          onClick={() => heroInputRef.current?.click()}
         >
           {form.hero_url
             ? <div style={{ background:"rgba(0,0,0,0.55)", color:"#fff", borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600 }}>Clique para trocar</div>
@@ -719,14 +686,7 @@ export default function Site() {
           onChange={(e) => e.target.files?.[0] && uploadImagem(e.target.files[0], "banner")} />
       </div>
 
-      <div className="panel" style={{ opacity:migrationPending ? 0.55 : 1, position:"relative" }}>
-        {migrationPending && (
-          <div style={{ position:"absolute", inset:0, zIndex:2, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:12, background:"rgba(15,23,42,0.45)" }}>
-            <span style={{ background:"rgba(245,158,11,0.90)", color:"#000", fontWeight:700, fontSize:12, padding:"6px 14px", borderRadius:8 }}>
-              ⚠️ Execute o SQL acima para ativar
-            </span>
-          </div>
-        )}
+      <div className="panel">
         <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>⭐ Avaliações Google</div>
         <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>
           Exibido com ★★★★★ no site público.
@@ -740,8 +700,7 @@ export default function Site() {
               onChange={(e) => setForm(prev => ({ ...prev, nota_google: e.target.value }))}
               placeholder="4.9"
               className="input-field"
-              type="number" min="1" max="5" step="0.1"
-              disabled={migrationPending}
+              type="number" min="0" max="5" step="0.1"
             />
           </div>
           <div>
@@ -752,7 +711,6 @@ export default function Site() {
               placeholder="237"
               className="input-field"
               type="number" min="0"
-              disabled={migrationPending}
             />
           </div>
         </div>

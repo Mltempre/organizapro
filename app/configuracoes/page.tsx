@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
@@ -58,46 +58,57 @@ export default function ConfiguracoesPage() {
   const [testeMsg, setTesteMsg] = useState('');
   const [linkGoogleMsg, setLinkGoogleMsg] = useState('');
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     setLoading(true);
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) { router.push('/login'); return; }
+    setErro('');
+    // try/catch envolvendo toda a função — sem isso, uma exceção inesperada
+    // (rede instável, etc.) em qualquer chamada ao Supabase deixava
+    // setLoading(false) sem executar, e a tela ficava presa no loader para
+    // sempre. Mesmo padrão já aplicado em app/site/page.tsx.
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) { router.push('/login'); return; }
 
-    const { data: cu } = await supabase
-      .from('clinica_usuarios')
-      .select('clinica_id')
-      .eq('usuario_id', user.id)
-      .maybeSingle();
+      const { data: cu } = await supabase
+        .from('clinica_usuarios')
+        .select('clinica_id')
+        .eq('usuario_id', user.id)
+        .maybeSingle();
 
-    setClinicaId(cu?.clinica_id || '');
+      setClinicaId(cu?.clinica_id || '');
 
-    const { data } = await supabase
-      .from('clinica_config')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (data) {
-      setConfig({
-        nome_clinica:          data.nome_clinica          || '',
-        telefone:              data.telefone              || '',
-        email:                 data.email                 || '',
-        endereco:              data.endereco              || '',
-        logo_url:              data.logo_url              || '',
-        link_google:           data.link_google           || '',
-        msg_lembrete:          data.msg_lembrete          || configInicial.msg_lembrete,
-        msg_confirmacao:       data.msg_confirmacao       || configInicial.msg_confirmacao,
-        msg_avaliacao:         data.msg_avaliacao         || configInicial.msg_avaliacao,
-        msg_reagendamento:     data.msg_reagendamento     || configInicial.msg_reagendamento,
-        horario_funcionamento: data.horario_funcionamento || configInicial.horario_funcionamento,
-        zapi_instance:         data.zapi_instance         || '',
-        zapi_token:            data.zapi_token            || '',
-        zapi_client_token:     data.zapi_client_token     || '',
-      });
+      const { data } = await supabase
+        .from('clinica_config')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data) {
+        setConfig({
+          nome_clinica:          data.nome_clinica          || '',
+          telefone:              data.telefone              || '',
+          email:                 data.email                 || '',
+          endereco:              data.endereco              || '',
+          logo_url:              data.logo_url              || '',
+          link_google:           data.link_google           || '',
+          msg_lembrete:          data.msg_lembrete          || configInicial.msg_lembrete,
+          msg_confirmacao:       data.msg_confirmacao       || configInicial.msg_confirmacao,
+          msg_avaliacao:         data.msg_avaliacao         || configInicial.msg_avaliacao,
+          msg_reagendamento:     data.msg_reagendamento     || configInicial.msg_reagendamento,
+          horario_funcionamento: data.horario_funcionamento || configInicial.horario_funcionamento,
+          zapi_instance:         data.zapi_instance         || '',
+          zapi_token:            data.zapi_token            || '',
+          zapi_client_token:     data.zapi_client_token     || '',
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setErro('Não foi possível carregar as configurações agora. Recarregue a página; se o problema continuar, tente novamente em instantes.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  }, [router]);
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => { carregar(); }, [carregar]);
 
   async function salvar() {
     // Trava síncrona (ref, não state) — ver docs/kensa-premium-dashboard-relatorio.md, K-03.
@@ -278,7 +289,7 @@ export default function ConfiguracoesPage() {
               </div>
             ))}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={lbl}>Link do Google Meu Negócio</label>
+              <label style={lbl}>⭐ Link para Avaliação no Google</label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <input
                   type="text"
@@ -298,11 +309,14 @@ export default function ConfiguracoesPage() {
                     cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background 0.15s',
                   }}
                 >
-                  🔗 Testar Link
+                  🔗 Abrir Link de Avaliação
                 </button>
               </div>
               <p style={{ fontSize: 11, color: '#475569', margin: '6px 0 0' }}>
-                Esse link será utilizado para solicitar avaliações automaticamente aos seus clientes.
+                Cole aqui o link direto da tela de avaliação do Google. Este é o link que será enviado automaticamente aos seus clientes após um atendimento concluído para solicitar uma avaliação.
+              </p>
+              <p style={{ fontSize: 11, color: '#64748b', margin: '6px 0 0' }}>
+                💡 Dica: Esse é o mesmo link que aparece quando você clica em &quot;Compartilhar formulário de avaliação&quot; no Perfil da Empresa no Google.
               </p>
               {linkGoogleMsg && (
                 <div style={{ marginTop: 8 }}>
