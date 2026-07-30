@@ -13,6 +13,10 @@ import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDado
 import DiretorDigitalCard from "../components/DiretorDigitalCard";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, organizarSinaisCanonicos, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import MissaoDoDiaCard from "../components/MissaoDoDiaCard";
+import IndicadoresExecutivos from "../components/IndicadoresExecutivos";
+import CentralDeOportunidadesCard from "../components/CentralDeOportunidades";
+import RadarDeOportunidades from "../components/RadarDeOportunidades";
+import ProximaMelhorAcao, { type AcaoPrioritaria } from "../components/ProximaMelhorAcao";
 
 type AgItem = {
   id: string;
@@ -279,13 +283,6 @@ const stStatus: Record<string, { bg: string; color: string; label: string }> = {
   reagendar:  { bg: "#ea580c22", color: "#fb923c", label: "Reagendar"  },
 };
 
-const stTom: Record<"critico" | "positivo" | "neutro" | "atencao", { bg: string; border: string; color: string }> = {
-  critico:  { bg: "rgba(248,113,113,0.12)", border: "rgba(248,113,113,0.3)",  color: "#f87171" },
-  atencao:  { bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.3)",   color: "#fbbf24" },
-  positivo: { bg: "rgba(74,222,128,0.12)",  border: "rgba(74,222,128,0.3)",   color: "#4ade80" },
-  neutro:   { bg: "rgba(74,155,176,0.12)",  border: "rgba(74,155,176,0.3)",   color: "#4a9bb0" },
-};
-
 // Lapidação comercial — reforço visual de que o OrganizaPro já entrega uma
 // plataforma completa (nenhuma dessas ferramentas é nova: todas já existem
 // e estão navegáveis pelo menu lateral). Puramente decorativo.
@@ -319,18 +316,9 @@ const FRASE_PULSO: Record<"critico" | "atencao" | "positivo", string> = {
 // (ver docs/nucleo-inteligente-v1-arquitetura.md, seção 5). Nunca completa
 // com item inventado: se houver menos de 5 sinais reais, devolve só os que
 // existem. A tela usa o primeiro item como destaque ("Próxima Melhor Ação")
-// e o restante (até 4) como "Outras oportunidades".
-type AcaoPrioritaria = {
-  id:            string;
-  titulo:        string;
-  prioridade:    "alta" | "media" | "baixa";
-  destino?:      string;
-  destinoLabel?: string;
-  contexto?:     string; // nome do cliente, quando a ação é de um cliente específico
-  motivo?:       string; // por que essa ação existe
-  tempoEstimado: string; // "2 minutos" | "3 minutos" | "5 minutos" — por tipo de botão, nunca calculado
-  whatsapp?:     string; // link wa.me pronto, só quando há telefone do cliente
-};
+// e o restante (até 4) como "Outras oportunidades". A apresentação vive em
+// app/components/ProximaMelhorAcao.tsx (Fase 2, docs/modo-demonstracao-v1-
+// arquitetura.md), que também é dona do tipo AcaoPrioritaria.
 
 // Tempo estimado por tipo de botão — valores fixos, nunca calculados a
 // partir de um dado que a tela não tem: WhatsApp/confirmação = 2 min,
@@ -405,17 +393,6 @@ function gerarResumoIA(ctx: { ocupacaoPct: number | null; horariosVagosHoje: num
   }
   return partes.join(" ");
 }
-
-// Central de Oportunidades e "Próxima Melhor Ação" (mesma paleta) — os
-// emojis 🔴🟡🟢 usados para agrupar visualmente os cartões por urgência.
-// Paleta unificada em todo o Dashboard (2026-07-27): "baixa" deixou de usar
-// azul (🔵/neutro) para usar verde (🟢/positivo) — um único vocabulário de
-// cor em toda a tela, em vez de dois esquemas parecidos.
-const stTierOportunidade: Record<"alta" | "media" | "baixa", { emoji: string; label: string; tom: keyof typeof stTom }> = {
-  alta:  { emoji: "🔴", label: "Alta prioridade",  tom: "critico"  },
-  media: { emoji: "🟡", label: "Média prioridade", tom: "atencao"  },
-  baixa: { emoji: "🟢", label: "Baixa prioridade", tom: "positivo" },
-};
 
 export default function Dashboard() {
   const router = useRouter();
@@ -987,167 +964,28 @@ export default function Dashboard() {
       )}
 
       {/* ── 3. PRÓXIMA MELHOR AÇÃO ─────────────────────────────────────────
-          V1: mesmo motor de sempre (gerarProximasAcoes, que já mescla Radar
-          de Oportunidades + Central de Oportunidades) — a novidade é só a
-          apresentação. O primeiro item da lista já ordenada (prioridade,
-          depois desempate determinístico) vira o card em destaque; o resto
-          (no máximo 4) fica abaixo como "Outras oportunidades". Nunca
-          completa com item inventado. */}
+          Extraído para app/components/ProximaMelhorAcao.tsx (Fase 2,
+          docs/modo-demonstracao-v1-arquitetura.md). Mesmo motor de sempre
+          (gerarProximasAcoes acima) — a apresentação é só o componente. */}
       {insights.temDados && (
-        <div className="dc" style={{
-          background: "#12151f", border: "1px solid rgba(245,158,11,0.22)",
-          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: "rgba(245,158,11,0.16)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
-            }}>
-              🚀
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-              Próxima Melhor Ação
-            </div>
-          </div>
-
-          {proximasAcoes.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
-              Tudo sob controle por enquanto. Novas recomendações aparecerão conforme o OrganizaPro identificar oportunidades.
-            </p>
-          ) : (() => {
-            const [destaque, ...outras] = proximasAcoes;
-            const meta = stTierOportunidade[destaque.prioridade];
-            const cor = stTom[meta.tom];
-            return (
-              <>
-                <div style={{
-                  background: "rgba(255,255,255,0.04)", border: `1px solid ${cor.border}`,
-                  borderRadius: 12, padding: "18px 20px", marginBottom: outras.length > 0 ? 18 : 0,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                    <div>
-                      {destaque.contexto && (
-                        <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 700, marginBottom: 2 }}>
-                          {destaque.contexto}
-                        </div>
-                      )}
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9" }}>
-                        {destaque.titulo}
-                      </div>
-                    </div>
-                    <span style={{
-                      padding: "3px 9px", borderRadius: 999, flexShrink: 0,
-                      background: cor.bg, border: `1px solid ${cor.border}`,
-                      color: cor.color, fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap",
-                    }}>
-                      {meta.emoji} {meta.label}
-                    </span>
-                  </div>
-
-                  {destaque.motivo && (
-                    <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5 }}>
-                      {destaque.motivo}
-                    </p>
-                  )}
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-                    <span style={{
-                      padding: "2px 8px", borderRadius: 999,
-                      background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                      color: "#94a3b8", fontSize: 10.5, fontWeight: 600,
-                    }}>
-                      ⏱ {destaque.tempoEstimado}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                    {destaque.whatsapp && (
-                      <a
-                        href={destaque.whatsapp}
-                        target="_blank" rel="noopener noreferrer"
-                        style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12.5, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}
-                      >
-                        💬 Abrir WhatsApp
-                      </a>
-                    )}
-                    {destaque.destino && (
-                      <button
-                        onClick={() => router.push(destaque.destino!)}
-                        style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(74,155,176,0.35)", background: "rgba(74,155,176,0.1)", color: "#4a9bb0", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
-                      >
-                        {destaque.destinoLabel || "Ver"} →
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {outras.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }}>
-                      Outras oportunidades
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {outras.map(acao => {
-                        const m = stTierOportunidade[acao.prioridade];
-                        const c = stTom[m.tom];
-                        return (
-                          <div key={acao.id} style={{
-                            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-                            background: "rgba(255,255,255,0.03)", border: `1px solid ${c.border}`,
-                            borderRadius: 12, padding: "12px 16px",
-                          }}>
-                            <span style={{ fontSize: 15 }}>{m.emoji}</span>
-                            <span style={{ fontSize: 13.5, color: "#f1f5f9", fontWeight: 600, flex: 1, minWidth: 160 }}>
-                              {acao.titulo}
-                            </span>
-                            {acao.destino && (
-                              <button
-                                onClick={() => router.push(acao.destino!)}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: c.color, color: "#0a0d14", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
-                              >
-                                {acao.destinoLabel || "Ver"} →
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
+        <ProximaMelhorAcao
+          acoes={proximasAcoes}
+          onNavigate={(destino) => router.push(destino)}
+        />
       )}
 
       {/* ── 4. INDICADORES EXECUTIVOS ───────────────────────────────────────
-          Cada indicador leva a uma ação (regra de UX do Diretor, 2026-07-27)
-          — nunca some quando o valor é zero, só mostra "0". */}
-      <div className="dc indicadores-grid" style={{ marginBottom: 20 }}>
-        {[
-          { label: "Clientes hoje",         valor: dash.compromissosHoje,          destino: "/agendamentos" },
-          { label: "Horários vagos",        valor: dash.horariosVagosHoje,         destino: "/agendamentos" },
-          { label: "Pendências",            valor: dash.pendentes + dash.atrasados, destino: "/agendamentos" },
-          { label: "Avaliações aguardando", valor: dash.avaliacoesPendentes,       destino: "/reputacao"    },
-        ].map(ind => (
-          <button
-            key={ind.label}
-            className="indicador-tile"
-            onClick={() => router.push(ind.destino)}
-            style={{
-              textAlign: "left", cursor: "pointer",
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 12, padding: "16px", transition: "border-color 0.15s",
-            }}
-          >
-            <div style={{ fontSize: 26, fontWeight: 900, color: "#f1f5f9", lineHeight: 1, marginBottom: 6 }}>
-              {ind.valor}
-            </div>
-            <div style={{ fontSize: 12, color: "#94a3b8" }}>{ind.label}</div>
-          </button>
-        ))}
-      </div>
+          Extraído para app/components/IndicadoresExecutivos.tsx (Fase 2,
+          docs/modo-demonstracao-v1-arquitetura.md) — mesma regra de UX do
+          Diretor (2026-07-27): nunca some quando o valor é zero. */}
+      <IndicadoresExecutivos
+        compromissosHoje={dash.compromissosHoje}
+        horariosVagosHoje={dash.horariosVagosHoje}
+        pendentes={dash.pendentes}
+        atrasados={dash.atrasados}
+        avaliacoesPendentes={dash.avaliacoesPendentes}
+        onNavigate={(destino) => router.push(destino)}
+      />
 
       {/* ── 5. RESUMO DA IA ─────────────────────────────────────────────── */}
       <div className="dc" style={{
@@ -1373,222 +1211,29 @@ export default function Dashboard() {
       )}
 
       {/* ── 9. RADAR DE OPORTUNIDADES (detalhe completo, por cliente) ────────
-          V1 se chamava "Agenda Autônoma de Receita" — mesma base, mesmos
-          dados já carregados acima, nenhum envio automático. Diferente da
-          Central de Oportunidades (mostra o panorama em contadores), aqui
-          cada card é UM cliente nomeado: quem merece atenção primeiro, por
-          quê, e há quanto tempo. Ordem: cancelamento > confirmação pendente
-          > sem retorno — dentro do mesmo tipo, quem espera há mais tempo
-          aparece primeiro. */}
+          Extraído para app/components/RadarDeOportunidades.tsx (Fase 2,
+          docs/modo-demonstracao-v1-arquitetura.md). V1 se chamava "Agenda
+          Autônoma de Receita" — mesma base, mesmos dados já carregados
+          acima, nenhum envio automático. */}
       {insights.temDados && (
-        <div className="dc" style={{
-          background: "#12151f", border: "1px solid rgba(124,58,237,0.22)",
-          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: "rgba(124,58,237,0.16)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
-            }}>
-              🎯
-            </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-                Radar de Oportunidades
-              </div>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
-                {oportunidadesClientes.length > 0
-                  ? resumoRadar
-                  : "Nenhuma oportunidade urgente encontrada hoje. Continue acompanhando seus clientes e compromissos."}
-              </div>
-            </div>
-          </div>
-
-          {oportunidadesClientes.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, marginTop: 16 }}>
-              {oportunidadesClientes.map(op => {
-                const meta = stTierOportunidade[op.prioridade];
-                const cor = stTom[meta.tom];
-                const numeroWpp = op.telefone ? (op.telefone.length > 11 ? op.telefone : `55${op.telefone}`) : null;
-                return (
-                  <div key={op.chave} style={{
-                    background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
-                    borderRadius: 12, padding: "16px 18px",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
-                        {op.nome}
-                      </div>
-                      <span style={{
-                        padding: "3px 9px", borderRadius: 999, flexShrink: 0,
-                        background: cor.bg, border: `1px solid ${cor.border}`,
-                        color: cor.color, fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap",
-                      }}>
-                        {meta.emoji} {meta.label}
-                      </span>
-                    </div>
-
-                    <p style={{ margin: "0 0 6px", fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5 }}>
-                      {op.motivoPrincipal}
-                    </p>
-
-                    {(op.tempoDecorrido || op.sinaisAdicionais > 0) && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-                        {op.tempoDecorrido && (
-                          <span style={{
-                            padding: "2px 8px", borderRadius: 999,
-                            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                            color: "#94a3b8", fontSize: 10.5, fontWeight: 600,
-                          }}>
-                            ⏱ {op.tempoDecorrido}
-                          </span>
-                        )}
-                        {op.sinaisAdicionais > 0 && (
-                          <span style={{
-                            padding: "2px 8px", borderRadius: 999,
-                            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                            color: "#94a3b8", fontSize: 10.5, fontWeight: 600,
-                          }}>
-                            +{op.sinaisAdicionais} outro{op.sinaisAdicionais > 1 ? "s" : ""} sinal{op.sinaisAdicionais > 1 ? "is" : ""}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 600, marginBottom: 12 }}>
-                      ✓ {op.acaoSugerida}
-                    </div>
-
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                      <button
-                        onClick={() => router.push("/clientes")}
-                        style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(74,155,176,0.35)", background: "rgba(74,155,176,0.1)", color: "#4a9bb0", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
-                      >
-                        Abrir cliente
-                      </button>
-                      {numeroWpp ? (
-                        <a
-                          href={`https://wa.me/${numeroWpp}?text=${encodeURIComponent(`Olá, ${op.nome}! Tudo bem?`)}`}
-                          target="_blank" rel="noopener noreferrer"
-                          style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12.5, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}
-                        >
-                          💬 Entrar em contato
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: 11.5, color: "#64748b", fontStyle: "italic" }}>
-                          Sem telefone cadastrado
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <RadarDeOportunidades
+          oportunidades={oportunidadesClientes}
+          resumo={resumoRadar}
+          onNavigate={(destino) => router.push(destino)}
+        />
       )}
 
       {/* ── 10. CENTRAL DE OPORTUNIDADES (detalhe completo, por urgência) ────
-          Intelligence 2.2. Diferente do Radar (um cartão por cliente), aqui
-          mostramos TODAS as ações disponíveis agrupadas por urgência — o
-          quadro completo. Mesmo motor, mesmos dados já carregados acima. */}
+          Extraído para app/components/CentralDeOportunidades.tsx (Fase 2,
+          docs/modo-demonstracao-v1-arquitetura.md). Intelligence 2.2:
+          diferente do Radar (um cartão por cliente), mostra TODAS as ações
+          disponíveis agrupadas por urgência — o quadro completo. Mesmo
+          motor, mesmos dados já carregados acima. */}
       {insights.temDados && (centralOportunidades.alta.length + centralOportunidades.media.length + centralOportunidades.baixa.length > 0) && (
-        <div className="dc" style={{
-          background: "#12151f", border: "1px solid rgba(255,255,255,0.06)",
-          borderRadius: 16, padding: "22px 24px", marginBottom: 20,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: "rgba(74,222,128,0.12)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
-            }}>
-              💰
-            </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-                Central de Oportunidades
-              </div>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
-                Ações que podem melhorar seu negócio hoje
-              </div>
-            </div>
-          </div>
-
-          {(["alta", "media", "baixa"] as const).map(tier => {
-            const itens = centralOportunidades[tier];
-            if (itens.length === 0) return null;
-            const meta = stTierOportunidade[tier];
-            const cor = stTom[meta.tom];
-            return (
-              <div key={tier} style={{ marginBottom: 22 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ fontSize: 13 }}>{meta.emoji}</span>
-                  <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: cor.color }}>
-                    {meta.label}
-                  </span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
-                  {itens.map(op => (
-                    <div key={op.id} style={{
-                      background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
-                      borderRadius: 12, padding: "16px 18px",
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
-                          {op.titulo}
-                        </div>
-                        <span style={{
-                          flexShrink: 0, minWidth: 22, height: 22, padding: "0 6px",
-                          borderRadius: 999, background: cor.bg, border: `1px solid ${cor.border}`,
-                          color: cor.color, fontSize: 11, fontWeight: 800,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                          {op.quantidade}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 8px" }}>
-                        {op.explicacao}
-                      </p>
-                      <p style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, margin: "0 0 10px", fontStyle: "italic" }}>
-                        Por quê: {op.motivo}
-                      </p>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                        <span style={{
-                          padding: "3px 9px", borderRadius: 999,
-                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
-                        }}>
-                          💡 {op.impacto}
-                        </span>
-                        <span style={{
-                          padding: "3px 9px", borderRadius: 999,
-                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                          color: "#cbd5e1", fontSize: 10.5, fontWeight: 600,
-                        }}>
-                          ⏱ {op.tempoEstimado}
-                        </span>
-                      </div>
-                      {op.destino ? (
-                        <button
-                          onClick={() => router.push(op.destino!)}
-                          style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: cor.color, color: "#0a0d14", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
-                        >
-                          Resolver agora →
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: cor.color }}>
-                          ✓ {op.acao}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <CentralDeOportunidadesCard
+          central={centralOportunidades}
+          onNavigate={(destino) => router.push(destino)}
+        />
       )}
 
       {/* ── ONBOARDING / RECURSOS / CONSULTORIA — rodapé (contas maduras) ─── */}
