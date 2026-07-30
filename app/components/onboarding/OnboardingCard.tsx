@@ -21,6 +21,12 @@ interface OnboardingCardProps {
    * texto de primeiro acesso. Sem valor, mantém o texto padrão (Dashboard
    * real, comportamento inalterado). */
   textoConcluido?: TextoConcluido;
+  /** Quando true, o checklist (etapas ainda pendentes) já nasce recolhido em
+   * tarja — mesmo estado que o botão "×" já produz, só com valor inicial
+   * diferente. Usado quando já há inteligência real na tela (temDados),
+   * para o card de implantação não competir por destaque com ela. Sem
+   * valor, mantém o comportamento padrão (nasce expandido). */
+  iniciarRecolhido?: boolean;
 }
 
 const chaveRecolhido = (clinicaId: string) => `op_onboarding_concluido_recolhido_${clinicaId}`;
@@ -28,6 +34,7 @@ const chaveVisto      = (clinicaId: string) => `op_onboarding_dashboard_visto_${
 
 export default function OnboardingCard({
   clinicaId, temEmpresa, temWhatsapp, temCliente, temCompromisso, onNavigate, textoConcluido,
+  iniciarRecolhido = false,
 }: OnboardingCardProps) {
   // clinicaId já chega resolvido no primeiro render (o Dashboard só monta
   // este componente depois de carregar os dados), então o localStorage pode
@@ -37,7 +44,7 @@ export default function OnboardingCard({
     localStorage.setItem(chaveVisto(clinicaId), "1");
     return true;
   });
-  const [recolhidoSessao, setRecolhidoSessao] = useState(false);
+  const [recolhidoSessao, setRecolhidoSessao] = useState(iniciarRecolhido);
   const [recolhidoConcluido, setRecolhidoConcluido] = useState(() => {
     if (typeof window === "undefined" || !clinicaId) return false;
     return localStorage.getItem(chaveRecolhido(clinicaId)) === "1";

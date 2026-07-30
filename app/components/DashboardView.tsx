@@ -316,7 +316,7 @@ export type DashboardViewProps = {
 export default function DashboardView(props: DashboardViewProps) {
   const {
     clinicaId, dataStr, saudacaoCard, temDados, situacaoEmoji, situacaoTom, ocupacaoPct,
-    botoesRapidos, contaMadura, onboarding, ideia, missaoDoDia, proximasAcoes, indicadores,
+    botoesRapidos, onboarding, ideia, missaoDoDia, proximasAcoes, indicadores,
     resumoIA, narrativaDiretor, recomendacoesConsultivas, focoDoDia, hojeStr, amanhaStr,
     diasOrdenados, gruposDias, lembretes, oportunidadesResumo, objetivosDoDia,
     oportunidadesClientes, resumoRadar, centralOportunidades, onNavigate,
@@ -324,8 +324,12 @@ export default function DashboardView(props: DashboardViewProps) {
   } = props;
 
   // Onboarding + Recursos Incluídos + Consultoria do Dia — mesmo grupo, uma
-  // única posição por vez: topo para conta nova, rodapé para conta madura
-  // (Homologação do Diretor, 2026-07-27).
+  // única posição por vez: topo quando ainda não há inteligência para
+  // mostrar (temDados = false), rodapé quando já há (Homologação do
+  // Diretor, 2026-07-30 — "o onboarding nunca deve liderar quando já existe
+  // inteligência"). Antes disso, a posição seguia `contaMadura` (cadastro
+  // 100% completo), o que fazia uma conta com dados reais mas cadastro
+  // incompleto ver o checklist antes de qualquer inteligência.
   const blocoOnboardingRecursosConsultoria = (
     <>
       <OnboardingCard
@@ -336,6 +340,7 @@ export default function DashboardView(props: DashboardViewProps) {
         temCompromisso={onboarding.temCompromisso}
         onNavigate={onNavigate}
         textoConcluido={textoBemVindo}
+        iniciarRecolhido={temDados}
       />
 
       <div className="dc" style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
@@ -496,8 +501,9 @@ export default function DashboardView(props: DashboardViewProps) {
         ))}
       </div>
 
-      {/* ── ONBOARDING / RECURSOS / CONSULTORIA — topo (só contas novas) ──── */}
-      {!contaMadura && blocoOnboardingRecursosConsultoria}
+      {/* ── ONBOARDING / RECURSOS / CONSULTORIA — topo (só quando ainda não
+          há inteligência para mostrar) ───────────────────────────────────── */}
+      {!temDados && blocoOnboardingRecursosConsultoria}
 
       {/* ── 2b. MISSÃO DO DIA ────────────────────────────────────────────── */}
       {temDados && (
@@ -509,7 +515,33 @@ export default function DashboardView(props: DashboardViewProps) {
         <ProximaMelhorAcao acoes={proximasAcoes} onNavigate={onNavigate} />
       )}
 
-      {/* ── 4. INDICADORES EXECUTIVOS ────────────────────────────────────── */}
+      {/* ── 4. IA COMERCIAL · DIRETOR DIGITAL ─────────────────────────────── */}
+      {temDados && (
+        <DiretorDigitalCard
+          narrativa={narrativaDiretor}
+          recomendacoes={recomendacoesConsultivas}
+          onNavigate={onNavigate}
+        />
+      )}
+
+      {/* ── 5. RADAR DE OPORTUNIDADES ─────────────────────────────────────── */}
+      {temDados && (
+        <RadarDeOportunidades
+          oportunidades={oportunidadesClientes}
+          resumo={resumoRadar}
+          onNavigate={onNavigate}
+        />
+      )}
+
+      {/* ── 6. CENTRAL DE OPORTUNIDADES ───────────────────────────────────── */}
+      {temDados && (centralOportunidades.alta.length + centralOportunidades.media.length + centralOportunidades.baixa.length > 0) && (
+        <CentralDeOportunidadesCard
+          central={centralOportunidades}
+          onNavigate={onNavigate}
+        />
+      )}
+
+      {/* ── 7. INDICADORES EXECUTIVOS ────────────────────────────────────── */}
       <IndicadoresExecutivos
         compromissosHoje={indicadores.compromissosHoje}
         horariosVagosHoje={indicadores.horariosVagosHoje}
@@ -519,7 +551,7 @@ export default function DashboardView(props: DashboardViewProps) {
         onNavigate={onNavigate}
       />
 
-      {/* ── 5. RESUMO DA IA ───────────────────────────────────────────────── */}
+      {/* ── 8. RESUMO DA IA ───────────────────────────────────────────────── */}
       <div className="dc" style={{
         background: "rgba(74,155,176,0.06)", border: "1px solid rgba(74,155,176,0.18)",
         borderRadius: 14, padding: "18px 20px", marginBottom: 20,
@@ -532,16 +564,7 @@ export default function DashboardView(props: DashboardViewProps) {
         </p>
       </div>
 
-      {/* ── 5b. IA COMERCIAL · DIRETOR DIGITAL ───────────────────────────── */}
-      {temDados && (
-        <DiretorDigitalCard
-          narrativa={narrativaDiretor}
-          recomendacoes={recomendacoesConsultivas}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* ── 6. AGENDA / PRÓXIMOS COMPROMISSOS ────────────────────────────── */}
+      {/* ── 9. AGENDA / PRÓXIMOS COMPROMISSOS ────────────────────────────── */}
       <div className="dash-grid dc" style={{ marginBottom: 20 }}>
 
         {/* FOCO DO DIA */}
@@ -688,7 +711,7 @@ export default function DashboardView(props: DashboardViewProps) {
         </div>
       )}
 
-      {/* ── 7. OPORTUNIDADES ENCONTRADAS ─────────────────────────────────── */}
+      {/* ── 10. OPORTUNIDADES ENCONTRADAS ────────────────────────────────── */}
       {temDados && (
         <div className="dc" style={{
           background: "#12151f", border: "1px solid rgba(124,58,237,0.22)",
@@ -714,7 +737,7 @@ export default function DashboardView(props: DashboardViewProps) {
         </div>
       )}
 
-      {/* ── 8. OBJETIVOS DO DIA ──────────────────────────────────────────── */}
+      {/* ── 11. OBJETIVOS DO DIA ─────────────────────────────────────────── */}
       {temDados && (
         <div className="dc" style={{
           background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
@@ -736,25 +759,8 @@ export default function DashboardView(props: DashboardViewProps) {
         </div>
       )}
 
-      {/* ── 9. RADAR DE OPORTUNIDADES ─────────────────────────────────────── */}
-      {temDados && (
-        <RadarDeOportunidades
-          oportunidades={oportunidadesClientes}
-          resumo={resumoRadar}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* ── 10. CENTRAL DE OPORTUNIDADES ──────────────────────────────────── */}
-      {temDados && (centralOportunidades.alta.length + centralOportunidades.media.length + centralOportunidades.baixa.length > 0) && (
-        <CentralDeOportunidadesCard
-          central={centralOportunidades}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* ── ONBOARDING / RECURSOS / CONSULTORIA — rodapé (contas maduras) ─── */}
-      {contaMadura && blocoOnboardingRecursosConsultoria}
+      {/* ── ONBOARDING / RECURSOS / CONSULTORIA — rodapé (já há inteligência) ─── */}
+      {temDados && blocoOnboardingRecursosConsultoria}
 
     </AdminShell>
   );
