@@ -11,6 +11,8 @@ import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import DiretorDigitalCard from "../components/DiretorDigitalCard";
+import { adaptarOportunidadesClientes, adaptarRecomendacoes, organizarSinaisCanonicos, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
+import MissaoDoDiaCard from "../components/MissaoDoDiaCard";
 
 type AgItem = {
   id: string;
@@ -311,11 +313,13 @@ const FRASE_PULSO: Record<"critico" | "atencao" | "positivo", string> = {
 
 // ── "Próxima Melhor Ação" ────────────────────────────────────────────────
 // Mescla, só para apresentação, os dois motores que já existem — nenhuma
-// regra de priorização nova além do desempate abaixo. Prioridade primeiro;
-// em caso de empate, uma ordem fixa e determinística (ver TIE_BREAK).
-// Nunca completa com item inventado: se houver menos de 5 sinais reais,
-// devolve só os que existem. A tela usa o primeiro item como destaque
-// ("Próxima Melhor Ação") e o restante (até 4) como "Outras oportunidades".
+// regra de priorização nova. Prioridade + desempate determinístico agora
+// vivem em lib/nucleo-inteligente.ts (organizarSinaisCanonicos), a mesma
+// função usada pela Missão do Dia — nenhuma lógica duplicada entre as duas
+// (ver docs/nucleo-inteligente-v1-arquitetura.md, seção 5). Nunca completa
+// com item inventado: se houver menos de 5 sinais reais, devolve só os que
+// existem. A tela usa o primeiro item como destaque ("Próxima Melhor Ação")
+// e o restante (até 4) como "Outras oportunidades".
 type AcaoPrioritaria = {
   id:            string;
   titulo:        string;
@@ -326,34 +330,7 @@ type AcaoPrioritaria = {
   motivo?:       string; // por que essa ação existe
   tempoEstimado: string; // "2 minutos" | "3 minutos" | "5 minutos" — por tipo de botão, nunca calculado
   whatsapp?:     string; // link wa.me pronto, só quando há telefone do cliente
-  tieBreak:      number; // 1(mais crítico) a 6 — só desempata itens de mesma prioridade
 };
-
-// Ordem de desempate exigida para V1 — do sinal mais crítico ao mais
-// genérico. Não é uma prioridade nova: só decide quem aparece primeiro
-// dentro do mesmo nível de prioridade (ex.: dois itens "alta").
-const TIE_BREAK = {
-  cancelamentoSemReagendamento: 1,
-  confirmacaoPendenteHoje:      2,
-  compromissosAtrasados:        3,
-  horariosVagosProximos:        4,
-  clienteSemProximoCompromisso: 5,
-  demaisRecomendacoes:          6,
-} as const;
-
-function tieBreakDoCliente(op: OportunidadeCliente): number {
-  switch (op.sinais[0].tipo) {
-    case "cancelamento_sem_reagendamento": return TIE_BREAK.cancelamentoSemReagendamento;
-    case "confirmacao_pendente":           return TIE_BREAK.confirmacaoPendenteHoje;
-    case "sem_proximo_compromisso":        return TIE_BREAK.clienteSemProximoCompromisso;
-  }
-}
-
-function tieBreakDaRecomendacao(r: Recomendacao): number {
-  if (r.id === "compromissos-atrasados") return TIE_BREAK.compromissosAtrasados;
-  if (r.id === "horario-vago-hoje") return TIE_BREAK.horariosVagosProximos;
-  return TIE_BREAK.demaisRecomendacoes;
-}
 
 // Tempo estimado por tipo de botão — valores fixos, nunca calculados a
 // partir de um dado que a tela não tem: WhatsApp/confirmação = 2 min,
@@ -365,42 +342,38 @@ function tempoEstimadoPorAcao(temWhatsapp: boolean, destinoLabel?: string): stri
   return "5 minutos";
 }
 
+// Reconstrói o formato que a Próxima Melhor Ação já usava antes do Sinal
+// Canônico existir — mesmo id, mesmo título, mesmo link de WhatsApp, mesmo
+// tempo estimado. Só quem decide a ORDEM mudou de lugar (para
+// lib/nucleo-inteligente.ts); o que aparece na tela continua igual.
+function sinalParaAcaoPrioritaria(sinal: SinalCanonico): AcaoPrioritaria {
+  const telefone = sinal.contexto?.telefone ?? null;
+  const numeroWpp = telefone ? (telefone.length > 11 ? telefone : `55${telefone}`) : null;
+  const whatsapp = numeroWpp && sinal.contexto
+    ? `https://wa.me/${numeroWpp}?text=${encodeURIComponent(`Olá, ${sinal.contexto.nome}! Tudo bem?`)}`
+    : undefined;
+  return {
+    id: sinal.id,
+    titulo: sinal.titulo,
+    prioridade: sinal.prioridade,
+    destino: sinal.destino,
+    destinoLabel: sinal.destinoLabel,
+    contexto: sinal.contexto?.nome,
+    motivo: sinal.motivo,
+    whatsapp,
+    tempoEstimado: tempoEstimadoPorAcao(!!whatsapp, sinal.destinoLabel),
+  };
+}
+
 function gerarProximasAcoes(
   recomendacoesAcionaveis: Recomendacao[],
   oportunidadesClientes: OportunidadeCliente[],
 ): AcaoPrioritaria[] {
-  const doClientes: AcaoPrioritaria[] = oportunidadesClientes.map(op => {
-    const numeroWpp = op.telefone ? (op.telefone.length > 11 ? op.telefone : `55${op.telefone}`) : null;
-    const whatsapp = numeroWpp
-      ? `https://wa.me/${numeroWpp}?text=${encodeURIComponent(`Olá, ${op.nome}! Tudo bem?`)}`
-      : undefined;
-    return {
-      id: `cliente-${op.chave}`,
-      titulo: `${op.nome} — ${op.acaoSugerida}`,
-      prioridade: op.prioridade,
-      destino: "/clientes",
-      destinoLabel: "Ver cliente",
-      contexto: op.nome,
-      motivo: op.motivoPrincipal,
-      whatsapp,
-      tempoEstimado: tempoEstimadoPorAcao(!!whatsapp, "Ver cliente"),
-      tieBreak: tieBreakDoCliente(op),
-    };
-  });
-  const dasRecomendacoes: AcaoPrioritaria[] = recomendacoesAcionaveis.map(r => ({
-    id: `rec-${r.id}`,
-    titulo: r.titulo,
-    prioridade: r.prioridade,
-    destino: r.destino,
-    destinoLabel: r.destinoLabel,
-    motivo: r.motivo,
-    tempoEstimado: tempoEstimadoPorAcao(false, r.destinoLabel),
-    tieBreak: tieBreakDaRecomendacao(r),
-  }));
-  const peso: Record<"alta" | "media" | "baixa", number> = { alta: 0, media: 1, baixa: 2 };
-  return [...doClientes, ...dasRecomendacoes]
-    .sort((a, b) => peso[a.prioridade] - peso[b.prioridade] || a.tieBreak - b.tieBreak)
-    .slice(0, 5);
+  const sinais = organizarSinaisCanonicos([
+    ...adaptarOportunidadesClientes(oportunidadesClientes),
+    ...adaptarRecomendacoes(recomendacoesAcionaveis),
+  ]);
+  return sinais.slice(0, 5).map(sinalParaAcaoPrioritaria);
 }
 
 // ── Resumo da IA ─────────────────────────────────────────────────────────
@@ -737,6 +710,15 @@ export default function Dashboard() {
     ? gerarProximasAcoes(todasRecomendacoesAcionaveis, oportunidadesClientes)
     : [];
 
+  // ── 🎯 Missão do Dia (Núcleo Inteligente V1.1, Fase 1) ───────────────────
+  // Mesmos sinais canônicos que alimentam a Próxima Melhor Ação — nenhuma
+  // regra de priorização própria, nenhuma consulta nova. Ver
+  // docs/nucleo-inteligente-v1-arquitetura.md, seção 4.5.
+  const sinaisCanonicos = insights.temDados
+    ? [...adaptarOportunidadesClientes(oportunidadesClientes), ...adaptarRecomendacoes(todasRecomendacoesAcionaveis)]
+    : [];
+  const missaoDoDia: SinalCanonico[] = gerarMissaoDoDia(sinaisCanonicos);
+
   const resumoIA = gerarResumoIA({
     ocupacaoPct,
     horariosVagosHoje: dash.horariosVagosHoje,
@@ -993,6 +975,16 @@ export default function Dashboard() {
 
       {/* ── ONBOARDING / RECURSOS / CONSULTORIA — topo (só contas novas) ──── */}
       {!contaMadura && blocoOnboardingRecursosConsultoria}
+
+      {/* ── 2b. MISSÃO DO DIA (Núcleo Inteligente V1.1, Fase 1) ─────────────
+          Resumo executivo, no máximo 3 prioridades — consome os mesmos
+          Sinais Canônicos da Próxima Melhor Ação (lib/nucleo-inteligente.ts),
+          nunca recalcula prioridade com lógica própria. Convivência
+          deliberada com a Próxima Melhor Ação nesta fase (ver
+          docs/nucleo-inteligente-v1-arquitetura.md, seção 12). */}
+      {insights.temDados && (
+        <MissaoDoDiaCard sinais={missaoDoDia} onNavigate={(destino) => router.push(destino)} />
+      )}
 
       {/* ── 3. PRÓXIMA MELHOR AÇÃO ─────────────────────────────────────────
           V1: mesmo motor de sempre (gerarProximasAcoes, que já mescla Radar
