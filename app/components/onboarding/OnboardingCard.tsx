@@ -3,6 +3,12 @@ import { useState } from "react";
 import ProgressBar from "./ProgressBar";
 import ChecklistItem from "./ChecklistItem";
 
+interface TextoConcluido {
+  titulo: string;
+  texto1: string;
+  texto2: string;
+}
+
 interface OnboardingCardProps {
   clinicaId: string;
   temEmpresa: boolean;
@@ -10,13 +16,18 @@ interface OnboardingCardProps {
   temCliente: boolean;
   temCompromisso: boolean;
   onNavigate: (path: string) => void;
+  /** Override só do texto do banner "100% concluído" — usado por
+   * /dashboard-demo para uma narrativa de empresa já em operação, em vez do
+   * texto de primeiro acesso. Sem valor, mantém o texto padrão (Dashboard
+   * real, comportamento inalterado). */
+  textoConcluido?: TextoConcluido;
 }
 
 const chaveRecolhido = (clinicaId: string) => `op_onboarding_concluido_recolhido_${clinicaId}`;
 const chaveVisto      = (clinicaId: string) => `op_onboarding_dashboard_visto_${clinicaId}`;
 
 export default function OnboardingCard({
-  clinicaId, temEmpresa, temWhatsapp, temCliente, temCompromisso, onNavigate,
+  clinicaId, temEmpresa, temWhatsapp, temCliente, temCompromisso, onNavigate, textoConcluido,
 }: OnboardingCardProps) {
   // clinicaId já chega resolvido no primeiro render (o Dashboard só monta
   // este componente depois de carregar os dados), então o localStorage pode
@@ -99,13 +110,13 @@ export default function OnboardingCard({
       {completo ? (
         <>
           <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 6 }}>
-            🚀 Bem-vindo ao OrganizaPro
+            {textoConcluido?.titulo ?? "🚀 Bem-vindo ao OrganizaPro"}
           </div>
           <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: 0, maxWidth: 480 }}>
-            Organize clientes, agenda, atendimento, presença digital e produtividade em uma única plataforma.
+            {textoConcluido?.texto1 ?? "Organize clientes, agenda, atendimento, presença digital e produtividade em uma única plataforma."}
           </p>
           <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, margin: "8px 0 0", maxWidth: 480 }}>
-            Tenha tudo o que sua empresa precisa para trabalhar com mais organização, eficiência e crescimento.
+            {textoConcluido?.texto2 ?? "Tenha tudo o que sua empresa precisa para trabalhar com mais organização, eficiência e crescimento."}
           </p>
           <button
             className="ob-btn-continuar"

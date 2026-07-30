@@ -8,12 +8,11 @@
 // exatamente como processariam dado real. Esta página nunca consulta o
 // Supabase, nunca persiste o cenário, nunca escreve texto final na mão.
 //
-// O gerador (lib/dados-demonstracao.ts) fornece só EntradaOportunidades e
-// ContextoNegocio — não fornece agenda (linhas de agendamento com hora),
-// porque essa não é a camada que a Fase 3 mocka. Por isso Foco do Dia,
-// Próximos 7 Dias e Lembretes aqui mostram seus estados vazios reais e
-// honestos (os mesmos que a rota real mostra quando não há agenda) — nunca
-// uma agenda inventada.
+// Etapa 6 (KENSA Comercial Final): agendaHoje/proximosDias (também vindos do
+// gerador) alimentam Foco do Dia, Próximos 7 Dias e Lembretes — mesmos
+// componentes, mesma regra de agrupamento por data já usada em
+// app/dashboard/page.tsx, só que a partir do cenário sintético em vez de
+// dash.agendaHoje/dash.proximos.
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gerarCenarioDemonstracao } from "../../lib/dados-demonstracao";
@@ -23,6 +22,7 @@ import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDado
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import DashboardView, {
   gerarIdeia, gerarInsights, gerarSaudacaoCard, gerarResumoIA, gerarProximasAcoes,
+  type AgItem,
 } from "../components/DashboardView";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
@@ -49,12 +49,31 @@ export default function DashboardDemo() {
     </AdminShell>
   );
 
-  const { hoje: hojeStr, entradaOportunidades, contextoNegocio: ctxNegocio } = cenario;
+  const { hoje: hojeStr, entradaOportunidades, contextoNegocio: ctxNegocio, agendaHoje, proximosDias } = cenario;
 
   const [ano, mes, dia] = hojeStr.split("-").map(Number);
   const hojeDate  = new Date(ano, mes - 1, dia);
   const amanhaStr = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
   const dataStr   = `${diasSemana[hojeDate.getDay()]}, ${hojeDate.getDate()} de ${mesesArr[hojeDate.getMonth()]}`;
+
+  // Foco do Dia — próximo compromisso de hoje ainda não concluído/cancelado
+  // (mesma regra de app/dashboard/page.tsx).
+  const focoDoDia: AgItem | null = agendaHoje.find(
+    a => !["concluido", "cancelado", "faltou"].includes(a.status)
+  ) ?? null;
+
+  // Próximos 7 Dias — agrupa hoje (não cancelado/faltou) + próximos dias por
+  // data, mesma regra de app/dashboard/page.tsx.
+  const gruposDias: Record<string, AgItem[]> = {};
+  agendaHoje
+    .filter(a => !["cancelado", "faltou"].includes(a.status))
+    .forEach(a => { (gruposDias[a.data] ??= []).push(a); });
+  proximosDias.forEach(a => { (gruposDias[a.data] ??= []).push(a); });
+  const diasOrdenados = Object.keys(gruposDias).sort();
+
+  // Lembretes = atrasados (sempre nenhum no cenário sintético) + pendentes
+  // de hoje — mesma regra de app/dashboard/page.tsx.
+  const lembretes: AgItem[] = agendaHoje.filter(a => a.status === "agendado");
 
   const ideia = gerarIdeia({
     totalPacientes: ctxNegocio.totalPacientes,
@@ -172,12 +191,12 @@ export default function DashboardDemo() {
       resumoIA={resumoIA}
       narrativaDiretor={narrativaDiretor}
       recomendacoesConsultivas={recomendacoesConsultivas}
-      focoDoDia={null}
+      focoDoDia={focoDoDia}
       hojeStr={hojeStr}
       amanhaStr={amanhaStr}
-      diasOrdenados={[]}
-      gruposDias={{}}
-      lembretes={[]}
+      diasOrdenados={diasOrdenados}
+      gruposDias={gruposDias}
+      lembretes={lembretes}
       oportunidadesResumo={oportunidadesResumo}
       objetivosDoDia={objetivosDoDia}
       oportunidadesClientes={oportunidadesClientes}
@@ -185,6 +204,11 @@ export default function DashboardDemo() {
       centralOportunidades={centralOportunidades}
       onNavigate={(destino) => router.push(destino)}
       exibirWelcomeModal={false}
+      textoBemVindo={{
+        titulo: "📈 Seu negócio, sempre organizado",
+        texto1: "É assim, todos os dias: cada cliente, cada agenda e cada oportunidade acompanhados automaticamente, sem depender da sua memória.",
+        texto2: "Continue explorando o painel para ver como cada bloco acima chegou a essas prioridades.",
+      }}
     />
   );
 }

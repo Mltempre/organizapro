@@ -307,6 +307,10 @@ export type DashboardViewProps = {
    * onboarding de "primeiro acesso" não é coerente numa página de vendas mostrando um
    * negócio já maduro, e criaria atrito antes do cliente ver o valor do produto. */
   exibirWelcomeModal?: boolean;
+  /** Repassado ao banner "100% concluído" do OnboardingCard. Sem valor, mantém o texto
+   * padrão (Dashboard real). /dashboard-demo passa uma narrativa de empresa já em
+   * operação, para não terminar a página com um texto de primeiro acesso. */
+  textoBemVindo?: { titulo: string; texto1: string; texto2: string };
 };
 
 export default function DashboardView(props: DashboardViewProps) {
@@ -316,7 +320,7 @@ export default function DashboardView(props: DashboardViewProps) {
     resumoIA, narrativaDiretor, recomendacoesConsultivas, focoDoDia, hojeStr, amanhaStr,
     diasOrdenados, gruposDias, lembretes, oportunidadesResumo, objetivosDoDia,
     oportunidadesClientes, resumoRadar, centralOportunidades, onNavigate,
-    exibirWelcomeModal = true,
+    exibirWelcomeModal = true, textoBemVindo,
   } = props;
 
   // Onboarding + Recursos Incluídos + Consultoria do Dia — mesmo grupo, uma
@@ -331,6 +335,7 @@ export default function DashboardView(props: DashboardViewProps) {
         temCliente={onboarding.temCliente}
         temCompromisso={onboarding.temCompromisso}
         onNavigate={onNavigate}
+        textoConcluido={textoBemVindo}
       />
 
       <div className="dc" style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>

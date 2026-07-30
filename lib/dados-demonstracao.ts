@@ -1,18 +1,26 @@
-// ── Dados de Demonstração V1 — Fase 3 ────────────────────────────────────
-// Ver docs/modo-demonstracao-v1-arquitetura.md, seções 4 e 9 (roadmap).
-// Fornece dados fictícios nos MESMOS tipos que os motores reais já
-// consomem (EntradaOportunidades, lib/oportunidades-clientes.ts;
-// ContextoNegocio, lib/recomendacoes.ts) — nunca escreve um texto final,
-// nunca inventa receita, nunca sugere uma ação que o produto real não
-// executa. Os motores reais e já homologados (gerarOportunidadesClientes,
-// gerarCentralOportunidades) processam este dado exatamente como
-// processariam um dado real — a honestidade do produto real (nunca
-// fabricar receita, nunca automação sem confirmação humana) se aplica
-// automaticamente aqui, porque este arquivo nunca decide prioridade,
-// nunca decide texto — só fornece o insumo.
+// ── Dados de Demonstração V1 — Fase 3 (+ ajuste comercial, Etapa 6) ──────
+// Ver docs/modo-demonstracao-v1-arquitetura.md, seções 4 e 9. Fornece dados
+// fictícios nos MESMOS tipos que os motores reais já consomem
+// (EntradaOportunidades, lib/oportunidades-clientes.ts; ContextoNegocio,
+// lib/recomendacoes.ts) — nunca escreve um texto final, nunca inventa
+// receita, nunca sugere uma ação que o produto real não executa. Os motores
+// reais e já homologados (gerarOportunidadesClientes, gerarCentralOportuni-
+// dades, gerarProximasAcoes, gerarRecomendacoesConsultivas, Diretor Digital,
+// Radar, Central de Oportunidades, Próxima Melhor Ação, Missão do Dia)
+// processam este dado exatamente como processariam um dado real — nenhum
+// deles foi alterado nesta etapa.
 //
-// Esta etapa NÃO integra nenhuma rota (nem /dashboard-demo, nem o
-// Dashboard real) — só o gerador e seus testes.
+// `agendaHoje`/`proximosDias` (Etapa 6 — KENSA Comercial Final) fornecem só
+// o suficiente para que Foco do Dia, Próximos 7 Dias e Lembretes deixem de
+// aparecer vazios na demonstração — mesma ideia de "mockar a entrada", só
+// que para a camada de agenda, que a Fase 3 não cobria ainda. `agendaHoje`
+// reaproveita a mesma pessoa já usada em `confirmacoesPendentes` (nenhum
+// evento novo é inventado, só a mesma pendência aparece também como um
+// horário do dia). `proximosDias` traz duas pessoas sem nenhum sinal de
+// oportunidade — só agenda normal, para o painel não parecer "só
+// problemas para resolver".
+//
+// Esta etapa NÃO integra o Dashboard real — só /dashboard-demo.
 
 import type { EntradaOportunidades } from "./oportunidades-clientes";
 import type { ContextoNegocio } from "./recomendacoes";
@@ -21,6 +29,16 @@ export type CenarioDemonstracao = {
   hoje: string; // YYYY-MM-DD, sempre relativo ao momento da geração
   entradaOportunidades: EntradaOportunidades;
   contextoNegocio: ContextoNegocio;
+  agendaHoje: ItemAgendaDemo[];
+  proximosDias: ItemAgendaDemo[];
+};
+
+export type ItemAgendaDemo = {
+  id: string;
+  hora: string;
+  paciente_nome: string;
+  status: "agendado" | "confirmado";
+  data: string; // YYYY-MM-DD
 };
 
 function paraDataISO(d: Date): string {
@@ -33,20 +51,26 @@ function diasAtras(hoje: Date, dias: number): string {
   return paraDataISO(d);
 }
 
+function diasNaFrente(hoje: Date, dias: number): string {
+  const d = new Date(hoje);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return paraDataISO(d);
+}
+
 /**
  * Gera um cenário fictício, pequeno e plausível — não o "melhor cenário
  * possível" (ver docs/modo-demonstracao-v1-arquitetura.md, seção 7, risco 2:
- * "dado demo bom demais"). Três clientes nomeados, cada um com um sinal
- * diferente (cancelamento sem reagendamento, confirmação pendente,
- * sem próximo compromisso), e um contexto de negócio coerente com eles —
- * os números do ContextoNegocio nunca contradizem as entidades nomeadas
- * (ex.: `pendentesHoje` é exatamente a quantidade de confirmações
- * pendentes fornecidas, não um número solto).
+ * "dado demo bom demais"). Quatro clientes nomeados, cada um com um sinal
+ * diferente ou complementar (cancelamento sem reagendamento, confirmação
+ * pendente, dois casos de cliente sem próximo compromisso), mais dois
+ * clientes de agenda "normal" (sem nenhum sinal) — e um contexto de negócio
+ * coerente com todos eles. Números de escala (totalPacientes,
+ * totalAgendamentos, compromissosHoje) representam uma empresa pequena já
+ * em operação — nunca perfeita, nunca exagerada.
  *
- * `agora` é injetável para tornar a geração determinística em teste —
- * sem argumento, usa a data real no momento da chamada (nunca uma data
- * fixa gravada no código, ao contrário da página estática que esta
- * fase substitui).
+ * `agora` é injetável para tornar a geração determinística em teste — sem
+ * argumento, usa a data real no momento da chamada (nunca uma data fixa
+ * gravada no código).
  */
 export function gerarCenarioDemonstracao(agora: Date = new Date()): CenarioDemonstracao {
   const hoje = paraDataISO(agora);
@@ -57,6 +81,13 @@ export function gerarCenarioDemonstracao(agora: Date = new Date()): CenarioDemon
       nome: "Carla Souza",
       telefone: "5511900000003",
       whatsapp: "5511900000003",
+      proximaConsulta: null,
+    },
+    {
+      id: "demo-cliente-diego",
+      nome: "Diego Fernandes",
+      telefone: "5511900000004",
+      whatsapp: "5511900000004",
       proximaConsulta: null,
     },
   ];
@@ -86,18 +117,39 @@ export function gerarCenarioDemonstracao(agora: Date = new Date()): CenarioDemon
     confirmacoesPendentes,
   };
 
+  // Foco do Dia — a mesma pendência de Bruno Alves (já declarada acima),
+  // agora também como um horário concreto de hoje. Nenhum evento novo.
+  const agendaHoje: ItemAgendaDemo[] = [
+    { id: "demo-foco-bruno", hora: "15:00", paciente_nome: "Bruno Alves", status: "agendado", data: hoje },
+  ];
+
+  // Próximos 7 Dias — agenda normal, sem nenhum sinal de oportunidade
+  // associado, para mostrar que nem tudo na operação é um problema a
+  // resolver. Cinco compromissos (>= 5) para que o motor de Central de
+  // Oportunidades não acione as recomendações de "agenda vazia"/"poucos
+  // compromissos" (lib/recomendacoes.ts) — ambas mencionam "receita
+  // prevista", termo proibido na demonstração; não é uma regra nova, é só
+  // manter o cenário fora da faixa que já aciona esse texto no motor real.
+  const proximosDias: ItemAgendaDemo[] = [
+    { id: "demo-proximo-patricia", hora: "10:00", paciente_nome: "Patrícia Lima", status: "confirmado", data: diasNaFrente(agora, 1) },
+    { id: "demo-proximo-rafael",   hora: "14:00", paciente_nome: "Rafael Nunes",  status: "agendado",   data: diasNaFrente(agora, 2) },
+    { id: "demo-proximo-juliana",  hora: "09:30", paciente_nome: "Juliana Alves", status: "confirmado", data: diasNaFrente(agora, 3) },
+    { id: "demo-proximo-fernando", hora: "16:00", paciente_nome: "Fernando Costa", status: "agendado",  data: diasNaFrente(agora, 4) },
+    { id: "demo-proximo-beatriz",  hora: "11:00", paciente_nome: "Beatriz Santos", status: "confirmado", data: diasNaFrente(agora, 6) },
+  ];
+
   // Coerência entre entidades: cada número aqui é derivável do que já foi
   // declarado acima, ou de uma escolha explícita e plausível — nunca um
   // valor solto. Perfil completo (temEmail/temTelefone/temEndereco/
   // temWhatsapp = true) para o cenário focar nos sinais comerciais, não em
   // pendências de cadastro.
   const contextoNegocio: ContextoNegocio = {
-    totalPacientes: 8,
-    totalAgendamentos: 24,
-    compromissosHoje: 4,
+    totalPacientes: 31,
+    totalAgendamentos: 94,
+    compromissosHoje: agendaHoje.length + 5,
     pendentesHoje: confirmacoesPendentes.length,
     atrasados: 0,
-    proximosSemana: 5,
+    proximosSemana: proximosDias.length,
     clientesParaReativar: clientesSemProximoCompromisso.length,
     cancelamentosHoje: cancelamentosSemReagendamento.filter(c => c.data === hoje).length,
     horariosVagosHoje: 2,
@@ -108,5 +160,5 @@ export function gerarCenarioDemonstracao(agora: Date = new Date()): CenarioDemon
     temWhatsapp: true,
   };
 
-  return { hoje, entradaOportunidades, contextoNegocio };
+  return { hoje, entradaOportunidades, contextoNegocio, agendaHoje, proximosDias };
 }
