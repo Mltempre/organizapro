@@ -1,63 +1,190 @@
 "use client";
-
+// ── /dashboard-demo — Etapa 4b do roadmap de Modo Demonstração ────────────
+// Ver docs/modo-demonstracao-v1-arquitetura.md, seções 4 e 9. Mesma
+// DashboardView do Dashboard real (app/dashboard/page.tsx), alimentada por
+// gerarCenarioDemonstracao() em vez de Supabase — "mockar a entrada, não a
+// saída": os motores reais (Radar, Central de Oportunidades, Próxima Melhor
+// Ação, Diretor Digital, Missão do Dia) processam o cenário fictício
+// exatamente como processariam dado real. Esta página nunca consulta o
+// Supabase, nunca persiste o cenário, nunca escreve texto final na mão.
+//
+// O gerador (lib/dados-demonstracao.ts) fornece só EntradaOportunidades e
+// ContextoNegocio — não fornece agenda (linhas de agendamento com hora),
+// porque essa não é a camada que a Fase 3 mocka. Por isso Foco do Dia,
+// Próximos 7 Dias e Lembretes aqui mostram seus estados vazios reais e
+// honestos (os mesmos que a rota real mostra quando não há agenda) — nunca
+// uma agenda inventada.
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { gerarCenarioDemonstracao } from "../../lib/dados-demonstracao";
+import { gerarCentralOportunidades } from "../../lib/recomendacoes";
+import { gerarOportunidadesClientes, gerarResumoRadar } from "../../lib/oportunidades-clientes";
+import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
+import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
+import DashboardView, {
+  gerarIdeia, gerarInsights, gerarSaudacaoCard, gerarResumoIA, gerarProximasAcoes,
+} from "../components/DashboardView";
 import AdminShell from "../components/AdminShell";
+import PageLoader from "../components/PageLoader";
 
-const recursos = [
-  ["👥", "Clientes"], ["📅", "Agenda"], ["🌐", "Site"],
-  ["✍️", "Conteúdo IA"], ["💬", "Chatbot"], ["🤖", "Automação"],
-  ["⭐", "Reputação"], ["📈", "Métricas"], ["📊", "Raio-X Inteligente"],
-];
-
-const agenda = [
-  { hora: "09:00", cliente: "Empresa Horizonte", servico: "Reunião", responsavel: "Comercial", status: "Confirmado", cor: "#4ade80" },
-  { hora: "11:30", cliente: "João Martins", servico: "Retorno", responsavel: "Equipe", status: "Confirmado", cor: "#4ade80" },
-  { hora: "14:00", cliente: "Comercial Aurora", servico: "Apresentação", responsavel: "Administrativo", status: "Aguardando", cor: "#fbbf24" },
-];
+const diasSemana = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+const mesesArr   = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 
 export default function DashboardDemo() {
-  return (
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [cenario, setCenario] = useState<ReturnType<typeof gerarCenarioDemonstracao> | null>(null);
+
+  useEffect(() => {
+    // Gerado em memória, no navegador — sempre relativo ao momento real da
+    // visita (nunca uma data fixa gravada no código), nunca uma consulta ao
+    // Supabase, nunca persistido.
+    setCenario(gerarCenarioDemonstracao());
+    setLoading(false);
+  }, []);
+
+  if (loading || !cenario) return (
     <AdminShell title="Painel Executivo">
-      <style>{`
-        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        .dc { animation: fadeUp .35s ease both; }
-        .demo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
-        .bottom-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:16px; }
-        @media(max-width:860px){.demo-grid,.bottom-grid{grid-template-columns:1fr}}
-      `}</style>
-
-      <div className="dc" style={{display:"inline-flex",alignItems:"center",gap:10,padding:"10px 16px",borderRadius:12,marginBottom:20,background:"rgba(74,155,176,.08)",border:"1px solid rgba(74,155,176,.2)"}}>
-        <span style={{fontSize:18}}>📅</span>
-        <div><div style={{fontSize:10,fontWeight:800,color:"#4a9bb0",textTransform:"uppercase",letterSpacing:".06em"}}>Hoje</div><div style={{fontSize:14,fontWeight:700,color:"#f1f5f9"}}>Segunda-feira, 13 de julho</div></div>
-      </div>
-
-      <div className="dc" style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:20}}>
-        {recursos.map(([icon,label])=><span key={label} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 13px",borderRadius:999,background:"rgba(74,155,176,.07)",border:"1px solid rgba(74,155,176,.18)",color:"#cbd5e1",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}><span style={{color:"#4ade80"}}>✔</span> {icon} {label}</span>)}
-      </div>
-
-      <section className="dc" style={{background:"linear-gradient(135deg,rgba(74,155,176,.12),rgba(31,78,95,.22))",border:"1px solid rgba(74,155,176,.3)",borderRadius:16,padding:"22px 24px",marginBottom:20,boxShadow:"0 8px 24px rgba(0,0,0,.15)"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
-          <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:36,height:36,borderRadius:10,background:"rgba(74,155,176,.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>🎯</div><strong style={{fontSize:16,color:"#f1f5f9"}}>Seu Plano para Hoje</strong></div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:800,color:"#64748b",letterSpacing:".08em",textTransform:"uppercase"}}>Status Operacional</span><span style={{padding:"5px 12px",borderRadius:999,background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.3)",color:"#fbbf24",fontSize:12,fontWeight:700}}>🟡 Atenção</span></div>
-        </div>
-        <div style={{fontSize:14,fontWeight:600,color:"#cbd5e1",margin:"6px 0 4px"}}>👋 Bom dia!<br/>Bem-vindo ao OrganizaPro.</div>
-        <p style={{fontSize:13,color:"#94a3b8",lineHeight:1.6,margin:"0 0 20px"}}>Acompanhe suas prioridades e mantenha sua empresa organizada durante todo o dia.</p>
-        <div className="demo-grid">
-          {[
-            ["Prioridades","2","clientes aguardando retorno.","#f87171"],
-            ["Agenda","5","compromissos agendados.","#4a9bb0"],
-            ["Oportunidades","3","clientes podem voltar a fazer negócio.","#4ade80"],
-          ].map(([titulo,numero,texto,cor])=><div key={titulo} style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:16}}><div style={{fontSize:10,fontWeight:800,color:"#94a3b8",letterSpacing:".08em",textTransform:"uppercase",marginBottom:8}}>{titulo}</div><div style={{fontSize:30,fontWeight:900,lineHeight:1,color:cor,marginBottom:6}}>{numero}</div><p style={{fontSize:12,color:"#94a3b8",margin:0}}>{texto}</p></div>)}
-        </div>
-        <div style={{marginTop:20,paddingTop:20,borderTop:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"flex-start",gap:12}}>
-          <div style={{width:40,height:40,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#1F4E5F,#0d3547)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>👔</div>
-          <div style={{flex:1}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}><strong style={{fontSize:14,color:"#f1f5f9"}}>Diretor Digital</strong><span style={{fontSize:9.5,fontWeight:700,textTransform:"uppercase",color:"#4a9bb0",background:"rgba(74,155,176,.12)",border:"1px solid rgba(74,155,176,.25)",borderRadius:999,padding:"2px 8px"}}>OrganizaPro Intelligence</span></div><p style={{fontSize:13,color:"#cbd5e1",lineHeight:1.55,margin:"0 0 12px"}}>Bom dia. Analisei a rotina da Empresa Demonstração e identifiquei a ação mais importante para hoje.</p><div style={{background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.3)",borderRadius:12,padding:"14px 16px"}}><div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:".08em",color:"#fbbf24",marginBottom:6}}>🎯 Prioridade do Diretor</div><strong style={{fontSize:14,color:"#f1f5f9"}}>Confirmar a apresentação da tarde</strong><p style={{fontSize:12,color:"#94a3b8",lineHeight:1.45,margin:"5px 0 0"}}>O compromisso com a Comercial Aurora ainda aguarda confirmação. Antecipar esse contato reduz imprevistos para a equipe.</p></div></div>
-        </div>
-      </section>
-
-      <div className="bottom-grid dc">
-        <section style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.07)",borderRadius:14,padding:"18px 20px"}}><div style={{fontSize:11,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:14}}>Agenda de hoje</div>{agenda.map((item,i)=><div key={item.hora} style={{display:"grid",gridTemplateColumns:"52px 1.4fr .8fr .8fr",gap:12,alignItems:"center",padding:"10px 0",borderBottom:i<agenda.length-1?"1px solid rgba(255,255,255,.05)":"none"}}><span style={{fontSize:12,color:"#64748b"}}>{item.hora}</span><div><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{item.cliente}</div><div style={{fontSize:11,color:"#64748b"}}>{item.servico}</div></div><span style={{fontSize:11,color:"#94a3b8"}}>{item.responsavel}</span><span style={{fontSize:11,fontWeight:700,color:item.cor,textAlign:"right"}}>{item.status}</span></div>)}</section>
-        <section style={{background:"linear-gradient(135deg,rgba(31,78,95,.18),rgba(13,53,71,.25))",border:"1px solid rgba(31,78,95,.35)",borderRadius:14,padding:"20px 22px"}}><div style={{fontSize:11,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:16}}>Panorama do dia</div>{[["🟢","5","compromissos hoje","#4ade80"],["🟡","2","aguardando confirmação","#fbbf24"],["🔴","0","em atraso","#64748b"]].map(([icon,n,label,cor])=><div key={label} style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}><span>{icon}</span><strong style={{fontSize:25,color:cor,minWidth:30}}>{n}</strong><span style={{fontSize:13,color:"#94a3b8"}}>{label}</span></div>)}</section>
-      </div>
+      <PageLoader title="Preparando seu painel..." />
     </AdminShell>
+  );
+
+  const { hoje: hojeStr, entradaOportunidades, contextoNegocio: ctxNegocio } = cenario;
+
+  const [ano, mes, dia] = hojeStr.split("-").map(Number);
+  const hojeDate  = new Date(ano, mes - 1, dia);
+  const amanhaStr = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
+  const dataStr   = `${diasSemana[hojeDate.getDay()]}, ${hojeDate.getDate()} de ${mesesArr[hojeDate.getMonth()]}`;
+
+  const ideia = gerarIdeia({
+    totalPacientes: ctxNegocio.totalPacientes,
+    atrasados:      ctxNegocio.atrasados,
+    pendentes:      ctxNegocio.pendentesHoje,
+    proximosSemana: ctxNegocio.proximosSemana,
+    temLogo:        true,
+    temEmail:       ctxNegocio.temEmail,
+    temTelefone:    ctxNegocio.temTelefone,
+    temEndereco:    ctxNegocio.temEndereco,
+    hoje:           hojeStr,
+  });
+
+  const insights = gerarInsights({
+    totalPacientes: ctxNegocio.totalPacientes,
+    pendentes:      ctxNegocio.pendentesHoje,
+    atrasados:      ctxNegocio.atrasados,
+  });
+
+  const centralOportunidades = insights.temDados
+    ? gerarCentralOportunidades(ctxNegocio)
+    : { alta: [], media: [], baixa: [] };
+
+  const oportunidadesClientes = insights.temDados
+    ? gerarOportunidadesClientes(entradaOportunidades)
+    : [];
+
+  const resumoRadar = gerarResumoRadar(oportunidadesClientes.length);
+
+  // Padrão institucional (V1): saudação sempre genérica, nunca personalizada
+  // — mesma regra do Dashboard real (nunca personalizar em demonstração).
+  const saudacaoCard = gerarSaudacaoCard({ nomeNegocio: "", ambienteProducao: false });
+
+  const totalSlotsHoje = ctxNegocio.compromissosHoje + ctxNegocio.horariosVagosHoje;
+  const ocupacaoPct = insights.temDados && totalSlotsHoje > 0
+    ? Math.round((ctxNegocio.compromissosHoje / totalSlotsHoje) * 100)
+    : null;
+
+  const todasRecomendacoesAcionaveis = [
+    ...centralOportunidades.alta, ...centralOportunidades.media, ...centralOportunidades.baixa,
+  ];
+  const proximasAcoes = insights.temDados
+    ? gerarProximasAcoes(todasRecomendacoesAcionaveis, oportunidadesClientes)
+    : [];
+
+  const sinaisCanonicos = insights.temDados
+    ? [...adaptarOportunidadesClientes(oportunidadesClientes), ...adaptarRecomendacoes(todasRecomendacoesAcionaveis)]
+    : [];
+  const missaoDoDia: SinalCanonico[] = gerarMissaoDoDia(sinaisCanonicos);
+
+  const resumoIA = gerarResumoIA({
+    ocupacaoPct,
+    horariosVagosHoje: ctxNegocio.horariosVagosHoje,
+    pendentes: ctxNegocio.pendentesHoje,
+  });
+
+  const recomendacoesConsultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: insights.temDados,
+    oportunidadesClientes,
+    recomendacoes: todasRecomendacoesAcionaveis,
+    ocupacaoPct,
+  });
+  const narrativaDiretor = insights.temDados
+    ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
+    : gerarMensagemDadosInsuficientes();
+
+  const oportunidadesResumo = [
+    ctxNegocio.clientesParaReativar > 0 ? `${ctxNegocio.clientesParaReativar} cliente${ctxNegocio.clientesParaReativar > 1 ? "s" : ""} sem retorno` : null,
+    ctxNegocio.horariosVagosHoje    > 0 ? `${ctxNegocio.horariosVagosHoje} horário${ctxNegocio.horariosVagosHoje > 1 ? "s" : ""} livre${ctxNegocio.horariosVagosHoje > 1 ? "s" : ""}` : null,
+    ctxNegocio.avaliacoesPendentes  > 0 ? `${ctxNegocio.avaliacoesPendentes} avaliaç${ctxNegocio.avaliacoesPendentes > 1 ? "ões" : "ão"} pendente${ctxNegocio.avaliacoesPendentes > 1 ? "s" : ""}` : null,
+  ].filter((s): s is string => s !== null);
+
+  const objetivosDoDia = [
+    { label: "Confirmar todos os atendimentos", feito: ctxNegocio.pendentesHoje === 0 && ctxNegocio.atrasados === 0 },
+    { label: "Preencher horários livres",       feito: ctxNegocio.horariosVagosHoje === 0 },
+    { label: "Solicitar avaliações",            feito: ctxNegocio.avaliacoesPendentes === 0 },
+    { label: "Encerrar o dia sem pendências",   feito: ctxNegocio.atrasados === 0 && ctxNegocio.pendentesHoje === 0 },
+  ];
+
+  const contaMadura = ctxNegocio.temEmail && ctxNegocio.temTelefone && ctxNegocio.temEndereco
+    && ctxNegocio.temWhatsapp && ctxNegocio.totalPacientes > 0 && ctxNegocio.totalAgendamentos > 0;
+
+  return (
+    <DashboardView
+      clinicaId="demo"
+      dataStr={dataStr}
+      saudacaoCard={saudacaoCard}
+      temDados={insights.temDados}
+      situacaoEmoji={insights.situacao.emoji}
+      situacaoTom={insights.situacao.tom}
+      ocupacaoPct={ocupacaoPct}
+      botoesRapidos={[
+        { icon: "➕", label: "Novo Cliente",     destino: "/clientes"     },
+        { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos" },
+        { icon: "💬", label: "WhatsApp",         destino: "/chatbot"      },
+        { icon: "📊", label: "Relatórios",       destino: "/metricas"     },
+      ]}
+      contaMadura={contaMadura}
+      onboarding={{
+        temEmpresa: ctxNegocio.temEmail && ctxNegocio.temTelefone && ctxNegocio.temEndereco,
+        temWhatsapp: ctxNegocio.temWhatsapp,
+        temCliente: ctxNegocio.totalPacientes > 0,
+        temCompromisso: ctxNegocio.totalAgendamentos > 0,
+      }}
+      ideia={ideia}
+      missaoDoDia={missaoDoDia}
+      proximasAcoes={proximasAcoes}
+      indicadores={{
+        compromissosHoje: ctxNegocio.compromissosHoje,
+        horariosVagosHoje: ctxNegocio.horariosVagosHoje,
+        pendentes: ctxNegocio.pendentesHoje,
+        atrasados: ctxNegocio.atrasados,
+        avaliacoesPendentes: ctxNegocio.avaliacoesPendentes,
+      }}
+      resumoIA={resumoIA}
+      narrativaDiretor={narrativaDiretor}
+      recomendacoesConsultivas={recomendacoesConsultivas}
+      focoDoDia={null}
+      hojeStr={hojeStr}
+      amanhaStr={amanhaStr}
+      diasOrdenados={[]}
+      gruposDias={{}}
+      lembretes={[]}
+      oportunidadesResumo={oportunidadesResumo}
+      objetivosDoDia={objetivosDoDia}
+      oportunidadesClientes={oportunidadesClientes}
+      resumoRadar={resumoRadar}
+      centralOportunidades={centralOportunidades}
+      onNavigate={(destino) => router.push(destino)}
+      exibirWelcomeModal={false}
+    />
   );
 }
