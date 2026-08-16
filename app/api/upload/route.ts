@@ -33,6 +33,18 @@ export async function POST(req: NextRequest) {
     if (!file || !tipo || !clinicaId) {
       return NextResponse.json({ error: "file, tipo e clinica_id são obrigatórios" }, { status: 400 });
     }
+
+    const { data: vinculo } = await supabase
+      .from("clinica_usuarios")
+      .select("id")
+      .eq("usuario_id", user.id)
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .maybeSingle();
+    if (!vinculo) {
+      return NextResponse.json({ error: "Usuário não tem vínculo com esta clínica" }, { status: 403 });
+    }
+
     if (!(VALID_TIPOS as readonly string[]).includes(tipo)) {
       return NextResponse.json({ error: "tipo inválido" }, { status: 400 });
     }
