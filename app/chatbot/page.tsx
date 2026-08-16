@@ -115,6 +115,7 @@ type Aba = 'historico' | 'config' | 'treinamento'
 export default function ChatbotPage() {
   const router = useRouter()
   const [clinicaId, setClinicaId]   = useState<string | null>(null)
+  const [segmento, setSegmento]     = useState<string | null>(null)
   const [aba, setAba]               = useState<Aba>('historico')
   const [logs, setLogs]             = useState<ChatLog[]>([])
   const [config, setConfig]         = useState<ChatbotConfig>({})
@@ -143,6 +144,7 @@ export default function ChatbotPage() {
           carregarLogs(cu.clinica_id),
           carregarConfig(cu.clinica_id),
           carregarTreinamentos(cu.clinica_id),
+          carregarSegmento(cu.clinica_id),
         ])
       }
       setCarregando(false)
@@ -156,6 +158,11 @@ export default function ChatbotPage() {
       .select('id,telefone,nome_paciente,mensagem_paciente,resposta_bot,processado_por,created_at')
       .eq('clinica_id', cid).order('created_at', { ascending: false }).limit(50)
     setLogs(data ?? [])
+  }
+
+  async function carregarSegmento(cid: string) {
+    const { data } = await supabase.from('clinicas').select('especialidade').eq('id', cid).maybeSingle()
+    setSegmento(data?.especialidade || null)
   }
 
   async function carregarConfig(cid: string) {
@@ -276,13 +283,21 @@ export default function ChatbotPage() {
       <div style={{ maxWidth: 900 }}>
 
         {/* Badge status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 14px', borderRadius: 20, background: config.ativo ? C.greenDim : 'rgba(100,116,139,0.1)', border: `1px solid ${config.ativo ? 'rgba(34,197,94,0.3)' : 'rgba(100,116,139,0.2)'}` }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: config.ativo ? C.green : C.textMuted, boxShadow: config.ativo ? `0 0 6px ${C.green}` : 'none' }} />
             <span style={{ fontSize: 12, fontWeight: 600, color: config.ativo ? C.green : C.textMuted }}>
               {config.ativo ? 'Chatbot Ativo' : 'Chatbot Inativo'}
             </span>
           </div>
+          {segmento && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 14px', borderRadius: 20, background: C.purpleDim, border: `1px solid rgba(124,58,237,0.3)` }}>
+              <span style={{ fontSize: 12 }}>🧩</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.purpleLight }}>
+                Segmento identificado: {segmento} — respostas adaptadas automaticamente
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Cards de estatísticas */}

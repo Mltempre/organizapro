@@ -469,7 +469,7 @@ export default function ClientesPage() {
                       onClick={() => abrirDetalhe(p)}
                       style={{ padding:'6px 14px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'rgba(31,78,95,0.12)', color:'#4a9bb0', fontSize:12, cursor:'pointer', fontWeight:600, transition:'background 0.15s' }}
                     >
-                      Ver
+                      🕐 Histórico
                     </button>
                     <button
                       className="cli-btn-editar"

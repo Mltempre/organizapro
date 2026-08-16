@@ -505,6 +505,23 @@ export default function DashboardView(props: DashboardViewProps) {
           há inteligência para mostrar) ───────────────────────────────────── */}
       {!temDados && blocoOnboardingRecursosConsultoria}
 
+      {/* ── 2a. CABEÇALHO DO BLOCO DE INTELIGÊNCIA — nomeia o conjunto abaixo
+          como uma coisa só (Missão → PMA → Diretor Digital → Radar → Central),
+          nunca 5 widgets soltos. Puramente apresentacional, nenhuma regra nova. */}
+      {temDados && (
+        <div className="dc" style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 14px" }}>
+          <span style={{ fontSize: 20 }}>🧭</span>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2 }}>
+              Seu Diretor Digital hoje
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+              A mesma inteligência olhando seu negócio de ângulos diferentes — prioridades, oportunidades e recomendações.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 2b. MISSÃO DO DIA ────────────────────────────────────────────── */}
       {temDados && (
         <MissaoDoDiaCard sinais={missaoDoDia} onNavigate={onNavigate} />
@@ -533,8 +550,10 @@ export default function DashboardView(props: DashboardViewProps) {
         />
       )}
 
-      {/* ── 6. CENTRAL DE OPORTUNIDADES ───────────────────────────────────── */}
-      {temDados && (centralOportunidades.alta.length + centralOportunidades.media.length + centralOportunidades.baixa.length > 0) && (
+      {/* ── 6. CENTRAL DE OPORTUNIDADES — sempre renderiza quando há dados;
+          estado vazio explicativo (nunca inventa oportunidade) fica a cargo
+          do próprio componente quando os 3 tiers estão vazios. */}
+      {temDados && (
         <CentralDeOportunidadesCard
           central={centralOportunidades}
           onNavigate={onNavigate}

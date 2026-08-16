@@ -18,7 +18,7 @@ export default function MissaoDoDiaCard({ sinais, onNavigate }: Props) {
       borderRadius: 14, padding: "18px 20px", marginBottom: 20,
     }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 2 }}>
-        🎯 Sua missão de hoje
+        🚩 Sua missão de hoje
       </div>
       <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
         Três prioridades para avançar seu negócio.

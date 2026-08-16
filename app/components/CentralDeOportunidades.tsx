@@ -16,6 +16,8 @@ type Props = {
 };
 
 export default function CentralDeOportunidadesCard({ central, onNavigate }: Props) {
+  const semOportunidades = central.alta.length + central.media.length + central.baixa.length === 0;
+
   return (
     <div className="dc" style={{
       background: "#12151f", border: "1px solid rgba(255,255,255,0.06)",
@@ -39,7 +41,11 @@ export default function CentralDeOportunidadesCard({ central, onNavigate }: Prop
         </div>
       </div>
 
-      {(["alta", "media", "baixa"] as const).map(tier => {
+      {semOportunidades ? (
+        <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
+          Nenhuma oportunidade identificada agora com os dados atuais do seu negócio. Conforme sua agenda e sua base de clientes crescem, novas ações aparecem aqui automaticamente.
+        </p>
+      ) : (["alta", "media", "baixa"] as const).map(tier => {
         const itens = central[tier];
         if (itens.length === 0) return null;
         const meta = stTierOportunidade[tier];
