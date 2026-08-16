@@ -1,8 +1,8 @@
 export type Category =
-  | "Marketing para Clínicas"
-  | "WhatsApp para Clínicas"
-  | "Google Avaliações"
-  | "Gestão de Clínicas"
+  | "Marketing para Pequenos Negócios"
+  | "WhatsApp e Atendimento"
+  | "Avaliações e Reputação Online"
+  | "Gestão do Negócio"
   | "Inteligência Artificial";
 
 export type ContentBlock =

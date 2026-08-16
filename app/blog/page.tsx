@@ -94,7 +94,7 @@ export default function BlogPage() {
             padding: "6px 16px", borderRadius: 20, marginBottom: 24,
             fontFamily: "DM Sans, sans-serif",
           }}>
-            📚 Conteúdo especializado para clínicas de saúde
+            📚 Conteúdo especializado para negócios com agenda
           </div>
           <h1 className="hero-title" style={{
             fontSize: "2.75rem", fontWeight: 800, color: "#e7ebff",
@@ -102,13 +102,13 @@ export default function BlogPage() {
             fontFamily: "DM Sans, sans-serif",
           }}>
             Estratégias que fazem<br />
-            <span style={{ color: "#7c3aed" }}>clínicas crescerem de verdade</span>
+            <span style={{ color: "#7c3aed" }}>seu negócio crescer de verdade</span>
           </h1>
           <p style={{
             fontSize: "1.1rem", color: "#94a3b8", lineHeight: 1.7,
             margin: "0 0 40px", fontFamily: "DM Sans, sans-serif",
           }}>
-            Guias práticos sobre WhatsApp, avaliações no Google, gestão e automação — tudo focado em dentistas, dermatologistas, estetas e fisioterapeutas.
+            Guias práticos sobre WhatsApp, avaliações no Google, gestão e automação — para clínicas, salões, escritórios, oficinas e qualquer negócio que trabalha com agenda.
           </p>
 
           {/* Search */}
@@ -338,7 +338,7 @@ export default function BlogPage() {
         padding: "32px 24px", textAlign: "center",
       }}>
         <p style={{ color: "#334155", fontSize: 13, fontFamily: "DM Sans, sans-serif", margin: 0 }}>
-          © {new Date().getFullYear()} OrganizaPro · Conteúdo especializado para clínicas de saúde
+          © {new Date().getFullYear()} OrganizaPro · Conteúdo especializado para negócios com agenda
         </p>
       </footer>
     </>

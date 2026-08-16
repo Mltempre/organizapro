@@ -4,19 +4,19 @@ import { BASE_URL } from "./data/articles";
 export const metadata: Metadata = {
   title: {
     template: "%s | Blog OrganizaPro",
-    default: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
+    default: "Blog OrganizaPro — Estratégias para Negócios com Agenda",
   },
   description:
-    "Conteúdo especializado sobre WhatsApp para clínicas, avaliações no Google, marketing para consultórios e gestão automatizada para profissionais de saúde.",
+    "Conteúdo especializado sobre WhatsApp, avaliações no Google, marketing e gestão automatizada para negócios locais que trabalham com agenda — clínicas, salões, escritórios, oficinas e mais.",
   keywords: [
-    "blog clínicas de saúde",
-    "whatsapp para clínicas",
-    "avaliações google consultório",
-    "marketing para dentistas",
-    "gestão de clínicas",
-    "automação clínica médica",
-    "reduzir faltas pacientes",
-    "confirmar consultas automaticamente",
+    "blog para negócios locais",
+    "whatsapp para pequenos negócios",
+    "avaliações google negócio local",
+    "marketing para pequenos negócios",
+    "gestão de negócio com agenda",
+    "automação para negócios locais",
+    "reduzir faltas de clientes",
+    "confirmar atendimentos automaticamente",
   ],
   authors: [{ name: "Equipe OrganizaPro", url: BASE_URL }],
   creator: "OrganizaPro",
@@ -31,15 +31,15 @@ export const metadata: Metadata = {
     siteName: "OrganizaPro",
     locale: "pt_BR",
     url: `${BASE_URL}/blog`,
-    title: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
+    title: "Blog OrganizaPro — Estratégias para Negócios com Agenda",
     description:
-      "Guias práticos sobre WhatsApp, avaliações no Google, marketing e automação para dentistas, dermatologistas, estetas e fisioterapeutas.",
+      "Guias práticos sobre WhatsApp, avaliações no Google, marketing e automação para negócios locais de qualquer segmento — de clínicas a barbearias, escritórios e oficinas.",
     images: [
       {
         url: `${BASE_URL}/og-blog.png`,
         width: 1200,
         height: 630,
-        alt: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
+        alt: "Blog OrganizaPro — Estratégias para Negócios com Agenda",
       },
     ],
   },
@@ -47,9 +47,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@organizapro",
     creator: "@organizapro",
-    title: "Blog OrganizaPro — Estratégias para Clínicas de Saúde",
+    title: "Blog OrganizaPro — Estratégias para Negócios com Agenda",
     description:
-      "Guias práticos sobre WhatsApp, avaliações no Google e automação para clínicas de saúde.",
+      "Guias práticos sobre WhatsApp, avaliações no Google e automação para negócios locais com agenda.",
     images: [`${BASE_URL}/og-blog.png`],
   },
   robots: {

@@ -14,7 +14,7 @@ import {
 } from "../data/articles";
 
 interface Props {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export async function generateStaticParams() {
@@ -22,7 +22,8 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const article = getArticleBySlug(params.slug);
+  const { slug } = await params;
+  const article = getArticleBySlug(slug);
   if (!article) return {};
 
   const url = `${BASE_URL}/blog/${article.slug}`;
@@ -155,7 +156,7 @@ function buildJsonLd(article: Article) {
         name: "OrganizaPro",
         url: BASE_URL,
         description:
-          "Sistema de automação de lembretes e avaliações para clínicas de saúde no Brasil.",
+          "Sistema de automação de lembretes, agenda e avaliações para pequenos negócios no Brasil.",
         contactPoint: {
           "@type": "ContactPoint",
           contactType: "customer support",
@@ -354,13 +355,14 @@ function RenderBlock({ block }: { block: ContentBlock }) {
   }
 }
 
-export default function ArticlePage({ params }: Props) {
-  const article = getArticleBySlug(params.slug);
+export default async function ArticlePage({ params }: Props) {
+  const { slug } = await params;
+  const article = getArticleBySlug(slug);
   if (!article) notFound();
 
   const jsonLd = buildJsonLd(article);
 
-  const related = getRelatedArticles(params.slug);
+  const related = getRelatedArticles(slug);
   const catColors = CATEGORY_COLORS[article.category];
 
   return (
