@@ -136,15 +136,19 @@ export default function ChatbotPage() {
     async function init() {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) { router.push('/login'); return }
-      const { data: cu } = await supabase
-        .from('clinica_usuarios').select('clinica_id').eq('usuario_id', user.id).maybeSingle()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) { router.push('/login'); return }
+      const cuRes = await fetch('/api/minha-clinica', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const cu = cuRes.ok ? await cuRes.json() : null
       if (cu?.clinica_id) {
         setClinicaId(cu.clinica_id)
+        setSegmento(cu.especialidade || null)
         await Promise.all([
           carregarLogs(cu.clinica_id),
           carregarConfig(cu.clinica_id),
           carregarTreinamentos(cu.clinica_id),
-          carregarSegmento(cu.clinica_id),
         ])
       }
       setCarregando(false)
@@ -158,11 +162,6 @@ export default function ChatbotPage() {
       .select('id,telefone,nome_paciente,mensagem_paciente,resposta_bot,processado_por,created_at')
       .eq('clinica_id', cid).order('created_at', { ascending: false }).limit(50)
     setLogs(data ?? [])
-  }
-
-  async function carregarSegmento(cid: string) {
-    const { data } = await supabase.from('clinicas').select('especialidade').eq('id', cid).maybeSingle()
-    setSegmento(data?.especialidade || null)
   }
 
   async function carregarConfig(cid: string) {

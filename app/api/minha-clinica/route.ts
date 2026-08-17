@@ -63,7 +63,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 404 });
   }
 
-  return NextResponse.json({ clinica_id: vinculo.clinica_id });
+  // Colunas explícitas, nunca SELECT * — mesma allowlist já homologada no
+  // PUT. Só telas que realmente precisam desses campos (Sublote 2.5) chamam
+  // este GET esperando mais que clinica_id.
+  const { data: clinica, error: clinicaError } = await supabase
+    .from("clinicas")
+    .select("nome, especialidade, telefone, whatsapp, endereco, cidade, estado, google_maps_url, email")
+    .eq("id", vinculo.clinica_id)
+    .maybeSingle();
+
+  if (clinicaError) {
+    console.error("[minha-clinica/GET] erro ao consultar clinica:", clinicaError.message);
+    return NextResponse.json({ error: "Não foi possível carregar os dados da clínica. Tente novamente." }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    clinica_id:      vinculo.clinica_id,
+    nome:            clinica?.nome            ?? "",
+    especialidade:   clinica?.especialidade   ?? "",
+    telefone:        clinica?.telefone        ?? "",
+    whatsapp:        clinica?.whatsapp        ?? "",
+    endereco:        clinica?.endereco        ?? "",
+    cidade:          clinica?.cidade          ?? "",
+    estado:          clinica?.estado          ?? "",
+    google_maps_url: clinica?.google_maps_url ?? "",
+    email:           clinica?.email           ?? "",
+  });
 }
 
 export async function PUT(req: NextRequest) {
