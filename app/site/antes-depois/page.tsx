@@ -43,10 +43,13 @@ export default function AntesDepoisAdmin() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
-      const { data: cu } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).maybeSingle();
-      if (!cu?.clinica_id) { return; }
-      setClinicaId(cu.clinica_id);
-      const { data } = await supabase.from("clinica_antes_depois").select("*").eq("clinica_id", cu.clinica_id).order("ordem");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { router.push("/login"); return; }
+      const cuRes = await fetch("/api/minha-clinica", { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
+      if (!cid) { return; }
+      setClinicaId(cid);
+      const { data } = await supabase.from("clinica_antes_depois").select("*").eq("clinica_id", cid).order("ordem");
       setItens(data ?? []);
     } finally {
       setLoading(false);
