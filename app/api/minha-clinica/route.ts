@@ -64,17 +64,25 @@ export async function GET(req: NextRequest) {
   }
 
   // Colunas explícitas, nunca SELECT * — mesma allowlist já homologada no
-  // PUT. Só telas que realmente precisam desses campos (Sublote 2.5) chamam
-  // este GET esperando mais que clinica_id.
+  // PUT, mais `produto` (só para a checagem abaixo, nunca devolvido no
+  // JSON). Só telas que realmente precisam desses campos (Sublote 2.5)
+  // chamam este GET esperando mais que clinica_id.
   const { data: clinica, error: clinicaError } = await supabase
     .from("clinicas")
-    .select("nome, especialidade, telefone, whatsapp, endereco, cidade, estado, google_maps_url, email")
+    .select("produto, nome, especialidade, telefone, whatsapp, endereco, cidade, estado, google_maps_url, email")
     .eq("id", vinculo.clinica_id)
     .maybeSingle();
 
   if (clinicaError) {
     console.error("[minha-clinica/GET] erro ao consultar clinica:", clinicaError.message);
     return NextResponse.json({ error: "Não foi possível carregar os dados da clínica. Tente novamente." }, { status: 500 });
+  }
+
+  // 'organizapro' é literal — nunca lido do cliente. produto ausente (NULL)
+  // ou diferente de 'organizapro' reprova com a mesma mensagem do caso
+  // "sem vínculo", para não revelar o motivo exato a um chamador não autorizado.
+  if (clinica?.produto !== "organizapro") {
+    return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 404 });
   }
 
   return NextResponse.json({
@@ -119,6 +127,18 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Não foi possível validar seu vínculo. Tente novamente." }, { status: 500 });
     }
     if (!vinculo?.clinica_id) {
+      return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 403 });
+    }
+
+    // 'organizapro' é literal — nunca lido do cliente. Mesma mensagem do
+    // caso "sem vínculo" para produto ausente (NULL) ou diferente — antes
+    // de ler o body ou escrever qualquer coisa.
+    const { data: clinicaAtual } = await supabase
+      .from("clinicas")
+      .select("produto")
+      .eq("id", vinculo.clinica_id)
+      .maybeSingle();
+    if (clinicaAtual?.produto !== "organizapro") {
       return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 403 });
     }
 
