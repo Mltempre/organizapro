@@ -32,6 +32,40 @@ function normalizarWhatsapp(valor: string): string {
   return valor.replace(/\D/g, "");
 }
 
+// Resolve o clinica_id do usuário autenticado — mesma autorização do PUT
+// abaixo (sessão real → auth.uid() → vínculo ativo), fail-closed. Só
+// devolve o id; nenhum campo de `clinicas` é exposto aqui (ver Sublote 2.5
+// para as telas que precisam de mais que isso).
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!bearer) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  const { data: { user } } = await supabaseAnon.auth.getUser(bearer);
+  if (!user) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  const { data: vinculo, error: vinculoError } = await supabase
+    .from("clinica_usuarios")
+    .select("clinica_id")
+    .eq("usuario_id", user.id)
+    .eq("ativo", true)
+    .maybeSingle();
+
+  if (vinculoError) {
+    console.error("[minha-clinica/GET] erro ao consultar vínculo:", vinculoError.message);
+    return NextResponse.json({ error: "Não foi possível validar seu vínculo. Tente novamente." }, { status: 500 });
+  }
+  if (!vinculo?.clinica_id) {
+    return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 404 });
+  }
+
+  return NextResponse.json({ clinica_id: vinculo.clinica_id });
+}
+
 export async function PUT(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");

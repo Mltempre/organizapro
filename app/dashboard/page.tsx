@@ -70,10 +70,12 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      const { data: cu } = await supabase
-        .from("clinica_usuarios").select("clinica_id")
-        .eq("usuario_id", user.id).maybeSingle();
-      const cid = cu?.clinica_id;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { router.push("/login"); return; }
+      const cuRes = await fetch("/api/minha-clinica", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
       if (!cid) { setLoading(false); return; }
       setClinicaId(cid);
 

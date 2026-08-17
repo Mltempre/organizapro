@@ -34,19 +34,30 @@ export default function Metricas() {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) { router.push('/login'); return }
       
-      const { data: cu, error: cuError } = await supabase.from('clinica_usuarios').select('clinica_id').eq('usuario_id', user.id).maybeSingle()
-      if (cuError) {
-        console.error("Erro ao buscar clinica_usuarios:", cuError)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) { router.push('/login'); return }
+
+      let clinicaId: string | undefined
+      try {
+        const cuRes = await fetch('/api/minha-clinica', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (cuRes.ok) {
+          clinicaId = (await cuRes.json()).clinica_id
+        } else if (cuRes.status !== 404) {
+          console.error("Erro ao buscar clinica_usuarios:", cuRes.status)
+          // Não quebrar métricas por erro de clinica_usuarios
+        }
+      } catch (e) {
+        console.error("Erro ao buscar clinica_usuarios:", e)
         // Não quebrar métricas por erro de clinica_usuarios
       }
-      if (!cu?.clinica_id) {
+      if (!clinicaId) {
         // Carregar métricas vazias mesmo sem clínica
         setDados({ totalPacientes: 0, totalAgendamentos: 0, confirmados: 0, concluidos: 0, cancelados: 0, pendentes: 0 })
         setLoading(false)
         return
       }
-
-      const clinicaId = cu.clinica_id
       
       const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
 

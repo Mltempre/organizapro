@@ -127,10 +127,13 @@ export default function ClientesPage() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) { router.push('/login'); return; }
-      const { data: cu, error: cuError } = await supabase
-        .from('clinica_usuarios').select('clinica_id').eq('usuario_id', user.id).maybeSingle();
-      if (cuError) console.error('Erro ao buscar clinica_usuarios:', cuError);
-      const cid = cu?.clinica_id;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { router.push('/login'); return; }
+      const cuRes = await fetch('/api/minha-clinica', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!cuRes.ok && cuRes.status !== 404) console.error('Erro ao buscar clinica_usuarios:', cuRes.status);
+      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
       setClinicaId(cid || '');
       if (!cid) { setPacientes([]); setCarregando(false); return; }
       const { data, error } = await supabase
