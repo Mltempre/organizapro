@@ -69,13 +69,12 @@ export default function ConfiguracoesPage() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) { router.push('/login'); return; }
 
-      const { data: cu } = await supabase
-        .from('clinica_usuarios')
-        .select('clinica_id')
-        .eq('usuario_id', user.id)
-        .maybeSingle();
-
-      setClinicaId(cu?.clinica_id || '');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { router.push('/login'); return; }
+      const cuRes = await fetch('/api/minha-clinica', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setClinicaId(cuRes.ok ? ((await cuRes.json()).clinica_id || '') : '');
 
       const { data } = await supabase
         .from('clinica_config')
@@ -160,22 +159,24 @@ export default function ConfiguracoesPage() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) { router.push('/login'); return; }
 
-      const { data: cu } = await supabase
-        .from('clinica_usuarios').select('clinica_id').eq('usuario_id', user.id).maybeSingle();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setTesteMsg('erro:Sessão expirada. Recarregue a página e tente novamente.');
+        return;
+      }
 
-      if (!cu?.clinica_id) {
+      const cuRes = await fetch('/api/minha-clinica', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
+
+      if (!cid) {
         setTesteMsg('erro:Negócio não vinculado ao usuário.');
         return;
       }
 
       if (!config.telefone) {
         setTesteMsg('erro:Informe o WhatsApp do negócio no campo acima antes de testar.');
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setTesteMsg('erro:Sessão expirada. Recarregue a página e tente novamente.');
         return;
       }
 
@@ -186,7 +187,7 @@ export default function ConfiguracoesPage() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          clinica_id: cu.clinica_id,
+          clinica_id: cid,
           user_id: user.id,
           telefone: config.telefone,
           mensagem: '✅ Teste OrganizaPro: integração Z-API funcionando corretamente!',

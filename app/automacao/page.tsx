@@ -58,13 +58,12 @@ export default function AutomacaoPage() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) { router.push('/login'); return; }
 
-      const { data: cu } = await supabase
-        .from('clinica_usuarios')
-        .select('clinica_id')
-        .eq('usuario_id', user.id)
-        .maybeSingle();
-
-      const cId = cu?.clinica_id || '';
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { router.push('/login'); return; }
+      const cuRes = await fetch('/api/minha-clinica', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const cId: string = cuRes.ok ? ((await cuRes.json()).clinica_id || '') : '';
       setClinicaId(cId);
       if (!cId) { setCarregando(false); return; }
 

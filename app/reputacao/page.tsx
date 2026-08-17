@@ -59,15 +59,16 @@ export default function ReputacaoPage() {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) { router.push('/login'); return }
 
-      const { data: cu } = await supabase
-        .from('clinica_usuarios')
-        .select('clinica_id')
-        .eq('usuario_id', user.id)
-        .maybeSingle()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) { router.push('/login'); return }
+      const cuRes = await fetch('/api/minha-clinica', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined
 
-      if (cu?.clinica_id) {
-        setClinicaId(cu.clinica_id)
-        await carregarDados(cu.clinica_id)
+      if (cid) {
+        setClinicaId(cid)
+        await carregarDados(cid)
       }
     }
     init()
