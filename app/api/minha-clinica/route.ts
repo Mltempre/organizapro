@@ -1,0 +1,109 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const supabaseAnon = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+// Únicos campos que esta tela (app/site/page.tsx) tem permissão de
+// atualizar em `clinicas`. Nunca repassar o body inteiro para o Supabase —
+// qualquer chave fora desta lista é ignorada, nunca persistida.
+const CAMPOS_PERMITIDOS = [
+  "nome", "especialidade", "telefone", "whatsapp",
+  "endereco", "cidade", "estado", "google_maps_url", "email",
+] as const;
+
+// Campos que o cliente NUNCA pode influenciar por este endpoint — se
+// vierem no body, a requisição inteira é rejeitada (não apenas ignorada),
+// para deixar explícito que foi uma tentativa de alterar algo fora do
+// escopo desta tela, e não um esquecimento de payload.
+const CAMPOS_PROIBIDOS = [
+  "id", "clinica_id", "produto", "user_id", "usuario_id",
+  "owner_id", "criado_em", "created_at",
+];
+
+function normalizarWhatsapp(valor: string): string {
+  return valor.replace(/\D/g, "");
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get("authorization");
+    const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!bearer) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    }
+
+    const { data: { user } } = await supabaseAnon.auth.getUser(bearer);
+    if (!user) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    }
+
+    // auth.uid() é a única fonte do vínculo — clinica_id nunca é lido do
+    // body. Um eventual erro de consulta bloqueia (fail-closed), não
+    // segue em frente com dado incompleto.
+    const { data: vinculo, error: vinculoError } = await supabase
+      .from("clinica_usuarios")
+      .select("clinica_id")
+      .eq("usuario_id", user.id)
+      .eq("ativo", true)
+      .maybeSingle();
+
+    if (vinculoError) {
+      console.error("[minha-clinica/PUT] erro ao consultar vínculo:", vinculoError.message);
+      return NextResponse.json({ error: "Não foi possível validar seu vínculo. Tente novamente." }, { status: 500 });
+    }
+    if (!vinculo?.clinica_id) {
+      return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 403 });
+    }
+
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 });
+    }
+    const bodyRecord = body as Record<string, unknown>;
+
+    for (const campo of CAMPOS_PROIBIDOS) {
+      if (campo in bodyRecord) {
+        return NextResponse.json(
+          { error: `Campo '${campo}' não pode ser alterado por este endpoint` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const payload: Record<string, string> = {};
+    for (const campo of CAMPOS_PERMITIDOS) {
+      const valor = bodyRecord[campo];
+      if (valor !== undefined && typeof valor !== "string") {
+        return NextResponse.json({ error: `Campo '${campo}' inválido` }, { status: 400 });
+      }
+      payload[campo] = typeof valor === "string" ? valor : "";
+    }
+    payload.whatsapp = normalizarWhatsapp(payload.whatsapp);
+
+    // service_role só executa a escrita AQUI — depois de sessão validada,
+    // vínculo confirmado e payload restrito à allowlist. id vem do
+    // vínculo (servidor), nunca do body.
+    const { error: updateError } = await supabase
+      .from("clinicas")
+      .upsert({ id: vinculo.clinica_id, ...payload }, { onConflict: "id" });
+
+    if (updateError) {
+      console.error("[minha-clinica/PUT] erro ao salvar:", updateError.message);
+      return NextResponse.json({ error: "Não foi possível salvar os dados do negócio." }, { status: 500 });
+    }
+
+    return NextResponse.json({ sucesso: true, clinica_id: vinculo.clinica_id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[minha-clinica/PUT] exceção:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

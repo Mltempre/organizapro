@@ -300,22 +300,29 @@ export default function Site() {
 
     if (existing) { setErro("Este endereço (slug) já está sendo usado por outro negócio. Escolha outro."); setSalvando(false); return; }
 
-    const { error: clinicaError } = await supabase
-      .from("clinicas")
-      .upsert({
-        id:              clinicaId,
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) { setErro("Sessão expirada. Recarregue a página e tente novamente."); setSalvando(false); return; }
+
+    const clinicaRes = await fetch("/api/minha-clinica", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
         nome:            form.nome,
         especialidade:   form.especialidade,
         telefone:        form.telefone,
-        whatsapp:        normalizePhone(form.whatsapp),
+        whatsapp:        form.whatsapp,
         endereco:        form.endereco,
         cidade:          form.cidade,
         estado:          form.estado,
         google_maps_url: form.google_maps_url,
         email:           form.email,
-      }, { onConflict: "id" });
+      }),
+    });
 
-    if (clinicaError) { setErro("Não foi possível salvar os dados do negócio. Tente novamente em instantes."); setSalvando(false); return; }
+    if (!clinicaRes.ok) { setErro("Não foi possível salvar os dados do negócio. Tente novamente em instantes."); setSalvando(false); return; }
 
     const configBase = {
       user_id:    userId,
