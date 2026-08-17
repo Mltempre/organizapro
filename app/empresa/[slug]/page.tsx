@@ -24,29 +24,28 @@ type ResumoEmpresa = {
 // si (SiteEmpresaClient) carrega os dados completos separadamente no
 // cliente. seo_titulo/seo_descricao/seo_imagem_url, quando preenchidos pelo
 // cliente no painel, têm prioridade sobre os valores gerados automaticamente.
+//
+// p_produto é sempre o literal 'organizapro' — nunca lido de query string,
+// body ou qualquer input do cliente. site_publico_por_slug_v2 já filtra por
+// produto internamente; slug de outro produto ou clinicas.produto IS NULL
+// devolvem 0 linhas por design (ver sql/isolamento-produto-clinicas-clinica-usuarios.sql).
 async function buscarResumoEmpresa(slug: string): Promise<ResumoEmpresa | null> {
-  const { data: config } = await supabase
-    .from("clinica_config_publica")
-    .select("clinica_id, logo_url, hero_url, banner_url, seo_titulo, seo_descricao, seo_imagem_url")
-    .eq("slug", slug)
-    .maybeSingle();
-  if (!config?.clinica_id) return null;
-
-  const { data: empresa } = await supabase
-    .from("clinicas")
-    .select("nome, especialidade, cidade, estado")
-    .eq("id", config.clinica_id)
-    .maybeSingle();
-  if (!empresa?.nome) return null;
+  const { data } = await supabase
+    .rpc("site_publico_por_slug_v2", { p_slug: slug, p_produto: "organizapro" })
+    .maybeSingle<ResumoEmpresa>();
+  if (!data?.nome) return null;
 
   return {
-    ...empresa,
-    logo_url: config.logo_url,
-    hero_url: config.hero_url,
-    banner_url: config.banner_url,
-    seo_titulo: config.seo_titulo,
-    seo_descricao: config.seo_descricao,
-    seo_imagem_url: config.seo_imagem_url,
+    nome: data.nome,
+    especialidade: data.especialidade,
+    cidade: data.cidade,
+    estado: data.estado,
+    logo_url: data.logo_url,
+    hero_url: data.hero_url,
+    banner_url: data.banner_url,
+    seo_titulo: data.seo_titulo,
+    seo_descricao: data.seo_descricao,
+    seo_imagem_url: data.seo_imagem_url,
   };
 }
 

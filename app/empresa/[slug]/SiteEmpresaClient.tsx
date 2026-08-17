@@ -48,35 +48,27 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
   useEffect(() => {
     if (!slug) return;
     async function carregar() {
-      type ConfigRow = {
-        clinica_id: string; logo_url?: string; hero_url?: string; banner_url?: string | null;
+      type DadosPublicos = {
+        clinica_id: string; nome?: string; especialidade?: string; cidade?: string; estado?: string;
+        telefone?: string; email?: string; endereco?: string; whatsapp?: string; google_maps_url?: string;
+        logo_url?: string; hero_url?: string; banner_url?: string | null;
         nota_google?: number | null; num_avaliacoes?: number | null; horario_funcionamento?: string | null;
         instagram_url?: string | null; facebook_url?: string | null; linkedin_url?: string | null; tiktok_url?: string | null;
         seo_titulo?: string | null; seo_descricao?: string | null; seo_imagem_url?: string | null;
       };
-      let config: ConfigRow | null = null;
-      // Lê da view pública clinica_config_publica — a tabela base
-      // clinica_config não aceita mais leitura anônima (ver migração
-      // 20260713000002_fix_clinica_config_rls.sql), só as 14 colunas
-      // necessárias para o site institucional ficam expostas aqui.
-      const { data: cfgFull, error: cfgErr } = await supabase
-        .from("clinica_config_publica")
-        .select("clinica_id, logo_url, hero_url, banner_url, nota_google, num_avaliacoes, horario_funcionamento, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
-        .eq("slug", slug)
-        .maybeSingle();
+      // p_produto é sempre o literal 'organizapro' — nunca lido de query
+      // string, body ou qualquer input do cliente. A RPC já filtra por
+      // produto internamente (ver sql/isolamento-produto-clinicas-clinica-usuarios.sql);
+      // slug de outro produto ou clinicas.produto IS NULL devolvem 0 linhas
+      // por design, tratados abaixo como "empresa não encontrada".
+      const { data: dados } = await supabase
+        .rpc("site_publico_por_slug_v2", { p_slug: slug, p_produto: "organizapro" })
+        .maybeSingle<DadosPublicos>();
 
-      if (cfgErr?.code === "42703") {
-        const { data: cfgBasic } = await supabase.from("clinica_config_publica").select("clinica_id, logo_url").eq("slug", slug).maybeSingle();
-        config = cfgBasic ? { clinica_id: cfgBasic.clinica_id, logo_url: cfgBasic.logo_url } : null;
-      } else if (!cfgErr) {
-        config = cfgFull;
-      }
+      if (!dados?.clinica_id) { setEmpresa(null); setLoading(false); return; }
+      const cid = dados.clinica_id;
 
-      if (!config?.clinica_id) { setEmpresa(null); setLoading(false); return; }
-      const cid = config.clinica_id;
-
-      const [empresaRes, galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes] = await Promise.all([
-        supabase.from("clinicas").select("*").eq("id", cid).maybeSingle(),
+      const [galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes] = await Promise.all([
         supabase.from("clinica_galeria").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_equipe").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_depoimentos").select("*").eq("clinica_id", cid).order("ordem"),
@@ -86,21 +78,28 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
       ]);
 
       setEmpresa({
-        ...(empresaRes.data ?? {}),
-        especialidade: normalizarEspecialidade(empresaRes.data?.especialidade),
-        logo_url: config.logo_url ?? undefined,
-        hero_url: config.hero_url ?? undefined,
-        banner_url: config.banner_url ?? null,
-        nota_google: config.nota_google ?? null,
-        num_avaliacoes: config.num_avaliacoes ?? null,
-        horario_funcionamento: config.horario_funcionamento ?? null,
-        instagram_url: config.instagram_url ?? null,
-        facebook_url: config.facebook_url ?? null,
-        linkedin_url: config.linkedin_url ?? null,
-        tiktok_url: config.tiktok_url ?? null,
-        seo_titulo: config.seo_titulo ?? null,
-        seo_descricao: config.seo_descricao ?? null,
-        seo_imagem_url: config.seo_imagem_url ?? null,
+        nome: dados.nome,
+        especialidade: normalizarEspecialidade(dados.especialidade),
+        cidade: dados.cidade,
+        estado: dados.estado,
+        telefone: dados.telefone,
+        email: dados.email,
+        endereco: dados.endereco,
+        whatsapp: dados.whatsapp,
+        google_maps_url: dados.google_maps_url,
+        logo_url: dados.logo_url ?? undefined,
+        hero_url: dados.hero_url ?? undefined,
+        banner_url: dados.banner_url ?? null,
+        nota_google: dados.nota_google ?? null,
+        num_avaliacoes: dados.num_avaliacoes ?? null,
+        horario_funcionamento: dados.horario_funcionamento ?? null,
+        instagram_url: dados.instagram_url ?? null,
+        facebook_url: dados.facebook_url ?? null,
+        linkedin_url: dados.linkedin_url ?? null,
+        tiktok_url: dados.tiktok_url ?? null,
+        seo_titulo: dados.seo_titulo ?? null,
+        seo_descricao: dados.seo_descricao ?? null,
+        seo_imagem_url: dados.seo_imagem_url ?? null,
       });
       setGaleria(safeData(galeriaRes as { data: DBGaleria[] | null; error: { code?: string } | null }));
       setEquipe(safeData(equipeRes as { data: DBEquipe[] | null; error: { code?: string } | null }));
