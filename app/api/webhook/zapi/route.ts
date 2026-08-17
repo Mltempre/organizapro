@@ -264,7 +264,10 @@ export async function POST(req: NextRequest) {
           try {
             const r = await fetch(`${baseUrl}/api/chatbot/message`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${process.env.CHATBOT_INTERNAL_SECRET}`,
+              },
               body: chatbotPayload,
             });
             const j = await r.json().catch(() => null);
@@ -428,7 +431,10 @@ export async function POST(req: NextRequest) {
           const baseUrl = new URL(req.url).origin;
           const cbRes2 = await fetch(`${baseUrl}/api/chatbot/message`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${process.env.CHATBOT_INTERNAL_SECRET}`,
+            },
             body: JSON.stringify({
               clinica_id: clinicaParaChatbot,
               telefone,

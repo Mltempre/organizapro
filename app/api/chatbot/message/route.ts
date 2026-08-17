@@ -509,6 +509,29 @@ export async function POST(req: NextRequest) {
   // ── PASSO 1: log imediato ─────────────────────────────────────────────────
   console.log("[CHATBOT] ===== NOVA REQUISIÇÃO =====");
 
+  // ── Autenticação interna: esta rota processa o motor de conversa real e dispara
+  // envio de WhatsApp usando as credenciais Z-API do tenant — nunca pode ser
+  // chamada por terceiro sem prova de que a origem é o próprio backend (webhook).
+  // Segredo aceito somente por header, nunca no corpo/URL, nunca logado. Mesmo
+  // padrão já homologado no ClínicaFlow (auditoria 2026-08-17).
+  const authHeader     = req.headers.get("authorization");
+  const bearer         = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const internalSecret = process.env.CHATBOT_INTERNAL_SECRET;
+  if (!internalSecret) {
+    // Erro de configuração do servidor, não uma falha genérica de execução —
+    // 503 (não 500) e a resposta HTTP nunca revela qual variável está
+    // faltando nem qualquer detalhe interno; o log técnico fica só no servidor.
+    console.error("[CHATBOT] CHATBOT_INTERNAL_SECRET não configurado — recusando execução (falha fechada)");
+    return NextResponse.json(
+      { sucesso: false, error: "Serviço temporariamente indisponível por configuração interna." },
+      { status: 503 }
+    );
+  }
+  if (bearer !== internalSecret) {
+    console.warn("[CHATBOT] requisição rejeitada: segredo interno ausente ou incorreto");
+    return NextResponse.json({ sucesso: false, error: "Não autorizado" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { clinica_id, telefone, mensagem, nome_paciente } = body as {

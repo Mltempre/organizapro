@@ -156,6 +156,11 @@ export default function ChatbotPage() {
     init()
   }, [])
 
+  async function authHeaders(): Promise<Record<string, string>> {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
   async function carregarLogs(cid: string) {
     const { data } = await supabase
       .from('chatbot_logs')
@@ -165,14 +170,14 @@ export default function ChatbotPage() {
   }
 
   async function carregarConfig(cid: string) {
-    const r = await fetch(`/api/chatbot/config?clinica_id=${cid}`)
+    const r = await fetch(`/api/chatbot/config?clinica_id=${cid}`, { headers: await authHeaders() })
     const j = await r.json()
     if (j.data) setConfig(j.data)
     else setConfig({ clinica_id: cid })
   }
 
   async function carregarTreinamentos(cid: string) {
-    const r = await fetch(`/api/chatbot/treinamento?clinica_id=${cid}`)
+    const r = await fetch(`/api/chatbot/treinamento?clinica_id=${cid}`, { headers: await authHeaders() })
     const j = await r.json()
     setTreinamentos(j.data ?? [])
   }
@@ -182,7 +187,7 @@ export default function ChatbotPage() {
     setSalvando(true); setMsg('')
     try {
       const r = await fetch('/api/chatbot/config', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ ...config, clinica_id: clinicaId }),
       })
       const j = await r.json()
@@ -208,7 +213,7 @@ export default function ChatbotPage() {
           ? { id: form.id, pergunta: form.pergunta, resposta: form.resposta, palavras_chave: form.palavras_chave }
           : { clinica_id: clinicaId, pergunta: form.pergunta, resposta: form.resposta, palavras_chave: form.palavras_chave }
         const r = await fetch('/api/chatbot/treinamento', {
-          method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+          method, headers: { 'Content-Type': 'application/json', ...(await authHeaders()) }, body: JSON.stringify(payload),
         })
         const j = await r.json()
         if (j.sucesso) {
@@ -226,7 +231,7 @@ export default function ChatbotPage() {
 
   async function toggleAtivo(t: Treinamento) {
     const r = await fetch('/api/chatbot/treinamento', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ id: t.id, ativo: !t.ativo }),
     })
     const j = await r.json()
@@ -235,7 +240,7 @@ export default function ChatbotPage() {
 
   async function excluirTreinamento(id: string) {
     if (!confirm('Excluir este treinamento?')) return
-    const r = await fetch(`/api/chatbot/treinamento?id=${id}`, { method: 'DELETE' })
+    const r = await fetch(`/api/chatbot/treinamento?id=${id}`, { method: 'DELETE', headers: await authHeaders() })
     const j = await r.json()
     if (j.sucesso && clinicaId) await carregarTreinamentos(clinicaId)
   }
