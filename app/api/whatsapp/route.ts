@@ -6,6 +6,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const supabaseAnon = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 function normalizarTelefone(telefone: string): string {
   const soNumeros = telefone.replace(/\D/g, "");
 
@@ -16,37 +21,54 @@ function normalizarTelefone(telefone: string): string {
   return "55" + soNumeros;
 }
 
-async function verificarAutenticacao(req: NextRequest): Promise<boolean> {
+// Chamada de serviço interno (cron, webhook Z-API, chatbot) — não há auth.uid();
+// o clinica_id já foi resolvido por código server-side confiável antes de chegar aqui,
+// nunca por input de um usuário externo.
+function autenticarServicoInterno(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!bearer) return false;
-
-  // Aceita CRON_SECRET como token de serviço interno
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && bearer === cronSecret) return true;
+  return !!(bearer && cronSecret && bearer === cronSecret);
+}
 
-  // Aceita token de usuário autenticado via Supabase
-  const supabaseAnon = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+// Chamada de usuário real. clinica_id do body é tratado como NÃO CONFIÁVEL até
+// confirmar vínculo ativo entre auth.uid() (derivado do token, nunca do body) e
+// esse clinica_id específico.
+async function autorizarUsuario(
+  req: NextRequest,
+  clinicaId: string
+): Promise<{ ok: true } | { ok: false; status: 401 | 403 }> {
+  const authHeader = req.headers.get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!bearer) return { ok: false, status: 401 };
+
   const { data: { user } } = await supabaseAnon.auth.getUser(bearer);
-  return !!user;
+  if (!user) return { ok: false, status: 401 };
+
+  const { data: vinculo } = await supabase
+    .from("clinica_usuarios")
+    .select("id")
+    .eq("usuario_id", user.id)
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .maybeSingle();
+
+  if (!vinculo) return { ok: false, status: 403 };
+
+  // PENDENTE: checagem de clinicas.produto = 'organizapro' (hardcoded).
+  // Coluna ainda não existe no banco (confirmado por leitura direta, sem migration
+  // aplicada). Fica bloqueado até a Fase A do isolamento de produto ser executada —
+  // reportado ao Diretor, não implementado por aproximação.
+
+  return { ok: true };
 }
 
 export async function POST(req: NextRequest) {
-  const autenticado = await verificarAutenticacao(req);
-  if (!autenticado) {
-    return NextResponse.json({ sucesso: false, error: "Não autenticado" }, { status: 401 });
-  }
-
-  let body: { clinica_id?: string; user_id?: string; telefone?: string; mensagem?: string } = {};
+  let body: { clinica_id?: string; telefone?: string; mensagem?: string } = {};
   try {
     body = await req.json();
 
     const clinica_id = body.clinica_id;
-    const user_id    = body.user_id;
-
     const telefone   = body.telefone;
     const mensagem   = body.mensagem;
 
@@ -57,82 +79,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    type ZapiConfig = { zapi_instance: string; zapi_token: string; zapi_client_token: string };
-    type DbError = { message?: string; code?: string; hint?: string } | null;
-
-    let config: ZapiConfig | null = null;
-    let lastError: DbError = null;
-
-    // Tentativa 1: clinica_config WHERE clinica_id = body.clinica_id
-    {
-      const { data, error } = await supabase
-        .from("clinica_config")
-        .select("zapi_instance, zapi_token, zapi_client_token")
-        .eq("clinica_id", clinica_id)
-        .maybeSingle();
-      if (data) config = data;
-      else lastError = error;
-    }
-
-    // Tentativa 2: clinica_usuarios WHERE usuario_id = user_id → clinica_config WHERE clinica_id
-    if (!config && user_id) {
-      const { data: cu } = await supabase
-        .from("clinica_usuarios")
-        .select("clinica_id")
-        .eq("usuario_id", user_id)
-        .maybeSingle();
-      if (cu?.clinica_id) {
-        const { data, error } = await supabase
-          .from("clinica_config")
-          .select("zapi_instance, zapi_token, zapi_client_token")
-          .eq("clinica_id", cu.clinica_id)
-          .maybeSingle();
-        if (data) config = data;
-        else lastError = error;
+    if (!autenticarServicoInterno(req)) {
+      const auth = await autorizarUsuario(req, clinica_id);
+      if (!auth.ok) {
+        const error = auth.status === 401
+          ? "Não autenticado"
+          : "Usuário não tem vínculo com esta clínica";
+        return NextResponse.json({ sucesso: false, error }, { status: auth.status });
       }
     }
 
-    // Tentativa 3: clinica_usuarios WHERE clinica_id → usuario_id → clinica_config WHERE user_id
-    if (!config) {
-      const { data: vinculo } = await supabase
-        .from("clinica_usuarios")
-        .select("usuario_id")
-        .eq("clinica_id", clinica_id)
-        .maybeSingle();
-      if (vinculo?.usuario_id) {
-        const { data, error } = await supabase
-          .from("clinica_config")
-          .select("zapi_instance, zapi_token, zapi_client_token")
-          .eq("user_id", vinculo.usuario_id)
-          .maybeSingle();
-        if (data) config = data;
-        else lastError = error;
-      }
-    }
-
-    // Tentativa 4: fallback final — clinica_config WHERE user_id = body.user_id
-    if (!config && user_id) {
-      const { data, error } = await supabase
-        .from("clinica_config")
-        .select("zapi_instance, zapi_token, zapi_client_token")
-        .eq("user_id", user_id)
-        .maybeSingle();
-      if (data) config = data;
-      else lastError = error;
-    }
+    const { data: config, error: configError } = await supabase
+      .from("clinica_config")
+      .select("zapi_instance, zapi_token, zapi_client_token")
+      .eq("clinica_id", clinica_id)
+      .maybeSingle();
 
     if (!config) {
       console.error("[whatsapp/route] config Z-API não encontrada:", {
-        clinica_id, user_id: user_id ?? null,
-        ultimo_erro: lastError?.message ?? "vazio",
+        clinica_id,
+        ultimo_erro: configError?.message ?? "vazio",
       });
       return NextResponse.json(
         {
           sucesso:  false,
-          error:    lastError?.message ?? "Configuração da clínica não encontrada",
-          detalhe:  lastError?.message ?? null,
-          code:     lastError?.code    ?? null,
-          hint:     lastError?.hint    ?? null,
+          error:    configError?.message ?? "Configuração da clínica não encontrada",
+          detalhe:  configError?.message ?? null,
+          code:     configError?.code    ?? null,
+          hint:     configError?.hint    ?? null,
         },
         { status: 404 }
       );
