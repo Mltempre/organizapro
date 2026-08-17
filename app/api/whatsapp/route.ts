@@ -55,10 +55,16 @@ async function autorizarUsuario(
 
   if (!vinculo) return { ok: false, status: 403 };
 
-  // PENDENTE: checagem de clinicas.produto = 'organizapro' (hardcoded).
-  // Coluna ainda não existe no banco (confirmado por leitura direta, sem migration
-  // aplicada). Fica bloqueado até a Fase A do isolamento de produto ser executada —
-  // reportado ao Diretor, não implementado por aproximação.
+  // 'organizapro' é literal — nunca lido do body, query string ou header.
+  // produto ausente (NULL) ou diferente de 'organizapro' reprova igual —
+  // mesma mensagem genérica do caso "sem vínculo", para não revelar a um
+  // chamador não autorizado se o problema foi vínculo ou produto.
+  const { data: clinica } = await supabase
+    .from("clinicas")
+    .select("produto")
+    .eq("id", clinicaId)
+    .maybeSingle();
+  if (clinica?.produto !== "organizapro") return { ok: false, status: 403 };
 
   return { ok: true };
 }

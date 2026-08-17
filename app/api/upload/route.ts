@@ -45,6 +45,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Usuário não tem vínculo com esta clínica" }, { status: 403 });
     }
 
+    // 'organizapro' é literal — nunca lido do body, query string ou header.
+    // Mesma mensagem genérica do caso "sem vínculo" para produto ausente
+    // (NULL) ou diferente — não revela ao chamador qual foi o motivo.
+    // Antes de qualquer efeito colateral (upload/storage abaixo).
+    const { data: clinica } = await supabase
+      .from("clinicas")
+      .select("produto")
+      .eq("id", clinicaId)
+      .maybeSingle();
+    if (clinica?.produto !== "organizapro") {
+      return NextResponse.json({ error: "Usuário não tem vínculo com esta clínica" }, { status: 403 });
+    }
+
     if (!(VALID_TIPOS as readonly string[]).includes(tipo)) {
       return NextResponse.json({ error: "tipo inválido" }, { status: 400 });
     }

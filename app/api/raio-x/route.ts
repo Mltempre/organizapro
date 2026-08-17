@@ -32,11 +32,24 @@ export async function GET(req: NextRequest) {
       .from("clinica_usuarios")
       .select("clinica_id")
       .eq("usuario_id", user.id)
+      .eq("ativo", true)
       .maybeSingle();
 
     if (!cu?.clinica_id) return NextResponse.json({ error: "Clínica não encontrada" }, { status: 404 });
 
     const cid = cu.clinica_id;
+
+    // 'organizapro' é literal — nunca lido do body, query string ou header.
+    // Mesma mensagem genérica do caso "sem vínculo" — antes de qualquer
+    // consulta cara (Promise.all abaixo) ou chamada à OpenAI.
+    const { data: clinicaCheck } = await supabase
+      .from("clinicas")
+      .select("produto")
+      .eq("id", cid)
+      .maybeSingle();
+    if (clinicaCheck?.produto !== "organizapro") {
+      return NextResponse.json({ error: "Clínica não encontrada" }, { status: 404 });
+    }
 
     // Date ranges (Brasília)
     const hoje        = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
