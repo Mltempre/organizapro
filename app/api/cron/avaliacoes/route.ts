@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
             method:  "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${cronSecret}`,
+              "Authorization": `Bearer ${process.env.INTERNAL_SERVICE_SECRET}`,
             },
             body: JSON.stringify({
               clinica_id: config.clinica_id,

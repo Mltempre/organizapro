@@ -24,11 +24,19 @@ function normalizarTelefone(telefone: string): string {
 // Chamada de serviço interno (cron, webhook Z-API, chatbot) — não há auth.uid();
 // o clinica_id já foi resolvido por código server-side confiável antes de chegar aqui,
 // nunca por input de um usuário externo.
+//
+// Auditoria 2026-08-17 (separação de segredos): este endpoint aceitava
+// CRON_SECRET — o mesmo segredo usado pelo Vercel Cron para autorizar
+// entrada em /api/cron/lembretes e /api/cron/avaliacoes. Um único segredo
+// cobrindo "quem pode disparar os crons de massa" e "quem pode mandar 1
+// WhatsApp para 1 tenant" ampliava o raio de um vazamento sem necessidade.
+// Passa a exigir INTERNAL_SERVICE_SECRET, dedicado só a chamadas internas
+// serviço-a-serviço — CRON_SECRET nunca mais é aceito aqui.
 function autenticarServicoInterno(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cronSecret = process.env.CRON_SECRET;
-  return !!(bearer && cronSecret && bearer === cronSecret);
+  const internalSecret = process.env.INTERNAL_SERVICE_SECRET;
+  return !!(bearer && internalSecret && bearer === internalSecret);
 }
 
 // Chamada de usuário real. clinica_id do body é tratado como NÃO CONFIÁVEL até

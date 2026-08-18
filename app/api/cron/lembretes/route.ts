@@ -96,7 +96,7 @@ export async function GET(request: Request) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${cronSecret}`,
+            "Authorization": `Bearer ${process.env.INTERNAL_SERVICE_SECRET}`,
           },
           body: JSON.stringify({
             telefone: ag.telefone,

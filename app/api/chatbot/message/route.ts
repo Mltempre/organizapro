@@ -714,15 +714,15 @@ export async function POST(req: NextRequest) {
     console.log("[CHATBOT] enviando resposta via /api/whatsapp");
     try {
       const baseUrl = new URL(req.url).origin;
-      const cronSecret = process.env.CRON_SECRET;
-      if (!cronSecret) {
-        throw new Error("CRON_SECRET não configurado para envio interno");
+      const internalServiceSecret = process.env.INTERNAL_SERVICE_SECRET;
+      if (!internalServiceSecret) {
+        throw new Error("INTERNAL_SERVICE_SECRET não configurado para envio interno");
       }
       const r       = await fetch(`${baseUrl}/api/whatsapp`, {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${cronSecret}`,
+          "Authorization": `Bearer ${internalServiceSecret}`,
         },
         body:    JSON.stringify({ clinica_id, telefone, mensagem: resposta }),
       });

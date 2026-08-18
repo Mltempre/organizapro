@@ -111,14 +111,29 @@ export async function POST(req: NextRequest) {
   });
 
   try {
+    // Autenticação obrigatória e fail-closed (auditoria 2026-08-17): antes
+    // desta correção, a checagem só rodava SE a env var existisse — ausência
+    // de configuração equivalia a aceitar qualquer requisição sem nenhuma
+    // credencial. Mesmo padrão já homologado em CHATBOT_INTERNAL_SECRET:
+    // sem a variável configurada, falha fechada (503); token ausente ou
+    // incorreto, 401. `?token=` na query string é o único mecanismo que a
+    // Z-API real suporta (a URL do webhook é só uma string, sem campo de
+    // headers customizados — confirmado na documentação oficial); o header
+    // `x-webhook-token` permanece só como alternativa para teste manual.
+    // Ocorre antes de qualquer leitura/escrita no banco.
     const secret = process.env.WEBHOOK_SECRET;
-    if (secret) {
-      const { searchParams } = new URL(req.url);
-      const token = searchParams.get("token") ?? req.headers.get("x-webhook-token");
-      if (token !== secret) {
-        console.log("[WEBHOOK] retorno antecipado: token inválido", { token: token?.slice(0, 10) });
-        return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-      }
+    if (!secret) {
+      console.error("[WEBHOOK] WEBHOOK_SECRET não configurado — recusando execução (falha fechada)");
+      return NextResponse.json(
+        { error: "Serviço temporariamente indisponível por configuração interna." },
+        { status: 503 }
+      );
+    }
+    const { searchParams } = new URL(req.url);
+    const token = searchParams.get("token") ?? req.headers.get("x-webhook-token");
+    if (token !== secret) {
+      console.log("[WEBHOOK] retorno antecipado: token inválido", { token: token?.slice(0, 10) });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -296,7 +311,16 @@ export async function POST(req: NextRequest) {
 
     const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
-    // ── Passo 1: clinica_id via instanceId (filtro opcional, não obrigatório) ─
+    // ── Passo 1: clinica_id via instanceId — OBRIGATÓRIO para todo o fluxo de
+    // confirmação/reagendamento. Auditoria 2026-08-17: antes desta correção,
+    // quando instanceId estava ausente/inválido/sem correspondência, o
+    // passo 2 caía num fallback que buscava agendamentos em TODOS os
+    // tenants por sufixo de telefone — permitia alterar agendamento real de
+    // qualquer clínica só com um número de telefone. Regra agora obrigatória
+    // e sem exceção: instanceId → clinica_config.zapi_instance → clinica_id
+    // → agendamento daquele tenant. Sem tenant identificado, o fluxo encerra
+    // aqui — nunca busca nem altera nada. Mesma disciplina já usada no ramo
+    // do chatbot acima (bloco "sem instanceId vazio"), agora também aqui.
     let clinicaIdHint: string | null = null;
     if (instanceId) {
       const { data: configRow } = await supabase
@@ -311,20 +335,33 @@ export async function POST(req: NextRequest) {
       clinicaIdHint: clinicaIdHint ?? "não encontrado",
     });
 
-    if (automacaoPausada(clinicaIdHint)) {
-      console.warn("[webhook/zapi] automação pausada para este tenant — fluxo de confirmação encerrado:", { clinica_id: clinicaIdHint });
+    if (!clinicaIdHint) {
+      console.warn("[webhook/zapi] instanceId ausente ou sem correspondência inequívoca — fluxo de confirmação encerrado (fail-closed, nunca busca/altera agendamento sem tenant identificado)");
       await supabase.from("whatsapp_logs").insert({
-        clinica_id: clinicaIdHint,
+        clinica_id: null,
+        telefone, mensagem, status: "recebido",
+        resposta: { acao, processado: false, motivo: "sem_instance_id" },
+      });
+      return NextResponse.json({ sucesso: true, ignorado: "sem_instance_id" });
+    }
+    // const, não let: garante ao TypeScript (e a qualquer leitor) que daqui
+    // em diante o tenant está definitivamente resolvido — nunca mais undefined.
+    const clinicaIdConfirmado: string = clinicaIdHint;
+
+    if (automacaoPausada(clinicaIdConfirmado)) {
+      console.warn("[webhook/zapi] automação pausada para este tenant — fluxo de confirmação encerrado:", { clinica_id: clinicaIdConfirmado });
+      await supabase.from("whatsapp_logs").insert({
+        clinica_id: clinicaIdConfirmado,
         telefone, mensagem, status: "recebido",
         resposta: { acao, processado: false, motivo: "chatbot_pausado_manualmente" },
       });
       return NextResponse.json({ sucesso: true, recebido: true, ignorado: "automacao_pausada" });
     }
 
-    // ── Passo 2: buscar agendamento por telefone ─────────────────────────────
-    // Tenta três formatos: telefone exato (com DDI), sufixo8, sufixo9.
-    // clinicaIdHint restringe a busca quando disponível (evita colisão multi-clínica).
-    // confirmado = false OU null (ambos indicam pendente).
+    // ── Passo 2: buscar agendamento por telefone — SEMPRE restrito ao tenant
+    // identificado no passo 1. Tenta três formatos: telefone exato (com
+    // DDI), sufixo8, sufixo9. confirmado = false OU null (ambos pendente).
+    // Não existe mais nenhum caminho que busque sem filtro de clinica_id.
 
     type AgRow = {
       id: string;
@@ -340,12 +377,12 @@ export async function POST(req: NextRequest) {
 
     async function buscarAgendamento(
       filtroTelefone: { tipo: "eq" | "ilike"; valor: string },
-      comClinica: boolean,
       exigirConfirmacaoEnviada = true
     ): Promise<AgRow | null> {
       let q = supabase
         .from("agendamentos")
-        .select("id,paciente_nome,clinica_id,status,data,hora,confirmacao_enviada,confirmado,precisa_reagendar");
+        .select("id,paciente_nome,clinica_id,status,data,hora,confirmacao_enviada,confirmado,precisa_reagendar")
+        .eq("clinica_id", clinicaIdConfirmado);
 
       if (filtroTelefone.tipo === "eq") {
         q = q.eq("telefone", filtroTelefone.valor);
@@ -366,11 +403,9 @@ export async function POST(req: NextRequest) {
         .order("hora", { ascending: true })
         .limit(1);
 
-      if (comClinica && clinicaIdHint) q = q.eq("clinica_id", clinicaIdHint);
-
       const { data, error } = await q;
       if (error) {
-        console.error("[webhook/zapi] erro na query agendamento:", error.message, { filtroTelefone, comClinica, exigirConfirmacaoEnviada });
+        console.error("[webhook/zapi] erro na query agendamento:", error.message, { filtroTelefone, exigirConfirmacaoEnviada });
         return null;
       }
       return (data?.[0] as AgRow) ?? null;
@@ -384,32 +419,19 @@ export async function POST(req: NextRequest) {
     ];
 
     for (const t of tentativas) {
-      // Com filtro de clínica primeiro (mais seguro em multi-tenant)
-      if (clinicaIdHint) {
-        ag = await buscarAgendamento(t, true);
-        if (ag) { console.log(`[webhook/zapi] passo 2 — match ${t.desc} + clinica:`, ag.paciente_nome); break; }
-      }
-      // Sem filtro de clínica (fallback)
-      ag = await buscarAgendamento(t, false);
-      if (ag) { console.log(`[webhook/zapi] passo 2 — match ${t.desc} sem clinica:`, ag.paciente_nome); break; }
+      ag = await buscarAgendamento(t);
+      if (ag) { console.log(`[webhook/zapi] passo 2 — match ${t.desc}:`, ag.paciente_nome); break; }
     }
 
-    // Fallback: busca sem exigir confirmacao_enviada=true.
-    // Cobre o caso onde o botão manual falhou em marcar o campo (anon key / RLS).
+    // Fallback: busca sem exigir confirmacao_enviada=true (cobre o caso onde
+    // o botão manual falhou em marcar o campo) — sempre ainda restrito ao
+    // tenant identificado no passo 1, nunca sem clinica_id.
     if (!ag) {
       console.warn("[webhook/zapi] passo 2 — retry sem confirmacao_enviada:", { telefone, sufixo8, sufixo9 });
       for (const t of tentativas) {
-        if (clinicaIdHint) {
-          ag = await buscarAgendamento(t, true, false);
-          if (ag) {
-            console.log(`[webhook/zapi] passo 2 — fallback match ${t.desc} + clinica:`, ag.paciente_nome);
-            await supabase.from("agendamentos").update({ confirmacao_enviada: true }).eq("id", ag.id);
-            break;
-          }
-        }
-        ag = await buscarAgendamento(t, false, false);
+        ag = await buscarAgendamento(t, false);
         if (ag) {
-          console.log(`[webhook/zapi] passo 2 — fallback match ${t.desc} sem clinica:`, ag.paciente_nome);
+          console.log(`[webhook/zapi] passo 2 — fallback match ${t.desc}:`, ag.paciente_nome);
           await supabase.from("agendamentos").update({ confirmacao_enviada: true }).eq("id", ag.id);
           break;
         }
@@ -418,15 +440,16 @@ export async function POST(req: NextRequest) {
 
     if (!ag) {
       console.warn("[webhook/zapi] passo 2 — nenhum agendamento elegível:", {
-        telefone, sufixo8, sufixo9, clinicaIdHint, hoje, acao,
+        telefone, sufixo8, sufixo9, clinica_id: clinicaIdConfirmado, hoje, acao,
       });
-      // Sem agendamento pendente: a mensagem (mesmo que sim/não) vai para o chatbot.
-      // O chatbot tem guarda interna que descarta confirmações sem contexto.
-      const clinicaParaChatbot = clinicaIdHint;
-      if (clinicaParaChatbot && automacaoPausada(clinicaParaChatbot)) {
-        console.warn("[WEBHOOK] automação pausada para este tenant — fallback para chatbot não será chamado:", { clinica_id: clinicaParaChatbot });
-      } else if (clinicaParaChatbot) {
-        console.log("[WEBHOOK] sem agendamento — roteando para chatbot:", { clinica_id: clinicaParaChatbot, acao });
+      // Sem agendamento pendente: a mensagem (mesmo que sim/não) vai para o
+      // chatbot, sempre no mesmo tenant já identificado no passo 1 — nunca
+      // em outro. O chatbot tem guarda interna que descarta confirmações
+      // sem contexto.
+      if (automacaoPausada(clinicaIdConfirmado)) {
+        console.warn("[WEBHOOK] automação pausada para este tenant — fallback para chatbot não será chamado:", { clinica_id: clinicaIdConfirmado });
+      } else {
+        console.log("[WEBHOOK] sem agendamento — roteando para chatbot:", { clinica_id: clinicaIdConfirmado, acao });
         try {
           const baseUrl = new URL(req.url).origin;
           const cbRes2 = await fetch(`${baseUrl}/api/chatbot/message`, {
@@ -436,7 +459,7 @@ export async function POST(req: NextRequest) {
               "Authorization": `Bearer ${process.env.CHATBOT_INTERNAL_SECRET}`,
             },
             body: JSON.stringify({
-              clinica_id: clinicaParaChatbot,
+              clinica_id: clinicaIdConfirmado,
               telefone,
               mensagem,
               nome_paciente: body.senderName ?? body.chatName ?? "",
@@ -452,11 +475,9 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           console.error("[webhook/zapi] chatbot fallback erro:", e);
         }
-      } else {
-        console.warn("[WEBHOOK] sem agendamento E sem clinicaIdHint — chatbot não chamado");
       }
       await supabase.from("whatsapp_logs").insert({
-        clinica_id: clinicaIdHint,
+        clinica_id: clinicaIdConfirmado,
         telefone, mensagem, status: "recebido",
         resposta: { acao, processado: false, motivo: "agendamento_nao_encontrado", instanceId },
       });
@@ -514,15 +535,15 @@ export async function POST(req: NextRequest) {
       });
 
       const baseUrl = new URL(req.url).origin;
-      const cronSecret = process.env.CRON_SECRET;
-      if (!cronSecret) {
-        throw new Error("CRON_SECRET não configurado para envio interno");
+      const internalServiceSecret = process.env.INTERNAL_SERVICE_SECRET;
+      if (!internalServiceSecret) {
+        throw new Error("INTERNAL_SERVICE_SECRET não configurado para envio interno");
       }
       await fetch(`${baseUrl}/api/whatsapp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${cronSecret}`,
+          "Authorization": `Bearer ${internalServiceSecret}`,
         },
         body: JSON.stringify({ clinica_id: clinicaId, telefone, mensagem: mensagemResposta }),
       });
