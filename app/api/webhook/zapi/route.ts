@@ -102,10 +102,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   // ── PASSO 1: log imediato — antes de qualquer processamento ─────────────────
+  // Nunca loga req.url bruto: a partir do rollout do WEBHOOK_SECRET, a URL
+  // real passa a conter `?token=<segredo>` na query string — logar a URL
+  // inteira vazaria o segredo em texto puro nos logs do servidor. Só o
+  // pathname é seguro de registrar.
   console.log("[WEBHOOK] ===== NOVA REQUISIÇÃO =====");
   console.log("[WEBHOOK] entrada:", {
     method:    req.method,
-    url:       req.url,
+    path:      new URL(req.url).pathname,
     timestamp: new Date().toISOString(),
     ua:        req.headers.get("user-agent")?.slice(0, 80) ?? "(sem UA)",
   });
@@ -122,18 +126,43 @@ export async function POST(req: NextRequest) {
     // `x-webhook-token` permanece só como alternativa para teste manual.
     // Ocorre antes de qualquer leitura/escrita no banco.
     const secret = process.env.WEBHOOK_SECRET;
-    if (!secret) {
-      console.error("[WEBHOOK] WEBHOOK_SECRET não configurado — recusando execução (falha fechada)");
-      return NextResponse.json(
-        { error: "Serviço temporariamente indisponível por configuração interna." },
-        { status: 503 }
-      );
-    }
     const { searchParams } = new URL(req.url);
     const token = searchParams.get("token") ?? req.headers.get("x-webhook-token");
-    if (token !== secret) {
-      console.log("[WEBHOOK] retorno antecipado: token inválido", { token: token?.slice(0, 10) });
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+
+    // ── Observação segura (preparação da Fase 1 do rollout) ──────────────────
+    // Só booleanos — nunca o valor do token nem do WEBHOOK_SECRET. Existe
+    // para comprovar, antes de Production passar a exigir o token, que a
+    // Z-API já está enviando `?token=` corretamente. Roda sempre, nos dois
+    // modos abaixo — é diagnóstico, nunca decide autorização sozinho.
+    console.log("[WEBHOOK] observacao_auth:", {
+      webhook_token_presente: !!token,
+      webhook_token_valido:   !!(secret && token === secret),
+      ambiente:  process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "desconhecido",
+      timestamp: new Date().toISOString(),
+    });
+
+    // Modo transitório, DESLIGADO por padrão (variável ausente = enforcement
+    // integral, idêntico ao já homologado — nada muda por omissão). Só serve
+    // para a Fase 1 do rollout do WEBHOOK_SECRET: permite observar se o
+    // token já está chegando corretamente ANTES de Production passar a
+    // bloquear quem não o envia. Precisa ser ligado de forma explícita e
+    // deliberada — nunca é o comportamento padrão, nunca um fallback
+    // silencioso. Fase 2 do rollout é só desligar esta variável (ou omiti-la
+    // — mesmo efeito), sem precisar de novo deploy de código.
+    const observacaoSemEnforcement = process.env.WEBHOOK_AUTH_OBSERVE_ONLY === "true";
+
+    if (!observacaoSemEnforcement) {
+      if (!secret) {
+        console.error("[WEBHOOK] WEBHOOK_SECRET não configurado — recusando execução (falha fechada)");
+        return NextResponse.json(
+          { error: "Serviço temporariamente indisponível por configuração interna." },
+          { status: 503 }
+        );
+      }
+      if (token !== secret) {
+        console.log("[WEBHOOK] retorno antecipado: token ausente ou incorreto");
+        return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      }
     }
 
     const body = await req.json();
