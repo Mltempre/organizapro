@@ -40,15 +40,21 @@
 // não tem nenhuma coluna de frequência/intervalo, então essa parte mais
 // ambiciosa da recompra fica bloqueada por schema, não implementada aqui.
 //
-// ── Orçamento → Venda → Receita (2026-09-18, ainda sem migration) ──────────
-// "orcamento_sem_resposta" é o primeiro sinal deste domínio — ver
+// ── Orçamento → Venda → Receita (2026-09-18/19, ainda sem migration) ───────
+// Quatro sinais deste domínio (orcamento_sem_resposta, orcamento_expirando,
+// orcamento_expirado, orcamento_aceito_sem_agendamento) — ver
 // docs/orcamento-venda-receita-v1-arquitetura.md para o desenho completo
-// (entidades, estados, e por que NÃO é heurístico: um orçamento só existe
-// por ação humana explícita, nunca inferido de conversa). O tipo de entrada
-// (OrcamentoSemResposta) é deliberadamente desacoplado de qual tabela vai
-// guardar o dado — nenhuma migration foi executada ainda, então hoje
-// ninguém chama este campo com dado real; existe só para o motor já estar
-// pronto no dia em que a migration for aprovada.
+// (entidades, estados, e por que NÃO são heurísticos: um orçamento só existe
+// por ação humana explícita, nunca inferido de conversa). Os tipos de
+// entrada são deliberadamente desacoplados de qual tabela vai guardar o
+// dado — nenhuma migration foi executada ainda, então hoje ninguém chama
+// estes campos com dado real; existem só para o motor já estar pronto no
+// dia em que a migration for aprovada. `orcamento_aceito_sem_pagamento` e
+// `pagamento_parcial_pendente` (Cobrador AI) ficam de fora desta lista de
+// propósito: dependem de `orcamento_pagamentos`, uma tabela que não existe
+// nem nesta proposta de migration — ver seção 8 do documento de arquitetura.
+
+import { orcamentoExpirado, orcamentoExpirando } from "./orcamentos-state-machine";
 
 export type PrioridadeOportunidade = "alta" | "media" | "baixa";
 
@@ -58,7 +64,10 @@ export type TipoSinal =
   | "sem_proximo_compromisso"
   | "interesse_sem_compra"
   | "demanda_nao_atendida"
-  | "orcamento_sem_resposta";
+  | "orcamento_sem_resposta"
+  | "orcamento_expirando"
+  | "orcamento_expirado"
+  | "orcamento_aceito_sem_agendamento";
 
 export type SinalOportunidade = {
   tipo:             TipoSinal;
@@ -132,15 +141,21 @@ export type CompromissoConfirmacaoPendente = {
   data?:     string; // YYYY-MM-DD do compromisso; se ausente, assume-se "hoje"
 };
 
-// ── Orçamento sem resposta (ver docs/orcamento-venda-receita-v1-arquitetura.md) ──
+// ── Orçamento (ver docs/orcamento-venda-receita-v1-arquitetura.md) ──────────
 // Diferente dos sinais heurísticos acima: um orçamento é um registro
 // estruturado, criado por ação humana explícita (nunca inferido de texto de
-// chatbot — ver seção 4 do documento de arquitetura), então este sinal é
-// tratado como CONFIRMADO, não heurístico. Este tipo é intencionalmente
-// desacoplado de qualquer schema específico (Opção A vs B do documento de
-// arquitetura) — quem chama entrega os dados já resolvidos, seja qual for a
-// tabela de origem quando a migration for aprovada e executada.
-export type OrcamentoSemResposta = {
+// chatbot — ver seção 4 do documento de arquitetura), então estes sinais são
+// tratados como CONFIRMADOS, não heurísticos. Estes tipos são
+// intencionalmente desacoplados de qualquer schema específico — quem chama
+// entrega os dados já resolvidos (`status='enviado'` no banco), seja qual
+// for a tabela de origem quando a migration for aprovada e executada.
+//
+// Um único registro `OrcamentoEnviado` pode virar um de três sinais
+// diferentes (sem_resposta / expirando / expirado), decidido por
+// `lib/orcamentos-state-machine.ts` a partir de `validadeAte` — nunca
+// gravado como um `status` diferente no banco (ver comentário no topo
+// daquele módulo: vencimento é sempre computado ao vivo).
+export type OrcamentoEnviado = {
   id:           string;
   nome:         string;
   telefone?:    string | null;
@@ -149,6 +164,17 @@ export type OrcamentoSemResposta = {
   valor:        number | null;
   dataEnvio:    string;         // YYYY-MM-DD
   validadeAte?: string | null;  // YYYY-MM-DD; null = sem prazo definido
+};
+
+// Orçamento aceito (fechamento comercial real — ver seção 3 do documento de
+// arquitetura: aceite NUNCA é confundido com pagamento) que ainda não virou
+// um compromisso operacional. `dataAceite` vem de `respondido_em` no banco.
+export type OrcamentoAceitoSemAgendamento = {
+  id:         string;
+  nome:       string;
+  telefone?:  string | null;
+  valor:      number | null;
+  dataAceite: string; // YYYY-MM-DD
 };
 
 export type EntradaOportunidades = {
@@ -160,10 +186,12 @@ export type EntradaOportunidades = {
   // Omitidos = comportamento idêntico a antes destes campos existirem.
   conversasComInteresseSemAgendamento?: ConversaChatbotSemConversao[];
   conversasSemResolucao?:               ConversaChatbotSemConversao[];
-  // Opcional — Orçamento → Venda → Receita (ver comentário acima). Omitido =
-  // comportamento idêntico a antes deste campo existir. Ainda sem fonte de
-  // dado real (nenhuma migration executada) — ver docs/orcamento-venda-receita-v1-arquitetura.md.
-  orcamentosSemResposta?: OrcamentoSemResposta[];
+  // Opcionais — Orçamento → Venda → Receita (ver comentário acima). Omitidos
+  // = comportamento idêntico a antes destes campos existirem. Ainda sem
+  // fonte de dado real (nenhuma migration executada) — ver
+  // docs/orcamento-venda-receita-v1-arquitetura.md.
+  orcamentosEnviados?:            OrcamentoEnviado[];
+  orcamentosAceitosSemAgendamento?: OrcamentoAceitoSemAgendamento[];
 };
 
 function formatarMoeda(valor: number): string {
@@ -200,20 +228,24 @@ const PESO_PRIORIDADE: Record<PrioridadeOportunidade, number> = { alta: 0, media
 const PESO_TIPO: Record<TipoSinal, number> = {
   cancelamento_sem_reagendamento: 0,
   confirmacao_pendente:           1,
-  // Orçamento sem resposta é dado confirmado (não heurístico — ver
+  // Orçamento (dado confirmado, não heurístico — ver
   // docs/orcamento-venda-receita-v1-arquitetura.md, seção 4), mesma
-  // prioridade "alta" dos dois sinais acima. Vem depois de ambos porque
-  // representa uma negociação em aberto (ainda pode se resolver sozinha,
-  // como confirmacao_pendente), nunca um compromisso já efetivamente
-  // perdido (cancelamento_sem_reagendamento).
-  orcamento_sem_resposta:         2,
-  sem_proximo_compromisso:        3,
+  // prioridade "alta" dos dois sinais acima. Ordem interna reflete o que
+  // tem mais a perder primeiro: um negócio já fechado sem operação
+  // (aceito_sem_agendamento) vale mais que um prazo perdido antes de
+  // qualquer aceite (expirado), que vale mais que um prazo perto de vencer
+  // (expirando), que vale mais que um sem pressão de prazo nenhuma.
+  orcamento_aceito_sem_agendamento: 2,
+  orcamento_expirado:               3,
+  orcamento_expirando:              4,
+  orcamento_sem_resposta:           5,
+  sem_proximo_compromisso:          6,
   // Sinais heurísticos vêm por último — mesmo quando desempatam com um sinal
   // de agenda de mesma prioridade nominal, nunca disputam à frente dele
   // (na prática nem chegam a disputar: entram com prioridade "baixa", que
   // já perde de "media"/"alta" antes mesmo de olhar para PESO_TIPO).
-  demanda_nao_atendida:           4,
-  interesse_sem_compra:           5,
+  demanda_nao_atendida:             7,
+  interesse_sem_compra:             8,
 };
 
 function ordenarSinais(sinais: SinalOportunidade[]): SinalOportunidade[] {
@@ -295,17 +327,56 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
     });
   }
 
-  for (const o of input.orcamentosSemResposta ?? []) {
+  // Orçamento enviado, aguardando resposta: vira um de três sinais
+  // diferentes (nunca mais de um ao mesmo tempo — ver teste de exclusão
+  // mútua em lib/orcamentos-state-machine.ts), decidido sempre ao vivo a
+  // partir de `validadeAte`, nunca de um `status` gravado como "expirado".
+  for (const o of input.orcamentosEnviados ?? []) {
     const dias = diasEntre(o.dataEnvio, input.hoje);
-    const vencido = !!o.validadeAte && o.validadeAte < input.hoje;
+    const validadeAte = o.validadeAte ?? null;
+    const valorTexto = o.valor != null ? ` de ${formatarMoeda(o.valor)}` : "";
+
+    if (orcamentoExpirado("enviado", validadeAte, input.hoje)) {
+      registrar(o.nome, o.telefone, {
+        tipo:            "orcamento_expirado",
+        motivo:          `${o.nome} tem um orçamento${valorTexto} enviado cuja validade já venceu, sem resposta.`,
+        prioridade:      "alta",
+        acaoSugerida:    "Reativar o orçamento vencido ou encerrar formalmente",
+        diasDesdeEvento: dias,
+        tempoDecorrido:  formatarTempoDecorrido(dias),
+      });
+    } else if (orcamentoExpirando("enviado", validadeAte, input.hoje)) {
+      registrar(o.nome, o.telefone, {
+        tipo:            "orcamento_expirando",
+        motivo:          `${o.nome} tem um orçamento${valorTexto} enviado, com validade vencendo em breve.`,
+        prioridade:      "alta",
+        acaoSugerida:    "Fazer follow-up urgente antes do orçamento vencer",
+        diasDesdeEvento: dias,
+        tempoDecorrido:  formatarTempoDecorrido(dias),
+      });
+    } else {
+      registrar(o.nome, o.telefone, {
+        tipo:            "orcamento_sem_resposta",
+        motivo:          `${o.nome} tem um orçamento${valorTexto} enviado, ainda sem resposta.`,
+        prioridade:      "alta",
+        acaoSugerida:    "Fazer follow-up do orçamento",
+        diasDesdeEvento: dias,
+        tempoDecorrido:  formatarTempoDecorrido(dias),
+      });
+    }
+  }
+
+  // Orçamento aceito (fechamento comercial real) que ainda não virou um
+  // compromisso operacional — nunca confundido com pagamento (ver seção 3
+  // do documento de arquitetura).
+  for (const o of input.orcamentosAceitosSemAgendamento ?? []) {
+    const dias = diasEntre(o.dataAceite, input.hoje);
     const valorTexto = o.valor != null ? ` de ${formatarMoeda(o.valor)}` : "";
     registrar(o.nome, o.telefone, {
-      tipo:            "orcamento_sem_resposta",
-      motivo:          vencido
-        ? `${o.nome} tem um orçamento${valorTexto} enviado cuja validade já venceu, sem resposta.`
-        : `${o.nome} tem um orçamento${valorTexto} enviado, ainda sem resposta.`,
+      tipo:            "orcamento_aceito_sem_agendamento",
+      motivo:          `${o.nome} aceitou um orçamento${valorTexto}, mas ainda não tem nenhum agendamento vinculado.`,
       prioridade:      "alta",
-      acaoSugerida:    "Fazer follow-up do orçamento",
+      acaoSugerida:    "Agendar o atendimento combinado",
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });

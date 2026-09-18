@@ -11,9 +11,9 @@ JS **real**, compilado a partir do TypeScript — nunca uma reimplementação em
 mkdir -p /tmp/smart-commerce-build
 npx tsc --module commonjs --target es2020 --esModuleInterop --skipLibCheck --strict false \
   --outDir /tmp/smart-commerce-build \
-  lib/oportunidades-clientes.ts lib/nucleo-inteligente.ts lib/recomendacoes.ts lib/chatbot-topico.ts lib/ia-comercial.ts
+  lib/oportunidades-clientes.ts lib/nucleo-inteligente.ts lib/recomendacoes.ts lib/chatbot-topico.ts lib/ia-comercial.ts lib/orcamentos-state-machine.ts
 
-# 2. Rodar os testes apontando para o build (glob pega os dois arquivos de teste)
+# 2. Rodar os testes apontando para o build (glob pega todos os arquivos de teste)
 SMART_COMMERCE_BUILD_DIR=/tmp/smart-commerce-build node --test tests/*.smart-commerce.test.mjs
 ```
 
@@ -21,7 +21,7 @@ No Windows (PowerShell), o passo 2 é:
 
 ```powershell
 $env:SMART_COMMERCE_BUILD_DIR = "C:\tmp\smart-commerce-build"
-node --test tests/oportunidades-clientes.smart-commerce.test.mjs tests/chatbot-topico.smart-commerce.test.mjs
+node --test tests/oportunidades-clientes.smart-commerce.test.mjs tests/chatbot-topico.smart-commerce.test.mjs tests/orcamentos-state-machine.smart-commerce.test.mjs
 ```
 
 Se este projeto ganhar um test runner de verdade (jest/vitest) no futuro, estes

@@ -122,6 +122,53 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         destino: "/clientes",
         destinoLabel: "Ver cliente",
       });
+    } else if (sinal.tipo === "orcamento_expirando") {
+      lista.push({
+        id: `consultivo-orcamento-${op.chave}`,
+        categoria: "cancelamento_confirmacao",
+        identificado: `${op.nome} tem um orçamento com validade vencendo em breve, ainda sem resposta.`,
+        motivo: "Um orçamento perto de vencer sem resposta corre risco real de virar receita perdida se ninguém retomar o contato antes do prazo.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Identificado no histórico real de orçamentos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de orçamentos.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
+    } else if (sinal.tipo === "orcamento_expirado") {
+      lista.push({
+        id: `consultivo-orcamento-${op.chave}`,
+        categoria: "cancelamento_confirmacao",
+        identificado: `${op.nome} tem um orçamento cuja validade já venceu, sem resposta registrada.`,
+        motivo: "A validade vencer não significa que o cliente perdeu o interesse — vale confirmar se ainda há intenção antes de encerrar o orçamento.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Identificado no histórico real de orçamentos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de orçamentos.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
+    } else if (sinal.tipo === "orcamento_aceito_sem_agendamento") {
+      // Aceite é fechamento comercial real — nunca confundido com pagamento
+      // (seção 3 do documento de arquitetura). "venda_fechada" ainda não
+      // existe como categoria própria (evita tocar o componente visual);
+      // reaproveita "cancelamento_confirmacao" pelo mesmo motivo dos dois
+      // sinais acima.
+      lista.push({
+        id: `consultivo-orcamento-${op.chave}`,
+        categoria: "cancelamento_confirmacao",
+        identificado: `${op.nome} aceitou um orçamento, mas ainda não tem nenhum agendamento vinculado.`,
+        motivo: "Um orçamento aceito sem agendamento é um negócio fechado que ainda não virou operação — vale marcar o compromisso antes que o cliente esfrie.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Identificado no histórico real de orçamentos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de orçamentos.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
     } else if (sinal.tipo === "interesse_sem_compra") {
       // Sinal heurístico (Smart Commerce — ver comentário no topo de
       // lib/oportunidades-clientes.ts): texto sempre deixa explícito que é

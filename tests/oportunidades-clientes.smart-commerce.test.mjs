@@ -130,14 +130,15 @@ test("demanda_nao_atendida: desaparece quando ja houve agendamento apos", () => 
   assert.equal(out.length, 0);
 });
 
-// ── orcamento_sem_resposta (dado CONFIRMADO, nao heuristico) ───────────────
+// ── Orçamento → Venda → Receita (dado CONFIRMADO, nao heuristico) ──────────
 // Ver docs/orcamento-venda-receita-v1-arquitetura.md — ainda sem fonte real
 // de dado (nenhuma migration executada); estes testes cobrem só o motor
 // puro, que ja fica pronto para o dia em que a migration for aprovada.
+// HOJE = "2026-09-18" (ver entradaBase).
 
-test("orcamento_sem_resposta: aparece com prioridade alta e evidencia NAO-heuristica", () => {
+test("orcamento_sem_resposta: aparece com prioridade alta e evidencia NAO-heuristica (sem validade definida)", () => {
   const out = gerarOportunidadesClientes(entradaBase({
-    orcamentosSemResposta: [
+    orcamentosEnviados: [
       { id: "orc1", nome: "Otavio", telefone: "11400000000", valor: 1500, dataEnvio: "2026-09-14", validadeAte: null },
     ],
   }));
@@ -150,21 +151,40 @@ test("orcamento_sem_resposta: aparece com prioridade alta e evidencia NAO-heuris
 
 test("orcamento_sem_resposta: valor ausente nao inventa numero, so omite o trecho de valor", () => {
   const out = gerarOportunidadesClientes(entradaBase({
-    orcamentosSemResposta: [
+    orcamentosEnviados: [
       { id: "orc2", nome: "Paula", telefone: "11300000000", valor: null, dataEnvio: "2026-09-14", validadeAte: null },
     ],
   }));
   assert.equal(out[0].motivoPrincipal, "Paula tem um orçamento enviado, ainda sem resposta.");
 });
 
-test("orcamento_sem_resposta: validade vencida muda o texto para vencido, sem mudar o tipo", () => {
+test("orcamento_sem_resposta: validade distante (fora da janela de 3 dias) continua sem_resposta, nao expirando", () => {
   const out = gerarOportunidadesClientes(entradaBase({
-    orcamentosSemResposta: [
+    orcamentosEnviados: [
+      { id: "orc1b", nome: "Zeca", telefone: "11450000000", valor: 100, dataEnvio: "2026-09-16", validadeAte: "2026-09-30" },
+    ],
+  }));
+  assert.equal(out[0].sinais[0].tipo, "orcamento_sem_resposta");
+});
+
+test("orcamento_expirado: validade ja vencida vira tipo proprio, nunca sem_resposta", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosEnviados: [
       { id: "orc3", nome: "Rafael", telefone: "11200000000", valor: 300, dataEnvio: "2026-08-01", validadeAte: "2026-09-01" },
     ],
   }));
+  assert.equal(out[0].sinais[0].tipo, "orcamento_expirado");
   assert.match(out[0].motivoPrincipal, /validade já venceu/);
-  assert.equal(out[0].sinais[0].tipo, "orcamento_sem_resposta");
+});
+
+test("orcamento_expirando: validade a vencer dentro de 3 dias vira tipo proprio, distinto de expirado e sem_resposta", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosEnviados: [
+      { id: "orc3b", nome: "Bia", telefone: "11250000000", valor: 700, dataEnvio: "2026-09-10", validadeAte: "2026-09-20" },
+    ],
+  }));
+  assert.equal(out[0].sinais[0].tipo, "orcamento_expirando");
+  assert.match(out[0].motivoPrincipal, /vencendo em breve/);
 });
 
 test("prioridade: orcamento_sem_resposta (alta) e cancelamento_sem_reagendamento (alta) nunca perdem para sem_proximo_compromisso (media)", () => {
@@ -172,7 +192,7 @@ test("prioridade: orcamento_sem_resposta (alta) e cancelamento_sem_reagendamento
     clientesSemProximoCompromisso: [
       { id: "p1", nome: "Sonia", telefone: "11100000000", proximaConsulta: null },
     ],
-    orcamentosSemResposta: [
+    orcamentosEnviados: [
       { id: "orc4", nome: "Thiago", telefone: "11000000000", valor: 800, dataEnvio: "2026-09-16", validadeAte: null },
     ],
   }));
@@ -182,9 +202,20 @@ test("prioridade: orcamento_sem_resposta (alta) e cancelamento_sem_reagendamento
   assert.equal(out[1].prioridade, "media");
 });
 
+test("prioridade interna: orcamento_expirado vem antes de orcamento_expirando, que vem antes de orcamento_sem_resposta", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosEnviados: [
+      { id: "e1", nome: "SemResposta", telefone: "11991110000", valor: 100, dataEnvio: "2026-09-16", validadeAte: null },
+      { id: "e2", nome: "Expirando",   telefone: "11992220000", valor: 100, dataEnvio: "2026-09-10", validadeAte: "2026-09-20" },
+      { id: "e3", nome: "Expirado",    telefone: "11993330000", valor: 100, dataEnvio: "2026-08-01", validadeAte: "2026-09-01" },
+    ],
+  }));
+  assert.deepEqual(out.map(o => o.nome), ["Expirado", "Expirando", "SemResposta"]);
+});
+
 test("dedup: mesmo telefone com orcamento_sem_resposta e sinal heuristico gera um unico card, orcamento em destaque", () => {
   const out = gerarOportunidadesClientes(entradaBase({
-    orcamentosSemResposta: [
+    orcamentosEnviados: [
       { id: "orc5", nome: "Ursula", telefone: "10999990000", valor: 200, dataEnvio: "2026-09-16", validadeAte: null },
     ],
     conversasComInteresseSemAgendamento: [
@@ -199,7 +230,7 @@ test("dedup: mesmo telefone com orcamento_sem_resposta e sinal heuristico gera u
 
 test("Sinal Canonico: evidencia de orcamento_sem_resposta cita 'historico real de orcamentos', nunca 'agendamentos' nem 'heuristico'", () => {
   const oportunidades = gerarOportunidadesClientes(entradaBase({
-    orcamentosSemResposta: [
+    orcamentosEnviados: [
       { id: "orc6", nome: "Vitor", telefone: "10888880000", valor: 450, dataEnvio: "2026-09-15", validadeAte: null },
     ],
   }));
@@ -211,7 +242,7 @@ test("Sinal Canonico: evidencia de orcamento_sem_resposta cita 'historico real d
 
 test("Diretor Digital: orcamento_sem_resposta vira recomendacao consultiva, categoria existente, evidencia nao-heuristica", () => {
   const oportunidades = gerarOportunidadesClientes(entradaBase({
-    orcamentosSemResposta: [
+    orcamentosEnviados: [
       { id: "orc7", nome: "Wagner", telefone: "10777770000", valor: 999, dataEnvio: "2026-09-13", validadeAte: null },
     ],
   }));
@@ -222,6 +253,48 @@ test("Diretor Digital: orcamento_sem_resposta vira recomendacao consultiva, cate
   assert.equal(consultivas[0].categoria, "cancelamento_confirmacao");
   assert.match(consultivas[0].evidencia, /histórico real de orçamentos/);
   assert.doesNotMatch(consultivas[0].evidencia, /heurístico/i);
+});
+
+// ── orcamento_aceito_sem_agendamento (venda fechada, nunca confundida com pagamento) ──
+
+test("orcamento_aceito_sem_agendamento: aparece com prioridade alta, evidencia real", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosAceitosSemAgendamento: [
+      { id: "acc1", nome: "Yara", telefone: "10666660000", valor: 2000, dataAceite: "2026-09-17" },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "orcamento_aceito_sem_agendamento");
+  assert.equal(out[0].prioridade, "alta");
+  assert.match(out[0].motivoPrincipal, /aceitou um orçamento/);
+  assert.match(out[0].motivoPrincipal, /R\$\s*2\.000,00/);
+  assert.doesNotMatch(out[0].motivoPrincipal, /pag/i); // nunca menciona pagamento — aceite != pago
+});
+
+test("prioridade interna: orcamento_aceito_sem_agendamento vem antes de orcamento_expirado (negocio fechado pesa mais)", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosEnviados: [
+      { id: "e4", nome: "Expirado2", telefone: "11994440000", valor: 100, dataEnvio: "2026-08-01", validadeAte: "2026-09-01" },
+    ],
+    orcamentosAceitosSemAgendamento: [
+      { id: "acc2", nome: "Aceito2", telefone: "10555550000", valor: 100, dataAceite: "2026-09-17" },
+    ],
+  }));
+  assert.deepEqual(out.map(o => o.nome), ["Aceito2", "Expirado2"]);
+});
+
+test("Diretor Digital: orcamento_aceito_sem_agendamento nunca usa a palavra receita/pago no texto (aceite != pagamento)", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    orcamentosAceitosSemAgendamento: [
+      { id: "acc3", nome: "Zilda", telefone: "10444440000", valor: 500, dataAceite: "2026-09-16" },
+    ],
+  }));
+  const consultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: true, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: null,
+  });
+  assert.equal(consultivas.length, 1);
+  assert.doesNotMatch(consultivas[0].identificado, /pago|pagamento|receita/i);
+  assert.doesNotMatch(consultivas[0].motivo, /pago|receita comprovada/i);
 });
 
 // ── prioridade: heuristico nunca fica na frente de sinal real de agenda ────

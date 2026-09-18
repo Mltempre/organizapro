@@ -25,7 +25,9 @@ const TIPOS_HEURISTICOS: ReadonlySet<TipoSinal> = new Set(["interesse_sem_compra
 // dado CONFIRMADO (nunca heurístico — um orçamento só existe por ação
 // humana explícita), mas a fonte não é `agendamentos`, então a evidência
 // precisa de um texto próprio, nunca o mesmo texto genérico de agenda.
-const TIPOS_ORCAMENTO: ReadonlySet<TipoSinal> = new Set(["orcamento_sem_resposta"]);
+const TIPOS_ORCAMENTO: ReadonlySet<TipoSinal> = new Set([
+  "orcamento_sem_resposta", "orcamento_expirando", "orcamento_expirado", "orcamento_aceito_sem_agendamento",
+]);
 
 export type EspecialistaOrigem = "comercial";
 
@@ -115,16 +117,20 @@ const TIER: Record<string, number> = {
   confirmacao_pendente:           2,
   // Orçamento → Venda → Receita: dado confirmado, mesma prioridade "alta"
   // dos dois sinais acima — ver docs/orcamento-venda-receita-v1-arquitetura.md.
-  orcamento_sem_resposta:         3,
-  "compromissos-atrasados":       4,
-  "horario-vago-hoje":            5,
-  sem_proximo_compromisso:        6,
+  // Mesma ordem interna de PESO_TIPO em lib/oportunidades-clientes.ts.
+  orcamento_aceito_sem_agendamento: 3,
+  orcamento_expirado:               4,
+  orcamento_expirando:              5,
+  orcamento_sem_resposta:           6,
+  "compromissos-atrasados":       7,
+  "horario-vago-hoje":            8,
+  sem_proximo_compromisso:        9,
   // Sinais heurísticos (Smart Commerce) — sempre depois dos sinais de
   // agenda confirmados, nunca competindo por posição de destaque com eles.
-  demanda_nao_atendida:           7,
-  interesse_sem_compra:           8,
+  demanda_nao_atendida:           10,
+  interesse_sem_compra:           11,
 };
-const TIER_PADRAO = 9;
+const TIER_PADRAO = 12;
 
 function tierDoSinal(sinal: SinalCanonico): number {
   return TIER[sinal.tipo] ?? TIER_PADRAO;
