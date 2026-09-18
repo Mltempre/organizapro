@@ -438,3 +438,87 @@ test("Diretor Digital: temDadosSuficientes=false devolve lista vazia mesmo com s
   });
   assert.equal(consultivas.length, 0);
 });
+
+// ── cobranca_vencida (Financeiro Inteligente / Cobrador AI) ──────────────
+// Ver docs/financeiro-inteligente-cobrador-ai-v1-arquitetura.md — dado
+// CONFIRMADO (decidido por lib/cobranca-state-machine.ts, nunca recalculado
+// aqui), maior prioridade interna do motor: dinheiro já vencido pesa mais
+// que qualquer sinal de agenda.
+
+test("cobranca_vencida: aparece com prioridade alta e evidencia propria de cobranca", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    cobrancasVencidas: [
+      { id: "cob1", nome: "Aline", telefone: "11711110000", valor: 150, vencimento: "2026-09-10" },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "cobranca_vencida");
+  assert.equal(out[0].prioridade, "alta");
+  assert.match(out[0].motivoPrincipal, /cobrança/);
+  assert.match(out[0].motivoPrincipal, /R\$\s*150,00/);
+});
+
+test("cobranca_vencida: valor ausente nao inventa numero, so omite o trecho de valor", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    cobrancasVencidas: [
+      { id: "cob2", nome: "Bento", telefone: "11722220000", valor: null, vencimento: "2026-09-10" },
+    ],
+  }));
+  assert.equal(out[0].motivoPrincipal, "Bento tem uma cobrança vencida, sem pagamento confirmado.");
+});
+
+test("prioridade interna: cobranca_vencida vem antes de cancelamento_sem_reagendamento e de todo sinal de orcamento", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    cancelamentosSemReagendamento: [
+      { id: "canc1", nome: "Cancelou", telefone: "11733330000", data: "2026-09-16" },
+    ],
+    orcamentosAceitosSemAgendamento: [
+      { id: "acc1", nome: "AceitouSemAgenda", telefone: "11744440000", valor: 100, dataAceite: "2026-09-17" },
+    ],
+    cobrancasVencidas: [
+      { id: "cob3", nome: "Devendo", telefone: "11755550000", valor: 200, vencimento: "2026-09-10" },
+    ],
+  }));
+  assert.equal(out[0].nome, "Devendo");
+});
+
+test("Sinal Canonico: evidencia de cobranca_vencida cita 'historico real de cobrancas', nunca 'orcamentos' nem 'agendamentos'", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    cobrancasVencidas: [
+      { id: "cob4", nome: "Diana", telefone: "11766660000", valor: 300, vencimento: "2026-09-05" },
+    ],
+  }));
+  const canonicos = organizarSinaisCanonicos(adaptarOportunidadesClientes(oportunidades));
+  assert.equal(canonicos.length, 1);
+  assert.match(canonicos[0].evidencia, /histórico real de cobranças/);
+  assert.doesNotMatch(canonicos[0].evidencia, /orçamentos|agendamentos/);
+});
+
+test("Diretor Digital: cobranca_vencida vira recomendacao consultiva, nunca chama o cliente de inadimplente", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    cobrancasVencidas: [
+      { id: "cob5", nome: "Elias", telefone: "11777770000", valor: 400, vencimento: "2026-09-01" },
+    ],
+  }));
+  const consultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: true, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: null,
+  });
+  assert.equal(consultivas.length, 1);
+  assert.match(consultivas[0].identificado, /cobrança vencida/);
+  assert.doesNotMatch(consultivas[0].identificado, /inadimplente/i);
+  assert.doesNotMatch(consultivas[0].motivo, /inadimplente/i);
+});
+
+test("dedup: mesmo telefone com cobranca_vencida e orcamento_aceito_sem_agendamento gera um unico card, cobranca em destaque", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosAceitosSemAgendamento: [
+      { id: "acc2", nome: "Fabio", telefone: "10999990000", valor: 200, dataAceite: "2026-09-16" },
+    ],
+    cobrancasVencidas: [
+      { id: "cob6", nome: "Fabio", telefone: "10999990000", valor: 500, vencimento: "2026-09-05" },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinaisAdicionais, 1);
+  assert.equal(out[0].sinais[0].tipo, "cobranca_vencida");
+});

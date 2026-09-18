@@ -29,6 +29,12 @@ const TIPOS_ORCAMENTO: ReadonlySet<TipoSinal> = new Set([
   "orcamento_sem_resposta", "orcamento_expirando", "orcamento_expirado", "orcamento_aceito_sem_agendamento",
 ]);
 
+// Financeiro Inteligente / Cobrador AI (ver
+// docs/financeiro-inteligente-cobrador-ai-v1-arquitetura.md): mesmo
+// princípio — dado confirmado, fonte própria (`cobrancas`, não
+// `agendamentos` nem `orcamentos`), evidência com texto próprio.
+const TIPOS_COBRANCA: ReadonlySet<TipoSinal> = new Set(["cobranca_vencida"]);
+
 export type EspecialistaOrigem = "comercial";
 
 // Estrutura mínima definida em docs/nucleo-inteligente-v1-arquitetura.md,
@@ -72,6 +78,10 @@ export function adaptarOportunidadesClientes(oportunidades: OportunidadeCliente[
       ? (op.tempoDecorrido
           ? `Identificado no histórico real de orçamentos, ${op.tempoDecorrido}.`
           : "Identificado no histórico real de orçamentos.")
+      : TIPOS_COBRANCA.has(op.sinais[0].tipo)
+      ? (op.tempoDecorrido
+          ? `Identificado no histórico real de cobranças, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de cobranças.")
       : (op.tempoDecorrido
           ? `Identificado no histórico real de agendamentos, ${op.tempoDecorrido}.`
           : "Identificado no histórico real de agendamentos."),
@@ -113,24 +123,31 @@ export function adaptarRecomendacoes(recomendacoes: Recomendacao[]): SinalCanoni
 // para que Próxima Melhor Ação e Missão do Dia nunca precisem recalcular a
 // prioridade cada uma à sua moda.
 const TIER: Record<string, number> = {
-  cancelamento_sem_reagendamento: 1,
-  confirmacao_pendente:           2,
+  // Cobrança vencida: mesma ordem interna de PESO_TIPO em
+  // lib/oportunidades-clientes.ts — PRIORIDADE INICIAL DE PRODUTO, não
+  // verdade objetiva provada (ver o comentário completo naquele arquivo e
+  // a auditoria em docs/financeiro-inteligente-cobrador-ai-v1-arquitetura.md).
+  // Deverá evoluir para priorização econômica/contextual quando houver
+  // valores, atraso e demais evidências confiáveis.
+  cobranca_vencida:                1,
+  cancelamento_sem_reagendamento: 2,
+  confirmacao_pendente:           3,
   // Orçamento → Venda → Receita: dado confirmado, mesma prioridade "alta"
   // dos dois sinais acima — ver docs/orcamento-venda-receita-v1-arquitetura.md.
   // Mesma ordem interna de PESO_TIPO em lib/oportunidades-clientes.ts.
-  orcamento_aceito_sem_agendamento: 3,
-  orcamento_expirado:               4,
-  orcamento_expirando:              5,
-  orcamento_sem_resposta:           6,
-  "compromissos-atrasados":       7,
-  "horario-vago-hoje":            8,
-  sem_proximo_compromisso:        9,
+  orcamento_aceito_sem_agendamento: 4,
+  orcamento_expirado:               5,
+  orcamento_expirando:              6,
+  orcamento_sem_resposta:           7,
+  "compromissos-atrasados":       8,
+  "horario-vago-hoje":            9,
+  sem_proximo_compromisso:        10,
   // Sinais heurísticos (Smart Commerce) — sempre depois dos sinais de
   // agenda confirmados, nunca competindo por posição de destaque com eles.
-  demanda_nao_atendida:           10,
-  interesse_sem_compra:           11,
+  demanda_nao_atendida:           11,
+  interesse_sem_compra:           12,
 };
-const TIER_PADRAO = 12;
+const TIER_PADRAO = 13;
 
 function tierDoSinal(sinal: SinalCanonico): number {
   return TIER[sinal.tipo] ?? TIER_PADRAO;

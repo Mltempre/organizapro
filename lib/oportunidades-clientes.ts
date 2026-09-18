@@ -53,6 +53,16 @@
 // `pagamento_parcial_pendente` (Cobrador AI) ficam de fora desta lista de
 // propósito: dependem de `orcamento_pagamentos`, uma tabela que não existe
 // nem nesta proposta de migration — ver seção 8 do documento de arquitetura.
+//
+// ── Financeiro Inteligente · Cobrador AI (ainda sem migration) ─────────────
+// Um sinal novo, "cobranca_vencida": dado CONFIRMADO (uma cobrança só existe
+// por ação humana/sistema determinístico, nunca inferida de conversa — ver
+// docs/financeiro-inteligente-cobrador-ai-v1-arquitetura.md). É o sinal de
+// maior prioridade interna do motor (PESO_TIPO 0): dinheiro já vencido e não
+// pago pesa mais que qualquer outro sinal de agenda, porque já é uma perda
+// financeira confirmada, não uma perda potencial. Este motor só recebe a
+// cobrança já classificada como `vencida` por `lib/cobranca-state-machine.ts`
+// — nunca decide sozinho se algo está vencido.
 
 import { orcamentoExpirado, orcamentoExpirando } from "./orcamentos-state-machine";
 
@@ -67,7 +77,8 @@ export type TipoSinal =
   | "orcamento_sem_resposta"
   | "orcamento_expirando"
   | "orcamento_expirado"
-  | "orcamento_aceito_sem_agendamento";
+  | "orcamento_aceito_sem_agendamento"
+  | "cobranca_vencida";
 
 export type SinalOportunidade = {
   tipo:             TipoSinal;
@@ -177,6 +188,18 @@ export type OrcamentoAceitoSemAgendamento = {
   dataAceite: string; // YYYY-MM-DD
 };
 
+// Cobrança vencida (ver docs/financeiro-inteligente-cobrador-ai-v1-arquitetura.md).
+// `status` já vem resolvido por `lib/cobranca-state-machine.ts` — este
+// tipo só existe para o motor de oportunidades poder registrar o cliente;
+// a decisão "está vencida?" nunca é recalculada aqui.
+export type CobrancaVencida = {
+  id:          string;
+  nome:        string;
+  telefone?:   string | null;
+  valor:       number | null;
+  vencimento:  string; // YYYY-MM-DD
+};
+
 export type EntradaOportunidades = {
   hoje: string; // YYYY-MM-DD — referência para todos os cálculos de tempo decorrido
   clientesSemProximoCompromisso: ClienteSemProximoCompromisso[];
@@ -192,6 +215,9 @@ export type EntradaOportunidades = {
   // docs/orcamento-venda-receita-v1-arquitetura.md.
   orcamentosEnviados?:            OrcamentoEnviado[];
   orcamentosAceitosSemAgendamento?: OrcamentoAceitoSemAgendamento[];
+  // Opcional — Financeiro Inteligente / Cobrador AI (ver comentário acima).
+  // Omitido = comportamento idêntico a antes deste campo existir.
+  cobrancasVencidas?: CobrancaVencida[];
 };
 
 function formatarMoeda(valor: number): string {
@@ -226,8 +252,19 @@ const PESO_PRIORIDADE: Record<PrioridadeOportunidade, number> = { alta: 0, media
 // sozinha (o cliente pode simplesmente confirmar ou comparecer). "Sem
 // próximo compromisso" vem por último por já ter prioridade média, não alta.
 const PESO_TIPO: Record<TipoSinal, number> = {
-  cancelamento_sem_reagendamento: 0,
-  confirmacao_pendente:           1,
+  // Cobrança vencida vem antes de tudo: dinheiro já vencido e não pago é
+  // tratado, nesta V1, como o sinal de maior urgência do motor.
+  // IMPORTANTE — isto é uma PRIORIDADE INICIAL DE PRODUTO, não uma
+  // verdade objetiva provada: a ordenação é só por tipo de sinal, sem
+  // pesar valor, dias de atraso, ou risco de perda do relacionamento —
+  // uma cobrança pequena vencida hoje desloca, sem distinção, um
+  // cancelamento sem reagendamento de valor muito maior. Deverá evoluir
+  // para priorização econômica/contextual quando houver valores, atraso e
+  // demais evidências confiáveis disponíveis a este motor (ver auditoria
+  // em docs/financeiro-inteligente-cobrador-ai-v1-arquitetura.md).
+  cobranca_vencida:                0,
+  cancelamento_sem_reagendamento: 1,
+  confirmacao_pendente:           2,
   // Orçamento (dado confirmado, não heurístico — ver
   // docs/orcamento-venda-receita-v1-arquitetura.md, seção 4), mesma
   // prioridade "alta" dos dois sinais acima. Ordem interna reflete o que
@@ -235,17 +272,17 @@ const PESO_TIPO: Record<TipoSinal, number> = {
   // (aceito_sem_agendamento) vale mais que um prazo perdido antes de
   // qualquer aceite (expirado), que vale mais que um prazo perto de vencer
   // (expirando), que vale mais que um sem pressão de prazo nenhuma.
-  orcamento_aceito_sem_agendamento: 2,
-  orcamento_expirado:               3,
-  orcamento_expirando:              4,
-  orcamento_sem_resposta:           5,
-  sem_proximo_compromisso:          6,
+  orcamento_aceito_sem_agendamento: 3,
+  orcamento_expirado:               4,
+  orcamento_expirando:              5,
+  orcamento_sem_resposta:           6,
+  sem_proximo_compromisso:          7,
   // Sinais heurísticos vêm por último — mesmo quando desempatam com um sinal
   // de agenda de mesma prioridade nominal, nunca disputam à frente dele
   // (na prática nem chegam a disputar: entram com prioridade "baixa", que
   // já perde de "media"/"alta" antes mesmo de olhar para PESO_TIPO).
-  demanda_nao_atendida:             7,
-  interesse_sem_compra:             8,
+  demanda_nao_atendida:             8,
+  interesse_sem_compra:             9,
 };
 
 function ordenarSinais(sinais: SinalOportunidade[]): SinalOportunidade[] {
@@ -377,6 +414,22 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
       motivo:          `${o.nome} aceitou um orçamento${valorTexto}, mas ainda não tem nenhum agendamento vinculado.`,
       prioridade:      "alta",
       acaoSugerida:    "Agendar o atendimento combinado",
+      diasDesdeEvento: dias,
+      tempoDecorrido:  formatarTempoDecorrido(dias),
+    });
+  }
+
+  // Cobrança vencida (Financeiro Inteligente / Cobrador AI). `vencida` já
+  // vem decidida por lib/cobranca-state-machine.ts — este motor só organiza
+  // e prioriza, nunca recalcula o vencimento.
+  for (const c of input.cobrancasVencidas ?? []) {
+    const dias = diasEntre(c.vencimento, input.hoje);
+    const valorTexto = c.valor != null ? ` de ${formatarMoeda(c.valor)}` : "";
+    registrar(c.nome, c.telefone, {
+      tipo:            "cobranca_vencida",
+      motivo:          `${c.nome} tem uma cobrança${valorTexto} vencida, sem pagamento confirmado.`,
+      prioridade:      "alta",
+      acaoSugerida:    "Acionar o Cobrador AI (revisar ação sugerida antes de enviar)",
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });

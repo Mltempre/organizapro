@@ -169,6 +169,28 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         destino: "/clientes",
         destinoLabel: "Ver cliente",
       });
+    } else if (sinal.tipo === "cobranca_vencida") {
+      // Financeiro Inteligente / Cobrador AI (ver
+      // docs/financeiro-inteligente-cobrador-ai-v1-arquitetura.md): dado
+      // CONFIRMADO — uma cobrança só existe por decisão determinística do
+      // motor de cobrança, nunca inferida. Texto nunca afirma "não vai
+      // pagar" nem chama a situação de "inadimplente" — só relata o fato
+      // de vencimento sem pagamento confirmado, mesma disciplina de
+      // orcamento_expirado. Reaproveita "cancelamento_confirmacao" —
+      // nenhuma categoria nova, nenhuma alteração em componente visual.
+      lista.push({
+        id: `consultivo-cobranca-${op.chave}`,
+        categoria: "cancelamento_confirmacao",
+        identificado: `${op.nome} tem uma cobrança vencida, sem pagamento confirmado.`,
+        motivo: "Uma cobrança vencida é dinheiro já devido — vale revisar a próxima ação sugerida pelo Cobrador AI antes de qualquer contato.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Identificado no histórico real de cobranças, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de cobranças.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
     } else if (sinal.tipo === "interesse_sem_compra") {
       // Sinal heurístico (Smart Commerce — ver comentário no topo de
       // lib/oportunidades-clientes.ts): texto sempre deixa explícito que é

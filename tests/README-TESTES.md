@@ -12,7 +12,8 @@ mkdir -p /tmp/smart-commerce-build
 npx tsc --module commonjs --target es2020 --esModuleInterop --skipLibCheck --strict false \
   --outDir /tmp/smart-commerce-build \
   lib/oportunidades-clientes.ts lib/nucleo-inteligente.ts lib/recomendacoes.ts lib/chatbot-topico.ts lib/ia-comercial.ts lib/orcamentos-state-machine.ts \
-  lib/motor-reputacao.ts lib/atribuicao-origem.ts lib/presenca-digital.ts
+  lib/motor-reputacao.ts lib/atribuicao-origem.ts lib/presenca-digital.ts \
+  lib/cobranca-state-machine.ts lib/motor-cobranca.ts
 
 # 2. Rodar os testes apontando para o build (glob pega todos os arquivos de teste)
 SMART_COMMERCE_BUILD_DIR=/tmp/smart-commerce-build node --test tests/*.test.mjs
@@ -22,7 +23,7 @@ No Windows (PowerShell), o passo 2 é:
 
 ```powershell
 $env:SMART_COMMERCE_BUILD_DIR = "C:\tmp\smart-commerce-build"
-node --test tests/oportunidades-clientes.smart-commerce.test.mjs tests/chatbot-topico.smart-commerce.test.mjs tests/orcamentos-state-machine.smart-commerce.test.mjs tests/motor-reputacao.test.mjs tests/atribuicao-origem.test.mjs tests/presenca-digital.test.mjs
+node --test tests/oportunidades-clientes.smart-commerce.test.mjs tests/chatbot-topico.smart-commerce.test.mjs tests/orcamentos-state-machine.smart-commerce.test.mjs tests/motor-reputacao.test.mjs tests/atribuicao-origem.test.mjs tests/presenca-digital.test.mjs tests/cobranca-state-machine.test.mjs tests/motor-cobranca.test.mjs
 ```
 
 Os testes do bloco Google Presença + Reputação + Demanda/Ads (ver
