@@ -103,6 +103,62 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         destino: "/clientes",
         destinoLabel: "Ver cliente",
       });
+    } else if (sinal.tipo === "orcamento_sem_resposta") {
+      // Orçamento → Venda → Receita (ver docs/orcamento-venda-receita-v1-
+      // arquitetura.md): dado CONFIRMADO, não heurístico — um orçamento só
+      // existe por ação humana explícita. Reaproveita "cancelamento_confirmacao"
+      // (mesmo tema: uma pendência que ainda pode se resolver sozinha) —
+      // nenhuma categoria nova, nenhuma alteração em componente visual.
+      lista.push({
+        id: `consultivo-orcamento-${op.chave}`,
+        categoria: "cancelamento_confirmacao",
+        identificado: `${op.nome} tem um orçamento enviado, ainda sem resposta.`,
+        motivo: "Um orçamento sem retorno é receita prevista parada — o cliente pode simplesmente ter esquecido de responder.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Identificado no histórico real de orçamentos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de orçamentos.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
+    } else if (sinal.tipo === "interesse_sem_compra") {
+      // Sinal heurístico (Smart Commerce — ver comentário no topo de
+      // lib/oportunidades-clientes.ts): texto sempre deixa explícito que é
+      // uma leitura de conversa, nunca um registro confirmado de intenção.
+      lista.push({
+        id: `consultivo-interesse-${op.chave}`,
+        // Reaproveita a categoria "retorno_cliente" (nenhuma categoria nova
+        // no contrato) — evita qualquer alteração em componente visual do
+        // Dashboard (stCategoria em DiretorDigitalCard.tsx), fora do escopo
+        // deste bloco. Semanticamente é o mesmo tema: cliente a reaproximar.
+        categoria: "retorno_cliente",
+        identificado: `${op.nome} demonstrou interesse pelo WhatsApp e, até onde os dados mostram, não chegou a agendar.`,
+        motivo: "Sinal heurístico, baseado no texto da conversa — não é um registro confirmado de intenção, mas pode ser uma oportunidade perdida se ninguém retomar o contato.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Sinal heurístico a partir de conversas do WhatsApp, ${op.tempoDecorrido} — não é um registro confirmado de interesse.`
+          : "Sinal heurístico a partir de conversas do WhatsApp — não é um registro confirmado de interesse.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
+    } else if (sinal.tipo === "demanda_nao_atendida") {
+      // Mesma ressalva heurística acima — a evidência nunca afirma que a
+      // conversa ficou de fato sem resposta, só que o texto salvo sugere isso.
+      lista.push({
+        id: `consultivo-demanda-${op.chave}`,
+        categoria: "retorno_cliente",
+        identificado: `${op.nome} enviou uma mensagem pelo WhatsApp que o assistente não conseguiu resolver diretamente.`,
+        motivo: "Sinal heurístico, baseado na resposta automática enviada — não é um registro confirmado do resultado da conversa, mas pode ser um cliente esperando uma resposta pessoal.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Sinal heurístico a partir de conversas do WhatsApp, ${op.tempoDecorrido} — não é um registro confirmado de que a demanda ficou sem resposta.`
+          : "Sinal heurístico a partir de conversas do WhatsApp — não é um registro confirmado de que a demanda ficou sem resposta.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
     }
   }
 

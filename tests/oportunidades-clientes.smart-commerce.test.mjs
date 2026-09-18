@@ -1,0 +1,367 @@
+// ── Testes reais (node:test) · Smart Commerce, bloco sem migration ─────────
+// Roda contra o JS REAL compilado de lib/oportunidades-clientes.ts e
+// lib/nucleo-inteligente.ts (não uma reimplementação) — ver README-TESTES no
+// mesmo diretório para como (re)gerar o build antes de rodar este arquivo.
+//
+// Cobre: sem_proximo_compromisso (comportamento antigo preservado quando o
+// campo novo está ausente; texto de reativação quando presente),
+// interesse_sem_compra e demanda_nao_atendida (heurísticos: nunca disputam
+// com sinal de agenda de prioridade alta/média; nunca aparecem se já
+// converteram; texto sempre marcado como heurístico), dedup por
+// telefone/chave, e o TIER/evidência de nucleo-inteligente.ts.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const BUILD = process.env.SMART_COMMERCE_BUILD_DIR;
+if (!BUILD) {
+  throw new Error(
+    "Defina SMART_COMMERCE_BUILD_DIR apontando para o diretorio com o build " +
+    "commonjs de lib/oportunidades-clientes.ts + lib/nucleo-inteligente.ts + lib/recomendacoes.ts."
+  );
+}
+
+const { gerarOportunidadesClientes } = require(`${BUILD}/oportunidades-clientes.js`);
+const { adaptarOportunidadesClientes, organizarSinaisCanonicos } = require(`${BUILD}/nucleo-inteligente.js`);
+const { gerarRecomendacoesConsultivas } = require(`${BUILD}/ia-comercial.js`);
+
+const HOJE = "2026-09-18";
+
+function entradaBase(overrides = {}) {
+  return {
+    hoje: HOJE,
+    clientesSemProximoCompromisso: [],
+    cancelamentosSemReagendamento: [],
+    confirmacoesPendentes: [],
+    ...overrides,
+  };
+}
+
+// ── sem_proximo_compromisso · não-regressão ──────────────────────────────
+
+test("sem_proximo_compromisso: sem o campo novo, texto e acao ficam identicos a antes", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesSemProximoCompromisso: [
+      { id: "p1", nome: "Ana", telefone: "11999990000", proximaConsulta: null },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].motivoPrincipal, "Ana está sem um próximo atendimento programado.");
+  assert.equal(out[0].acaoSugerida, "Oferecer um novo horário");
+  assert.equal(out[0].sinais[0].tipo, "sem_proximo_compromisso");
+});
+
+test("sem_proximo_compromisso: teveAtendimentoConcluido=false tambem preserva o texto antigo", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesSemProximoCompromisso: [
+      { id: "p1", nome: "Ana", telefone: "11999990000", proximaConsulta: null, teveAtendimentoConcluido: false },
+    ],
+  }));
+  assert.equal(out[0].motivoPrincipal, "Ana está sem um próximo atendimento programado.");
+  assert.equal(out[0].acaoSugerida, "Oferecer um novo horário");
+});
+
+test("sem_proximo_compromisso: teveAtendimentoConcluido=true muda para o texto de reativacao", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesSemProximoCompromisso: [
+      { id: "p1", nome: "Bruno", telefone: "11988880000", proximaConsulta: null, teveAtendimentoConcluido: true },
+    ],
+  }));
+  assert.equal(out[0].motivoPrincipal, "Bruno já foi atendido antes e está sem um novo atendimento programado — candidato a reativação.");
+  assert.equal(out[0].acaoSugerida, "Oferecer retorno e reativar o relacionamento");
+  assert.equal(out[0].sinais[0].tipo, "sem_proximo_compromisso"); // evoluido, nao um tipo novo
+});
+
+// ── interesse_sem_compra ──────────────────────────────────────────────────
+
+test("interesse_sem_compra: aparece quando nao ha agendamento apos a conversa", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    conversasComInteresseSemAgendamento: [
+      { id: "log1", nome: "Carla", telefone: "11977770000", data: "2026-09-15", teveAgendamentoApos: false },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "interesse_sem_compra");
+  assert.equal(out[0].prioridade, "baixa");
+  assert.match(out[0].motivoPrincipal, /sinal heurístico/i);
+  assert.match(out[0].motivoPrincipal, /não é um registro confirmado/i);
+});
+
+test("interesse_sem_compra: desaparece quando ja houve agendamento apos a conversa (converteu)", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    conversasComInteresseSemAgendamento: [
+      { id: "log1", nome: "Carla", telefone: "11977770000", data: "2026-09-15", teveAgendamentoApos: true },
+    ],
+  }));
+  assert.equal(out.length, 0);
+});
+
+test("interesse_sem_compra: nome ausente usa rotulo generico, nunca inventa nome", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    conversasComInteresseSemAgendamento: [
+      { id: "log1", nome: null, telefone: "11977770000", data: "2026-09-15", teveAgendamentoApos: false },
+    ],
+  }));
+  assert.match(out[0].motivoPrincipal, /^Contato sem nome salvo/);
+});
+
+// ── demanda_nao_atendida ───────────────────────────────────────────────────
+
+test("demanda_nao_atendida: aparece quando a conversa nao teve resolucao nem agendamento depois", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    conversasSemResolucao: [
+      { id: "log2", nome: "Diego", telefone: "11966660000", data: "2026-09-17", teveAgendamentoApos: false },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "demanda_nao_atendida");
+  assert.equal(out[0].prioridade, "baixa");
+  assert.match(out[0].motivoPrincipal, /sinal heurístico/i);
+});
+
+test("demanda_nao_atendida: desaparece quando ja houve agendamento apos", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    conversasSemResolucao: [
+      { id: "log2", nome: "Diego", telefone: "11966660000", data: "2026-09-17", teveAgendamentoApos: true },
+    ],
+  }));
+  assert.equal(out.length, 0);
+});
+
+// ── orcamento_sem_resposta (dado CONFIRMADO, nao heuristico) ───────────────
+// Ver docs/orcamento-venda-receita-v1-arquitetura.md — ainda sem fonte real
+// de dado (nenhuma migration executada); estes testes cobrem só o motor
+// puro, que ja fica pronto para o dia em que a migration for aprovada.
+
+test("orcamento_sem_resposta: aparece com prioridade alta e evidencia NAO-heuristica", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosSemResposta: [
+      { id: "orc1", nome: "Otavio", telefone: "11400000000", valor: 1500, dataEnvio: "2026-09-14", validadeAte: null },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "orcamento_sem_resposta");
+  assert.equal(out[0].prioridade, "alta");
+  assert.doesNotMatch(out[0].motivoPrincipal, /sinal heurístico/i);
+  assert.match(out[0].motivoPrincipal, /R\$\s*1\.500,00/);
+});
+
+test("orcamento_sem_resposta: valor ausente nao inventa numero, so omite o trecho de valor", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosSemResposta: [
+      { id: "orc2", nome: "Paula", telefone: "11300000000", valor: null, dataEnvio: "2026-09-14", validadeAte: null },
+    ],
+  }));
+  assert.equal(out[0].motivoPrincipal, "Paula tem um orçamento enviado, ainda sem resposta.");
+});
+
+test("orcamento_sem_resposta: validade vencida muda o texto para vencido, sem mudar o tipo", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosSemResposta: [
+      { id: "orc3", nome: "Rafael", telefone: "11200000000", valor: 300, dataEnvio: "2026-08-01", validadeAte: "2026-09-01" },
+    ],
+  }));
+  assert.match(out[0].motivoPrincipal, /validade já venceu/);
+  assert.equal(out[0].sinais[0].tipo, "orcamento_sem_resposta");
+});
+
+test("prioridade: orcamento_sem_resposta (alta) e cancelamento_sem_reagendamento (alta) nunca perdem para sem_proximo_compromisso (media)", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesSemProximoCompromisso: [
+      { id: "p1", nome: "Sonia", telefone: "11100000000", proximaConsulta: null },
+    ],
+    orcamentosSemResposta: [
+      { id: "orc4", nome: "Thiago", telefone: "11000000000", valor: 800, dataEnvio: "2026-09-16", validadeAte: null },
+    ],
+  }));
+  assert.equal(out[0].nome, "Thiago");
+  assert.equal(out[0].prioridade, "alta");
+  assert.equal(out[1].nome, "Sonia");
+  assert.equal(out[1].prioridade, "media");
+});
+
+test("dedup: mesmo telefone com orcamento_sem_resposta e sinal heuristico gera um unico card, orcamento em destaque", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    orcamentosSemResposta: [
+      { id: "orc5", nome: "Ursula", telefone: "10999990000", valor: 200, dataEnvio: "2026-09-16", validadeAte: null },
+    ],
+    conversasComInteresseSemAgendamento: [
+      { id: "log9", nome: "Ursula", telefone: "10999990000", data: "2026-09-12", teveAgendamentoApos: false },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinaisAdicionais, 1);
+  assert.equal(out[0].sinais[0].tipo, "orcamento_sem_resposta");
+  assert.equal(out[0].sinais[1].tipo, "interesse_sem_compra");
+});
+
+test("Sinal Canonico: evidencia de orcamento_sem_resposta cita 'historico real de orcamentos', nunca 'agendamentos' nem 'heuristico'", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    orcamentosSemResposta: [
+      { id: "orc6", nome: "Vitor", telefone: "10888880000", valor: 450, dataEnvio: "2026-09-15", validadeAte: null },
+    ],
+  }));
+  const canonicos = adaptarOportunidadesClientes(oportunidades);
+  assert.match(canonicos[0].evidencia, /histórico real de orçamentos/);
+  assert.doesNotMatch(canonicos[0].evidencia, /agendamentos/);
+  assert.doesNotMatch(canonicos[0].evidencia, /heurístico/i);
+});
+
+test("Diretor Digital: orcamento_sem_resposta vira recomendacao consultiva, categoria existente, evidencia nao-heuristica", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    orcamentosSemResposta: [
+      { id: "orc7", nome: "Wagner", telefone: "10777770000", valor: 999, dataEnvio: "2026-09-13", validadeAte: null },
+    ],
+  }));
+  const consultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: true, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: null,
+  });
+  assert.equal(consultivas.length, 1);
+  assert.equal(consultivas[0].categoria, "cancelamento_confirmacao");
+  assert.match(consultivas[0].evidencia, /histórico real de orçamentos/);
+  assert.doesNotMatch(consultivas[0].evidencia, /heurístico/i);
+});
+
+// ── prioridade: heuristico nunca fica na frente de sinal real de agenda ────
+
+test("prioridade: cancelamento (alta) sempre vem antes de interesse_sem_compra (baixa), mesmo cliente diferente", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    cancelamentosSemReagendamento: [
+      { id: "a1", nome: "Elaine", telefone: "11955550000", data: "2026-09-17" },
+    ],
+    conversasComInteresseSemAgendamento: [
+      { id: "log3", nome: "Fabio", telefone: "11944440000", data: "2026-09-10", teveAgendamentoApos: false },
+    ],
+  }));
+  assert.equal(out.length, 2);
+  assert.equal(out[0].nome, "Elaine");
+  assert.equal(out[0].prioridade, "alta");
+  assert.equal(out[1].nome, "Fabio");
+  assert.equal(out[1].prioridade, "baixa");
+});
+
+test("prioridade: sem_proximo_compromisso (media) vem antes de demanda_nao_atendida (baixa)", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesSemProximoCompromisso: [
+      { id: "p1", nome: "Gustavo", telefone: "11933330000", proximaConsulta: null },
+    ],
+    conversasSemResolucao: [
+      { id: "log4", nome: "Helena", telefone: "11922220000", data: "2026-09-16", teveAgendamentoApos: false },
+    ],
+  }));
+  assert.equal(out[0].nome, "Gustavo");
+  assert.equal(out[1].nome, "Helena");
+});
+
+// ── deduplicacao: mesmo telefone em sinal de agenda + sinal heuristico vira 1 card ──
+
+test("dedup: mesmo telefone com sinal de agenda e sinal heuristico gera um unico card, sinal de agenda em destaque", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesSemProximoCompromisso: [
+      { id: "p1", nome: "Igor", telefone: "11911110000", proximaConsulta: null },
+    ],
+    conversasComInteresseSemAgendamento: [
+      { id: "log5", nome: "Igor", telefone: "11911110000", data: "2026-09-12", teveAgendamentoApos: false },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinaisAdicionais, 1);
+  assert.equal(out[0].sinais[0].tipo, "sem_proximo_compromisso"); // media > baixa, fica em destaque
+  assert.equal(out[0].sinais[1].tipo, "interesse_sem_compra");
+});
+
+// ── nucleo-inteligente.ts: evidencia distingue heuristico de agenda real ───
+
+test("Sinal Canonico: evidencia de sinal de agenda real menciona 'historico real de agendamentos'", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    cancelamentosSemReagendamento: [
+      { id: "a1", nome: "Julia", telefone: "11900000000", data: "2026-09-17" },
+    ],
+  }));
+  const canonicos = adaptarOportunidadesClientes(oportunidades);
+  assert.match(canonicos[0].evidencia, /histórico real de agendamentos/);
+});
+
+test("Sinal Canonico: evidencia de sinal heuristico avisa que nao e confirmado", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    conversasSemResolucao: [
+      { id: "log6", nome: "Karen", telefone: "11800000000", data: "2026-09-16", teveAgendamentoApos: false },
+    ],
+  }));
+  const canonicos = adaptarOportunidadesClientes(oportunidades);
+  assert.match(canonicos[0].evidencia, /Sinal heurístico/);
+  assert.match(canonicos[0].evidencia, /não é um registro confirmado/);
+});
+
+test("Sinal Canonico: sinal heuristico continua valido (motivo/evidencia/acao preenchidos) e sobrevive a organizarSinaisCanonicos", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    conversasComInteresseSemAgendamento: [
+      { id: "log7", nome: "Lucas", telefone: "11700000000", data: "2026-09-14", teveAgendamentoApos: false },
+    ],
+  }));
+  const canonicos = adaptarOportunidadesClientes(oportunidades);
+  const organizados = organizarSinaisCanonicos(canonicos);
+  assert.equal(organizados.length, 1);
+  assert.equal(organizados[0].tipo, "interesse_sem_compra");
+});
+
+test("Sinal Canonico: heuristico nunca fica antes de um sinal real na Missao do Dia (organizarSinaisCanonicos)", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    cancelamentosSemReagendamento: [
+      { id: "a1", nome: "Marcia", telefone: "11600000000", data: "2026-09-17" },
+    ],
+    conversasSemResolucao: [
+      { id: "log8", nome: "Nina", telefone: "11500000000", data: "2026-09-01", teveAgendamentoApos: false },
+    ],
+  }));
+  const organizados = organizarSinaisCanonicos(adaptarOportunidadesClientes(oportunidades));
+  assert.equal(organizados[0].contexto.nome, "Marcia");
+  assert.equal(organizados[1].contexto.nome, "Nina");
+});
+
+// ── lib/ia-comercial.ts: Diretor Digital narra os dois sinais heuristicos ──
+// (reaproveitando a categoria "retorno_cliente" já existente no contrato —
+// nenhuma categoria nova, nenhuma alteração em componente visual).
+
+test("Diretor Digital: interesse_sem_compra vira recomendacao consultiva com texto heuristico", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    conversasComInteresseSemAgendamento: [
+      { id: "log9", nome: "Otavio", telefone: "11400000000", data: "2026-09-14", teveAgendamentoApos: false },
+    ],
+  }));
+  const consultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: true, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: null,
+  });
+  assert.equal(consultivas.length, 1);
+  assert.equal(consultivas[0].categoria, "retorno_cliente");
+  assert.match(consultivas[0].evidencia, /Sinal heurístico/);
+  assert.match(consultivas[0].evidencia, /não é um registro confirmado/);
+});
+
+test("Diretor Digital: demanda_nao_atendida vira recomendacao consultiva com texto heuristico", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    conversasSemResolucao: [
+      { id: "log10", nome: "Paula", telefone: "11300000000", data: "2026-09-13", teveAgendamentoApos: false },
+    ],
+  }));
+  const consultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: true, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: null,
+  });
+  assert.equal(consultivas.length, 1);
+  assert.equal(consultivas[0].categoria, "retorno_cliente");
+  assert.match(consultivas[0].identificado, /assistente não conseguiu resolver/);
+});
+
+test("Diretor Digital: temDadosSuficientes=false devolve lista vazia mesmo com sinal heuristico presente", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    conversasSemResolucao: [
+      { id: "log11", nome: "Rafael", telefone: "11200000000", data: "2026-09-12", teveAgendamentoApos: false },
+    ],
+  }));
+  const consultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: false, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: null,
+  });
+  assert.equal(consultivas.length, 0);
+});

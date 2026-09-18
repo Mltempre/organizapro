@@ -7,6 +7,7 @@ import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
+import { classificarConversasChatbot } from "../../lib/chatbot-topico";
 import DashboardView, {
   gerarIdeia, gerarInsights, gerarSaudacaoCard, gerarResumoIA, gerarProximasAcoes,
   type AgItem,
@@ -27,6 +28,18 @@ type CancelamentoSemReagendamentoRow = {
   nome: string;
   telefone: string | null;
   data: string;
+};
+
+// Smart Commerce · Bloco sem migration — sinais heurísticos derivados de
+// chatbot_logs (ver comentário no topo de lib/oportunidades-clientes.ts).
+// Mesmo formato de ConversaChatbotSemConversao, já com teveAgendamentoApos
+// resolvido a partir de `agendamentos` real (nunca suposto).
+type ConversaChatbotRow = {
+  id:                  string;
+  nome:                string | null;
+  telefone:            string;
+  data:                string;
+  teveAgendamentoApos: boolean;
 };
 
 type DashData = {
@@ -50,6 +63,10 @@ type DashData = {
   temWhatsapp:      boolean;
   clientesSemProximoRows: ClienteSemProximoRow[];
   cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[];
+  // Smart Commerce · Bloco sem migration
+  telefonesComAtendimentoConcluido: string[]; // reativação — evidência real em agendamentos.status = 'concluido'
+  conversasInteresseRows:     ConversaChatbotRow[];
+  conversasSemResolucaoRows:  ConversaChatbotRow[];
 };
 
 export default function Dashboard() {
@@ -63,6 +80,7 @@ export default function Dashboard() {
     cancelamentosHoje: 0, horariosVagosHoje: 0, avaliacoesPendentes: 0, nomeNegocio: "",
     temLogo: false, temEmail: false, temTelefone: false, temEndereco: false, temWhatsapp: false,
     clientesSemProximoRows: [], cancelamentosSemReagendamentoRows: [],
+    telefonesComAtendimentoConcluido: [], conversasInteresseRows: [], conversasSemResolucaoRows: [],
   });
 
   const carregarDados = useCallback(async () => {
@@ -96,6 +114,7 @@ export default function Dashboard() {
         { data: cfg },
         { data: semProximoData },
         { data: canceladosRecentes },
+        { data: chatbotLogsRecentes },
       ] = await Promise.all([
         supabase.from("agendamentos")
           .select("id, hora, paciente_nome, telefone, tipo_consulta, status, data")
@@ -146,6 +165,17 @@ export default function Dashboard() {
           .eq("clinica_id", cid).eq("status", "cancelado")
           .gte("data", trintaDiasAtras)
           .order("data", { ascending: false }).limit(50),
+        // Smart Commerce · Bloco sem migration — candidatos aos sinais
+        // heurísticos "interesse_sem_compra"/"demanda_nao_atendida". Mesma
+        // tabela e mesmas colunas já lidas hoje por app/chatbot/page.tsx
+        // (carregarLogs) — nenhuma consulta nova a um dado que a tela do
+        // Chatbot já não expusesse a este tenant.
+        supabase.from("chatbot_logs")
+          .select("id, telefone, nome_paciente, mensagem_paciente, processado_por, created_at")
+          .eq("clinica_id", cid)
+          .gte("created_at", trintaDiasAtras)
+          .order("created_at", { ascending: false })
+          .limit(200),
       ]);
 
       // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
@@ -172,6 +202,78 @@ export default function Dashboard() {
         telefonesJaIncluidos.add(a.telefone);
         cancelamentosSemReagendamentoRows.push({ id: a.id, nome: a.paciente_nome, telefone: a.telefone, data: a.data });
       }
+
+      // Smart Commerce · Bloco sem migration — reativação: só nomeada quando
+      // há evidência real de atendimento concluído no passado (agendamentos
+      // .status = 'concluido'), nunca suposta. Mesmo padrão do bloco acima:
+      // consulta de refinamento restrita aos telefones já carregados.
+      const telefonesSemProximo = Array.from(new Set(
+        (semProximoData || [])
+          .flatMap(c => [c.telefone, c.whatsapp])
+          .filter((t): t is string => !!t)
+      ));
+      let telefonesComAtendimentoConcluido: string[] = [];
+      if (telefonesSemProximo.length > 0) {
+        const { data: concluidos } = await supabase
+          .from("agendamentos")
+          .select("telefone")
+          .eq("clinica_id", cid)
+          .eq("status", "concluido")
+          .in("telefone", telefonesSemProximo);
+        telefonesComAtendimentoConcluido = Array.from(new Set((concluidos || []).map(a => a.telefone).filter(Boolean)));
+      }
+
+      // Smart Commerce · Bloco sem migration — sinais heurísticos a partir de
+      // chatbot_logs (ver comentário no topo de lib/oportunidades-clientes.ts
+      // e lib/chatbot-topico.ts). `chatbot_logs` não guarda o tópico decidido
+      // em tempo de resposta; classificarConversasChatbot reclassifica pelo
+      // texto real salvo, com a MESMA regra usada por
+      // app/api/chatbot/message/route.ts — nunca uma segunda regra em
+      // paralelo. Aqui só resolve a parte que depende de banco (conversão
+      // real em `agendamentos`), que a função pura não pode saber.
+      const { interesse: candidatosInteresseList, semResolucao: candidatosSemResolucaoList } =
+        classificarConversasChatbot(
+          (chatbotLogsRecentes || [])
+            .filter(log => log.telefone && log.mensagem_paciente)
+            .map(log => ({
+              id:               log.id,
+              telefone:         log.telefone,
+              nomePaciente:     log.nome_paciente,
+              mensagemPaciente: log.mensagem_paciente,
+              processadoPor:    log.processado_por,
+              data:             String(log.created_at).slice(0, 10),
+            }))
+        );
+
+      const telefonesChat = Array.from(new Set([
+        ...candidatosInteresseList.map(c => c.telefone),
+        ...candidatosSemResolucaoList.map(c => c.telefone),
+      ]));
+      const datasCandidatos = [...candidatosInteresseList, ...candidatosSemResolucaoList].map(c => c.data);
+      const telefonesComAgendamentoApos = new Map<string, string[]>();
+      if (telefonesChat.length > 0 && datasCandidatos.length > 0) {
+        const menorData = datasCandidatos.slice().sort()[0];
+        const { data: agsApos } = await supabase
+          .from("agendamentos")
+          .select("telefone, data")
+          .eq("clinica_id", cid)
+          .in("telefone", telefonesChat)
+          .gte("data", menorData)
+          .not("status", "in", '("cancelado","faltou")');
+        for (const a of agsApos || []) {
+          const arr = telefonesComAgendamentoApos.get(a.telefone) ?? [];
+          arr.push(a.data);
+          telefonesComAgendamentoApos.set(a.telefone, arr);
+        }
+      }
+      function teveAgendamentoApos(telefone: string, dataLog: string): boolean {
+        const datas = telefonesComAgendamentoApos.get(telefone);
+        return !!datas && datas.some(d => d >= dataLog);
+      }
+      const conversasInteresseRows: ConversaChatbotRow[] = candidatosInteresseList
+        .map(c => ({ ...c, teveAgendamentoApos: teveAgendamentoApos(c.telefone, c.data) }));
+      const conversasSemResolucaoRows: ConversaChatbotRow[] = candidatosSemResolucaoList
+        .map(c => ({ ...c, teveAgendamentoApos: teveAgendamentoApos(c.telefone, c.data) }));
 
       const lista         = (agHoje       || []) as AgItem[];
       const ativos        = lista.filter(a => !["cancelado", "faltou"].includes(a.status));
@@ -201,6 +303,9 @@ export default function Dashboard() {
         temWhatsapp:      !!cfg?.zapi_instance && !!cfg?.zapi_token,
         clientesSemProximoRows: (semProximoData || []) as ClienteSemProximoRow[],
         cancelamentosSemReagendamentoRows,
+        telefonesComAtendimentoConcluido,
+        conversasInteresseRows,
+        conversasSemResolucaoRows,
       });
     } catch (err) {
       console.error(err);
@@ -302,12 +407,18 @@ export default function Dashboard() {
 
   // Agenda Autônoma de Receita — diferente da Central de Oportunidades (que
   // conta), aqui cada card é UM cliente nomeado, com o motivo real que o
-  // trouxe até aqui. Mesmos dados já carregados acima; zero consulta nova.
+  // trouxe até aqui. Dados já carregados em carregarDados() acima (Smart
+  // Commerce, bloco sem migration, adicionou 3 consultas de refinamento —
+  // reativação e chatbot_logs — todas já resolvidas antes de chegar aqui).
+  const telefonesComAtendimentoConcluido = new Set(dash.telefonesComAtendimentoConcluido);
   const oportunidadesClientes: OportunidadeCliente[] = insights.temDados
     ? gerarOportunidadesClientes({
         hoje: hojeStr,
         clientesSemProximoCompromisso: dash.clientesSemProximoRows.map(c => ({
           id: c.id, nome: c.nome, telefone: c.telefone, whatsapp: c.whatsapp, proximaConsulta: c.proxima_consulta,
+          teveAtendimentoConcluido:
+            (!!c.telefone && telefonesComAtendimentoConcluido.has(c.telefone)) ||
+            (!!c.whatsapp && telefonesComAtendimentoConcluido.has(c.whatsapp)),
         })),
         cancelamentosSemReagendamento: dash.cancelamentosSemReagendamentoRows.map(a => ({
           id: a.id, nome: a.nome, telefone: a.telefone, data: a.data,
@@ -315,6 +426,8 @@ export default function Dashboard() {
         confirmacoesPendentes: dash.agendaHoje
           .filter(a => a.status === "agendado")
           .map(a => ({ id: a.id, nome: a.paciente_nome, telefone: a.telefone || null, data: a.data })),
+        conversasComInteresseSemAgendamento: dash.conversasInteresseRows,
+        conversasSemResolucao:               dash.conversasSemResolucaoRows,
       })
     : [];
 

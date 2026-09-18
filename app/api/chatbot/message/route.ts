@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolverComCamadaUniversal, resolverModuloSegmento, type DadosEmpresaUniversal } from "../../../../lib/ia-universal";
+import { normalizar, classificarTopico, type Topico } from "../../../../lib/chatbot-topico";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,10 +21,6 @@ type Etapa =
   | "descoberta_dor"
   | "concluido";
 
-type Topico =
-  | "horario" | "endereco" | "convenios" | "procedimentos"
-  | "faq" | "consulta" | "agendar" | "saudacao" | "humano" | "default";
-
 type Config      = Record<string, string | boolean | null | undefined>;
 type Treinamento = { id: string; palavras_chave: string; resposta: string };
 
@@ -41,10 +38,6 @@ interface Lead {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function normalizar(t: string): string {
-  return t.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
 
 const REGEX_CONFIRMACAO =
   /^(sim|s|nao|n|confirmo|confirmado|ok|certo|cancelar|cancela|reagendar|remarcar|estarei la|estou indo|pode confirmar)[\s,!.?]?$/;
@@ -64,23 +57,6 @@ function ehConfirmacaoDeConsulta(msg: string): boolean {
 // "quanto custa" ou "como funciona". Ver app/api/webhook/zapi/route.ts
 // (TENANTS_COM_AUTOMACAO_PAUSADA) para o mesmo tenant isolado por outro motivo.
 const TENANT_SDR_ORGANIZAPRO = "9b21a735-4bbb-4cbc-8666-7d941be9d35c";
-
-// ─── Classificador de tópico (regras fixas) ───────────────────────────────────
-
-function classificarTopico(msg: string): Topico {
-  const t = normalizar(msg);
-  if (/hor[aá]rio|funciona|abre|fecha|atende quando|que horas/.test(t))                  return "horario";
-  if (/endere[cç]o|localiz|onde fica|como cheg|rua |av\.|avenida|bairro|cep/.test(t))    return "endereco";
-  if (/conv[eê]nio|plano|unimed|sul.?am[eé]rica|amil|bradesco|hapvida|aceita/.test(t))   return "convenios";
-  if (/procedimento|tratamento|especialidade|servi[cç]o|exame|cirurgia|realiz/.test(t))  return "procedimentos";
-  if (/consulta/.test(t) && /valor|pre[cç]o|quanto|custo|custa|cobr/.test(t))            return "consulta";
-  if (/^consulta$/.test(t))                                                                return "consulta";
-  if (/valor|pre[cç]o|quanto custa|custo|tabela|particular|cobr/.test(t))                 return "faq";
-  if (/agendar|marcar|consulta|reservar|encaixar|quero uma|quero marcar/.test(t))         return "agendar";
-  if (/^(oi|ol[aá]|bom dia|boa tarde|boa noite|ola|hey|e a[ií])/.test(t))                return "saudacao";
-  if (/humano|atendente|pessoa|recepci|falar com|fale com/.test(t))                       return "humano";
-  return "default";
-}
 
 // ─── Montagem de resposta (regras fixas) ──────────────────────────────────────
 

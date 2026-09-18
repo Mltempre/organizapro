@@ -17,10 +17,48 @@
 // entrada em EntradaOportunidades, um novo loop em gerarOportunidadesClientes
 // chamando `registrar(...)`, e uma entrada em PESO_TIPO — a deduplicação e a
 // priorização já são automáticas.
+//
+// ── Smart Commerce · Bloco sem migration (2026-09-18) ───────────────────────
+// Dois sinais novos, "interesse_sem_compra" e "demanda_nao_atendida", são
+// HEURÍSTICOS por natureza: `chatbot_logs` não persiste qual tópico foi
+// identificado numa conversa nem se ela foi resolvida (só mensagem, resposta
+// e camada que processou — ver app/api/chatbot/message/route.ts:748-755).
+// Sem esse dado estruturado, este motor não pode saber com certeza se um
+// contato "tinha interesse" ou "não foi atendido" — só recebe, de quem
+// chama, uma classificação já feita a partir do texto real disponível hoje.
+// Por isso os dois tipos sempre entram com prioridade "baixa" (nunca
+// disputam lugar com um sinal confirmado de agenda) e um motivo que deixa
+// o caráter heurístico explícito — nunca apresentados como fato.
+//
+// `sem_proximo_compromisso` também evoluiu: quando quem chama souber que o
+// cliente já teve algum atendimento concluído no passado, o motor agora
+// nomeia isso como reativação (candidato a recompra) em vez do texto
+// genérico. O campo é opcional e, quando ausente, o comportamento é
+// idêntico ao anterior — nenhuma regressão para quem já chama este motor
+// sem o novo dado. Não foi criada nenhuma regra de intervalo/recorrência:
+// `clinica_servicos` (supabase/migrations/20260625000002_site_modules.sql)
+// não tem nenhuma coluna de frequência/intervalo, então essa parte mais
+// ambiciosa da recompra fica bloqueada por schema, não implementada aqui.
+//
+// ── Orçamento → Venda → Receita (2026-09-18, ainda sem migration) ──────────
+// "orcamento_sem_resposta" é o primeiro sinal deste domínio — ver
+// docs/orcamento-venda-receita-v1-arquitetura.md para o desenho completo
+// (entidades, estados, e por que NÃO é heurístico: um orçamento só existe
+// por ação humana explícita, nunca inferido de conversa). O tipo de entrada
+// (OrcamentoSemResposta) é deliberadamente desacoplado de qual tabela vai
+// guardar o dado — nenhuma migration foi executada ainda, então hoje
+// ninguém chama este campo com dado real; existe só para o motor já estar
+// pronto no dia em que a migration for aprovada.
 
 export type PrioridadeOportunidade = "alta" | "media" | "baixa";
 
-export type TipoSinal = "cancelamento_sem_reagendamento" | "confirmacao_pendente" | "sem_proximo_compromisso";
+export type TipoSinal =
+  | "cancelamento_sem_reagendamento"
+  | "confirmacao_pendente"
+  | "sem_proximo_compromisso"
+  | "interesse_sem_compra"
+  | "demanda_nao_atendida"
+  | "orcamento_sem_resposta";
 
 export type SinalOportunidade = {
   tipo:             TipoSinal;
@@ -52,6 +90,32 @@ export type ClienteSemProximoCompromisso = {
   telefone?:        string | null;
   whatsapp?:        string | null;
   proximaConsulta?: string | null; // YYYY-MM-DD ou null
+  // Opcional: true quando o cliente já teve ao menos um agendamento com
+  // status "concluido" no passado (dado real de `agendamentos`, calculado
+  // por quem chama). Diferencia reativação (já foi cliente) de alguém que
+  // nunca chegou a ser atendido. Ausente = comportamento idêntico ao
+  // anterior a este campo existir.
+  teveAtendimentoConcluido?: boolean;
+};
+
+// ── Sinais heurísticos a partir de conversas do WhatsApp (chatbot_logs) ─────
+// `chatbot_logs` (id, clinica_id, telefone, nome_paciente, mensagem_paciente,
+// resposta_bot, processado_por, created_at — ver app/chatbot/page.tsx:167)
+// não guarda o tópico identificado nem se a conversa foi resolvida. Por
+// isso este motor exige que quem chama já tenha decidido, a partir do texto
+// real da mensagem/resposta, se aquela conversa indica interesse ou
+// ausência de resolução — o motor só organiza e prioriza, nunca classifica.
+export type ConversaChatbotSemConversao = {
+  id:                  string;        // chatbot_logs.id
+  nome:                string | null; // chatbot_logs.nome_paciente (frequentemente ausente)
+  telefone:            string;        // chatbot_logs.telefone
+  data:                string;        // YYYY-MM-DD derivado de chatbot_logs.created_at
+  // true quando existe, para este telefone, algum agendamento real
+  // (status diferente de "cancelado"/"faltou") datado a partir desta
+  // conversa — calculado por quem chama a partir de `agendamentos`, nunca
+  // suposto aqui. Quando true, a conversa já converteu e não é mais
+  // oportunidade — o motor descarta o sinal.
+  teveAgendamentoApos: boolean;
 };
 
 export type CompromissoCanceladoSemReagendamento = {
@@ -68,12 +132,43 @@ export type CompromissoConfirmacaoPendente = {
   data?:     string; // YYYY-MM-DD do compromisso; se ausente, assume-se "hoje"
 };
 
+// ── Orçamento sem resposta (ver docs/orcamento-venda-receita-v1-arquitetura.md) ──
+// Diferente dos sinais heurísticos acima: um orçamento é um registro
+// estruturado, criado por ação humana explícita (nunca inferido de texto de
+// chatbot — ver seção 4 do documento de arquitetura), então este sinal é
+// tratado como CONFIRMADO, não heurístico. Este tipo é intencionalmente
+// desacoplado de qualquer schema específico (Opção A vs B do documento de
+// arquitetura) — quem chama entrega os dados já resolvidos, seja qual for a
+// tabela de origem quando a migration for aprovada e executada.
+export type OrcamentoSemResposta = {
+  id:           string;
+  nome:         string;
+  telefone?:    string | null;
+  // Valor real informado por quem criou o orçamento — nunca estimado.
+  // Ausente/null quando o valor não foi informado (nunca 0 fantasioso).
+  valor:        number | null;
+  dataEnvio:    string;         // YYYY-MM-DD
+  validadeAte?: string | null;  // YYYY-MM-DD; null = sem prazo definido
+};
+
 export type EntradaOportunidades = {
   hoje: string; // YYYY-MM-DD — referência para todos os cálculos de tempo decorrido
   clientesSemProximoCompromisso: ClienteSemProximoCompromisso[];
   cancelamentosSemReagendamento: CompromissoCanceladoSemReagendamento[];
   confirmacoesPendentes:         CompromissoConfirmacaoPendente[];
+  // Opcionais — Smart Commerce, sinais heurísticos (ver comentário acima).
+  // Omitidos = comportamento idêntico a antes destes campos existirem.
+  conversasComInteresseSemAgendamento?: ConversaChatbotSemConversao[];
+  conversasSemResolucao?:               ConversaChatbotSemConversao[];
+  // Opcional — Orçamento → Venda → Receita (ver comentário acima). Omitido =
+  // comportamento idêntico a antes deste campo existir. Ainda sem fonte de
+  // dado real (nenhuma migration executada) — ver docs/orcamento-venda-receita-v1-arquitetura.md.
+  orcamentosSemResposta?: OrcamentoSemResposta[];
 };
+
+function formatarMoeda(valor: number): string {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 function normalizarTelefone(t?: string | null): string {
   return (t || "").replace(/\D/g, "");
@@ -105,7 +200,20 @@ const PESO_PRIORIDADE: Record<PrioridadeOportunidade, number> = { alta: 0, media
 const PESO_TIPO: Record<TipoSinal, number> = {
   cancelamento_sem_reagendamento: 0,
   confirmacao_pendente:           1,
-  sem_proximo_compromisso:        2,
+  // Orçamento sem resposta é dado confirmado (não heurístico — ver
+  // docs/orcamento-venda-receita-v1-arquitetura.md, seção 4), mesma
+  // prioridade "alta" dos dois sinais acima. Vem depois de ambos porque
+  // representa uma negociação em aberto (ainda pode se resolver sozinha,
+  // como confirmacao_pendente), nunca um compromisso já efetivamente
+  // perdido (cancelamento_sem_reagendamento).
+  orcamento_sem_resposta:         2,
+  sem_proximo_compromisso:        3,
+  // Sinais heurísticos vêm por último — mesmo quando desempatam com um sinal
+  // de agenda de mesma prioridade nominal, nunca disputam à frente dele
+  // (na prática nem chegam a disputar: entram com prioridade "baixa", que
+  // já perde de "media"/"alta" antes mesmo de olhar para PESO_TIPO).
+  demanda_nao_atendida:           4,
+  interesse_sem_compra:           5,
 };
 
 function ordenarSinais(sinais: SinalOportunidade[]): SinalOportunidade[] {
@@ -143,11 +251,61 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
     if (!semProximo) continue;
     // Só há um "tempo decorrido" real quando havia uma data prevista que já passou.
     const dias = c.proximaConsulta ? diasEntre(c.proximaConsulta, input.hoje) : null;
+    // Recompra/reativação: só nomeada assim quando há evidência real de que
+    // o cliente já foi atendido antes. Sem essa evidência (campo ausente),
+    // o texto é idêntico ao de sempre.
+    const ehReativacao = c.teveAtendimentoConcluido === true;
     registrar(c.nome, c.whatsapp || c.telefone, {
       tipo:            "sem_proximo_compromisso",
-      motivo:          `${c.nome} está sem um próximo atendimento programado.`,
+      motivo:          ehReativacao
+        ? `${c.nome} já foi atendido antes e está sem um novo atendimento programado — candidato a reativação.`
+        : `${c.nome} está sem um próximo atendimento programado.`,
       prioridade:      "media",
-      acaoSugerida:    "Oferecer um novo horário",
+      acaoSugerida:    ehReativacao ? "Oferecer retorno e reativar o relacionamento" : "Oferecer um novo horário",
+      diasDesdeEvento: dias,
+      tempoDecorrido:  formatarTempoDecorrido(dias),
+    });
+  }
+
+  for (const c of input.conversasComInteresseSemAgendamento ?? []) {
+    if (c.teveAgendamentoApos) continue; // já converteu — não é mais oportunidade
+    const dias = diasEntre(c.data, input.hoje);
+    const nome = c.nome || "Contato sem nome salvo";
+    registrar(nome, c.telefone, {
+      tipo:            "interesse_sem_compra",
+      motivo:          `${nome} demonstrou interesse pelo WhatsApp e, até onde os dados mostram, não chegou a agendar (sinal heurístico, baseado no texto da conversa — não é um registro confirmado de intenção).`,
+      prioridade:      "baixa",
+      acaoSugerida:    "Retomar contato e oferecer agendamento",
+      diasDesdeEvento: dias,
+      tempoDecorrido:  formatarTempoDecorrido(dias),
+    });
+  }
+
+  for (const c of input.conversasSemResolucao ?? []) {
+    if (c.teveAgendamentoApos) continue;
+    const dias = diasEntre(c.data, input.hoje);
+    const nome = c.nome || "Contato sem nome salvo";
+    registrar(nome, c.telefone, {
+      tipo:            "demanda_nao_atendida",
+      motivo:          `${nome} enviou uma mensagem que o assistente não conseguiu resolver diretamente (sinal heurístico, baseado na resposta automática enviada — não é um registro confirmado do resultado da conversa).`,
+      prioridade:      "baixa",
+      acaoSugerida:    "Responder pessoalmente essa conversa",
+      diasDesdeEvento: dias,
+      tempoDecorrido:  formatarTempoDecorrido(dias),
+    });
+  }
+
+  for (const o of input.orcamentosSemResposta ?? []) {
+    const dias = diasEntre(o.dataEnvio, input.hoje);
+    const vencido = !!o.validadeAte && o.validadeAte < input.hoje;
+    const valorTexto = o.valor != null ? ` de ${formatarMoeda(o.valor)}` : "";
+    registrar(o.nome, o.telefone, {
+      tipo:            "orcamento_sem_resposta",
+      motivo:          vencido
+        ? `${o.nome} tem um orçamento${valorTexto} enviado cuja validade já venceu, sem resposta.`
+        : `${o.nome} tem um orçamento${valorTexto} enviado, ainda sem resposta.`,
+      prioridade:      "alta",
+      acaoSugerida:    "Fazer follow-up do orçamento",
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });

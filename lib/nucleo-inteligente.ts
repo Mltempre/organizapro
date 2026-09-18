@@ -11,8 +11,21 @@
 // Melhor Ação e Missão do Dia). Nenhuma consulta ao banco aqui — tudo entra
 // por parâmetro, já carregado por quem chama.
 
-import type { OportunidadeCliente } from "./oportunidades-clientes";
+import type { OportunidadeCliente, TipoSinal } from "./oportunidades-clientes";
 import type { Recomendacao } from "./recomendacoes";
+
+// Sinais heurísticos (Smart Commerce, bloco sem migration — ver comentário
+// no topo de lib/oportunidades-clientes.ts): a evidência do Sinal Canônico
+// precisa deixar isso explícito também nesta camada, para que nenhum
+// consumidor (Próxima Melhor Ação, Missão do Dia) apresente um sinal
+// heurístico com a mesma redação de confiança de um sinal de agenda real.
+const TIPOS_HEURISTICOS: ReadonlySet<TipoSinal> = new Set(["interesse_sem_compra", "demanda_nao_atendida"]);
+
+// Orçamento → Venda → Receita (ver docs/orcamento-venda-receita-v1-arquitetura.md):
+// dado CONFIRMADO (nunca heurístico — um orçamento só existe por ação
+// humana explícita), mas a fonte não é `agendamentos`, então a evidência
+// precisa de um texto próprio, nunca o mesmo texto genérico de agenda.
+const TIPOS_ORCAMENTO: ReadonlySet<TipoSinal> = new Set(["orcamento_sem_resposta"]);
 
 export type EspecialistaOrigem = "comercial";
 
@@ -49,9 +62,17 @@ export function adaptarOportunidadesClientes(oportunidades: OportunidadeCliente[
     prioridade:   op.prioridade,
     titulo:       `${op.nome} — ${op.acaoSugerida}`,
     motivo:       op.motivoPrincipal,
-    evidencia:    op.tempoDecorrido
-      ? `Identificado no histórico real de agendamentos, ${op.tempoDecorrido}.`
-      : "Identificado no histórico real de agendamentos.",
+    evidencia:    TIPOS_HEURISTICOS.has(op.sinais[0].tipo)
+      ? (op.tempoDecorrido
+          ? `Sinal heurístico a partir de conversas do WhatsApp, ${op.tempoDecorrido} — não é um registro confirmado de interesse ou de atendimento.`
+          : "Sinal heurístico a partir de conversas do WhatsApp — não é um registro confirmado de interesse ou de atendimento.")
+      : TIPOS_ORCAMENTO.has(op.sinais[0].tipo)
+      ? (op.tempoDecorrido
+          ? `Identificado no histórico real de orçamentos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de orçamentos.")
+      : (op.tempoDecorrido
+          ? `Identificado no histórico real de agendamentos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de agendamentos."),
     acaoSugerida: op.acaoSugerida,
     contexto:     { tipo: "cliente", nome: op.nome, telefone: op.telefone },
     chaveDedup:   op.chave,
@@ -92,11 +113,18 @@ export function adaptarRecomendacoes(recomendacoes: Recomendacao[]): SinalCanoni
 const TIER: Record<string, number> = {
   cancelamento_sem_reagendamento: 1,
   confirmacao_pendente:           2,
-  "compromissos-atrasados":       3,
-  "horario-vago-hoje":            4,
-  sem_proximo_compromisso:        5,
+  // Orçamento → Venda → Receita: dado confirmado, mesma prioridade "alta"
+  // dos dois sinais acima — ver docs/orcamento-venda-receita-v1-arquitetura.md.
+  orcamento_sem_resposta:         3,
+  "compromissos-atrasados":       4,
+  "horario-vago-hoje":            5,
+  sem_proximo_compromisso:        6,
+  // Sinais heurísticos (Smart Commerce) — sempre depois dos sinais de
+  // agenda confirmados, nunca competindo por posição de destaque com eles.
+  demanda_nao_atendida:           7,
+  interesse_sem_compra:           8,
 };
-const TIER_PADRAO = 6;
+const TIER_PADRAO = 9;
 
 function tierDoSinal(sinal: SinalCanonico): number {
   return TIER[sinal.tipo] ?? TIER_PADRAO;
