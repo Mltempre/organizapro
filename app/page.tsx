@@ -45,6 +45,20 @@ const TRABALHO = [
   { icone: "🌙", titulo: "No fim do dia",         desc: "Entrega recomendações."         },
 ];
 
+const PROBLEMAS = [
+  { icon: "◌", titulo: "Oportunidades esquecidas", texto: "Sinais ficam espalhados entre agenda, clientes e conversas até perderem o timing." },
+  { icon: "↻", titulo: "Clientes sem acompanhamento", texto: "Sem histórico e próximos passos claros, o relacionamento depende da memória da equipe." },
+  { icon: "⌁", titulo: "Agenda e atendimento no improviso", texto: "Confirmações, pendências e horários livres competem pela mesma atenção durante o dia." },
+  { icon: "✦", titulo: "Presença digital sem continuidade", texto: "Site, conteúdo e reputação precisam acompanhar a operação, não existir como tarefas isoladas." },
+];
+
+const COMO_AJUDA = [
+  { numero: "01", titulo: "Enxerga", texto: "Dashboard Executivo reúne os sinais importantes da operação em uma leitura rápida." },
+  { numero: "02", titulo: "Prioriza", texto: "Diretor Digital, Missão do Dia e Próxima Melhor Ação organizam o que merece atenção agora." },
+  { numero: "03", titulo: "Acompanha", texto: "Clientes, histórico, agenda e oportunidades ficam conectados para a equipe agir com contexto." },
+  { numero: "04", titulo: "Fortalece", texto: "Site Premium, Conteúdo IA, Chatbot, Automações, Reputação e Métricas apoiam a presença do negócio." },
+];
+
 const COMPARACAO_OUTROS = ["Apenas armazenam dados.", "Esperam comandos.", "Mostram relatórios.", "São ferramentas."];
 const COMPARACAO_ORGANIZAPRO = ["Analisa informações.", "Identifica prioridades.", "Recomenda ações.", "Atua como Diretor Digital."];
 
@@ -125,6 +139,7 @@ export default function Page() {
     window.open(`https://wa.me/5541988379119?text=${encodeURIComponent(msg)}`, "_blank");
 
   const [refDash, classDash]     = useReveal<HTMLDivElement>();
+  const [refProblema, classProblema] = useReveal<HTMLDivElement>();
   const [refTrab, classTrab]     = useReveal<HTMLDivElement>();
   const [refComp, classComp]     = useReveal<HTMLDivElement>();
   const [refFrent, classFrent]   = useReveal<HTMLDivElement>();
@@ -157,6 +172,12 @@ export default function Page() {
           transition: border-color 0.22s, transform 0.22s;
         }
         .card-soft:hover { border-color: rgba(74,155,176,0.4); transform: translateY(-3px); }
+        .problem-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .help-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: rgba(0,198,255,.16); border: 1px solid rgba(0,198,255,.16); }
+        .help-item { background: #0b101a; padding: 24px 22px; min-height: 190px; }
+        .help-item:hover { background: #0e1522; }
+        @media (max-width: 860px) { .problem-grid, .help-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 560px) { .problem-grid, .help-grid { grid-template-columns: 1fr; } .help-item { min-height: auto; } }
 
         .section-tag {
           display: inline-block; background: rgba(74,155,176,0.12); color: #4a9bb0;
@@ -220,7 +241,7 @@ export default function Page() {
                 <div style={{ display: "flex", gap: 6 }}>
                   {["#f87171", "#fbbf24", "#4ade80"].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />)}
                 </div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>OrganizaPro — Painel</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>OrganizaPro — Demonstração visual</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#4ade80" }}>
                   <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />
                   Ao vivo
@@ -245,17 +266,17 @@ export default function Page() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 8 }}>
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>Bom dia, Studio Bella 👋</div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Segunda-feira, 08 Jun</div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Exemplo de leitura da operação</div>
                     </div>
                     <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#1F4E5F,#0d3547)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>SB</div>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 10, marginBottom: 14 }}>
                     {[
-                      { label: "Compromissos", value: "8",       accent: "#4a9bb0" },
-                      { label: "Confirmados",  value: "6",       accent: "#4ade80" },
-                      { label: "Aguardando",   value: "2",       accent: "#fbbf24" },
-                      { label: "Receita prev.", value: "R$2.480", accent: "#4ade80" },
+                      { label: "Agenda", value: "Exemplo", accent: "#4a9bb0" },
+                      { label: "Clientes", value: "Exemplo", accent: "#4ade80" },
+                      { label: "Pendências", value: "Exemplo", accent: "#fbbf24" },
+                      { label: "Próxima ação", value: "Visível", accent: "#4ade80" },
                     ].map(item => (
                       <div key={item.label} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>{item.label}</div>
@@ -265,12 +286,12 @@ export default function Page() {
                   </div>
 
                   <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "12px 14px", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 12 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Agenda de hoje</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Agenda ilustrativa</div>
                     {[
-                      { time: "09:00", name: "Cliente 1", status: "#4ade80", label: "Confirmado" },
-                      { time: "10:30", name: "Cliente 2", status: "#4ade80", label: "Confirmado" },
-                      { time: "13:00", name: "Cliente 3", status: "#fbbf24", label: "Pendente" },
-                      { time: "14:30", name: "Cliente 4", status: "#f87171", label: "Não respondeu" },
+                      { time: "09:00", name: "Contato demonstrativo", status: "#4ade80", label: "Exemplo" },
+                      { time: "10:30", name: "Contato demonstrativo", status: "#4ade80", label: "Exemplo" },
+                      { time: "13:00", name: "Contato demonstrativo", status: "#fbbf24", label: "Exemplo" },
+                      { time: "14:30", name: "Contato demonstrativo", status: "#f87171", label: "Exemplo" },
                     ].map(apt => (
                       <div key={apt.time} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", width: 38, flexShrink: 0 }}>{apt.time}</div>
@@ -289,6 +310,58 @@ export default function Page() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PROBLEMA OPERACIONAL ─────────────────────────────────── */}
+      <section id="problema" style={{ padding: isMobile ? "64px 20px" : "86px 40px", background: "#0b0e16" }}>
+        <div ref={refProblema} className={classProblema} style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "0.78fr 1.22fr", gap: isMobile ? 30 : 68, alignItems: "end", marginBottom: isMobile ? 30 : 42 }}>
+            <div>
+              <span className="section-tag">O problema</span>
+              <h2 style={{ fontSize: isMobile ? 28 : 44, fontWeight: 850, color: "#f1f5f9", lineHeight: 1.08, margin: 0 }}>
+                O negócio não para.<br /><span style={{ color: "#79dfff" }}>Sua atenção também não precisa parar.</span>
+              </h2>
+            </div>
+            <p style={{ fontSize: isMobile ? 15 : 17, color: "#94a3b8", lineHeight: 1.75, margin: 0, maxWidth: 500 }}>
+              Pequenos negócios não sofrem por falta de esforço. Sofrem quando informações importantes ficam espalhadas e ninguém sabe qual é o próximo passo.
+            </p>
+          </div>
+          <div className="problem-grid">
+            {PROBLEMAS.map(item => (
+              <div key={item.titulo} className="card-soft" style={{ padding: "24px 20px", borderRadius: 14 }}>
+                <div style={{ width: 34, height: 34, display: "grid", placeItems: "center", marginBottom: 18, borderRadius: 10, color: "#79dfff", background: "rgba(0,198,255,.1)", border: "1px solid rgba(0,198,255,.18)", fontSize: 20 }}>{item.icon}</div>
+                <h3 style={{ fontSize: 15, color: "#f1f5f9", margin: "0 0 9px", lineHeight: 1.3 }}>{item.titulo}</h3>
+                <p style={{ fontSize: 13, color: "#8290a3", lineHeight: 1.6, margin: 0 }}>{item.texto}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── COMO O ORGANIZAPRO AJUDA ──────────────────────────────── */}
+      <section id="como-ajuda" style={{ padding: isMobile ? "64px 20px" : "90px 40px", background: "#080b13" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "end", justifyContent: "space-between", gap: 24, flexDirection: isMobile ? "column" : "row", marginBottom: isMobile ? 32 : 46 }}>
+            <div>
+              <span className="section-tag">Como o OrganizaPro ajuda</span>
+              <h2 style={{ fontSize: isMobile ? 28 : 42, fontWeight: 850, color: "#f1f5f9", lineHeight: 1.1, margin: 0, maxWidth: 650 }}>
+                Menos abas abertas.<br /><span style={{ color: "#a78bfa" }}>Mais clareza para agir.</span>
+              </h2>
+            </div>
+            <p style={{ fontSize: 14, color: "#8290a3", lineHeight: 1.7, margin: 0, maxWidth: 330 }}>
+              Uma sequência simples para transformar informação operacional em decisão prática.
+            </p>
+          </div>
+          <div className="help-grid">
+            {COMO_AJUDA.map(item => (
+              <div key={item.numero} className="help-item">
+                <div style={{ color: "#00c6ff", fontSize: 11, fontWeight: 800, letterSpacing: ".12em", marginBottom: 28 }}>{item.numero}</div>
+                <h3 style={{ color: "#f1f5f9", fontSize: 20, margin: "0 0 10px" }}>{item.titulo}</h3>
+                <p style={{ color: "#94a3b8", fontSize: 13.5, lineHeight: 1.65, margin: 0 }}>{item.texto}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -410,12 +483,12 @@ export default function Page() {
         <div ref={refProva} className={classProva} style={{ maxWidth: 800, margin: "0 auto" }}>
 
           <div style={{ textAlign: "center", marginBottom: isMobile ? 36 : 52 }}>
-            <span className="section-tag">Prova, não promessa</span>
+            <span className="section-tag">Demonstração</span>
             <h2 style={{ fontSize: isMobile ? 26 : 42, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.15, margin: "0 0 14px" }}>
-              Isto já roda na conta de todo cliente OrganizaPro
+              Uma próxima ação mais clara na rotina
             </h2>
             <p style={{ fontSize: isMobile ? 15 : 17, color: "#94a3b8", lineHeight: 1.7, maxWidth: 500, margin: "0 auto" }}>
-              O card &ldquo;Prioridade do Diretor&rdquo;, direto do Dashboard real.
+              Um exemplo visual de como a prioridade do Diretor pode aparecer no Dashboard.
             </p>
           </div>
 
@@ -434,7 +507,7 @@ export default function Page() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9" }}>Diretor Digital</span>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9" }}>Diretor Digital — exemplo</span>
                   <span style={{
                     fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
                     color: "#4a9bb0", background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.25)",
@@ -448,8 +521,7 @@ export default function Page() {
                   </span>
                 </div>
                 <p style={{ fontSize: 13.5, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
-                  Bom dia. Enquanto você cuidava do seu negócio, analisei sua rotina.
-                  Se eu estivesse administrando sua empresa hoje, começaria exatamente por esta ação.
+                  Uma leitura demonstrativa: enquanto você cuida do seu negócio, o painel organiza a próxima ação a partir da rotina.
                 </p>
               </div>
             </div>
@@ -459,14 +531,13 @@ export default function Page() {
                 🎯 Prioridade do Diretor
               </div>
               <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: "#f8fafc", marginBottom: 8 }}>
-                Analisei sua agenda e encontrei 2 compromissos em atraso.
+                Exemplo de prioridade: confirmar os atendimentos da tarde.
               </div>
               <p style={{ fontSize: 14, color: "#cbd5e1", lineHeight: 1.6, margin: "0 0 10px" }}>
-                Compromissos atrasados costumam virar clientes esquecidos se não forem resolvidos rápido.
-                Vale sua atenção agora.
+                A agenda reúne pendências e próximos passos para a equipe decidir o que merece atenção agora.
               </p>
               <p style={{ fontSize: 12.5, color: "#94a3b8", lineHeight: 1.4, margin: "0 0 18px", fontStyle: "italic" }}>
-                Por quê: 2 compromissos passaram da data sem confirmação ou reagendamento.
+                Leitura: o contexto da agenda fica próximo da ação recomendada.
               </p>
               <span style={{ display: "inline-flex", padding: "10px 22px", borderRadius: 10, background: "#f87171", color: "#0a0d14", fontSize: 14, fontWeight: 700 }}>
                 Executar agora →

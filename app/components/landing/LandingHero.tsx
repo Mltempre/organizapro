@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const NAV_LINKS = [
+  ["O problema", "#problema"],
   ["Como funciona", "#como-funciona"],
   ["O que ele faz", "#modulos"],
   ["Para quem", "#para-quem"],
@@ -68,15 +69,16 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
 
       <section id="top" className="hero-content">
         <div className="hero-copy">
-          <div className="eyebrow"><span aria-hidden="true" />Operação organizada. Próxima ação mais clara.</div>
-          <h1>Seu negócio em movimento. <strong>Sem perder o que importa.</strong></h1>
-          <p className="lead">O OrganizaPro reúne clientes, agenda, conteúdo, reputação e métricas para transformar sinais reais do negócio em prioridades e ações.</p>
+          <div className="eyebrow"><span aria-hidden="true" />Inteligência para a operação real.</div>
+          <h1>Organize a operação. <strong>Aja no que importa.</strong></h1>
+          <p className="lead">O OrganizaPro conecta clientes, agenda, atendimento, reputação e presença digital para transformar sinais reais do negócio em prioridades e ações.</p>
           <div className="hero-ctas">
             <button type="button" className="primary-cta" onClick={onPrimaryCta}>
-              Quero meu Diretor Digital <span aria-hidden="true">→</span>
+              Ver o OrganizaPro em ação <span aria-hidden="true">→</span>
             </button>
-            <a className="secondary-cta" href="#como-funciona">Ver como funciona</a>
+            <a className="secondary-cta" href="#modulos">Conhecer as capacidades</a>
           </div>
+          <p className="hero-offer"><strong>Implantação R$ 1.497</strong><span aria-hidden="true">·</span><strong>R$ 197/mês</strong><span aria-hidden="true">·</span>sem trocar sua operação de lugar</p>
           <p className="product-proof">Dashboard executivo · Clientes e histórico · Agenda universal · Diretor Digital · Site Premium · Conteúdo IA</p>
         </div>
 
@@ -133,6 +135,8 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
         .secondary-cta { padding: 0 17px; color: #d6dee7; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.13); transition: background .18s ease, border-color .18s ease; }
         .secondary-cta:hover { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.2); }
         .product-proof { margin: 20px 0 0; color: #687589; font-size: 11px; line-height: 1.55; }
+        .hero-offer { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; color: #7d8da2; font-size: 11.5px; line-height: 1.5; }
+        .hero-offer strong { color: #b9e5ee; font-weight: 800; }
         .dashboard-visual { position: relative; min-width: 0; }
         .dashboard-visual::before { content: ""; position: absolute; inset: 7% 5% -4%; z-index: -1; border-radius: 40%; background: rgba(38,111,130,.26); filter: blur(62px); }
         .browser-frame { position: relative; padding: 8px; border-radius: 18px; background: linear-gradient(145deg,rgba(22,29,40,.94),rgba(7,10,16,.98)); border: 1px solid rgba(138,190,203,.27); box-shadow: 0 42px 100px rgba(0,0,0,.54), 0 13px 36px rgba(0,0,0,.3), inset 0 1px rgba(255,255,255,.07); }
@@ -170,6 +174,7 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
           .hero-ctas { flex-direction: column; gap: 8px; }
           .primary-cta, .secondary-cta { width: 100%; min-height: 45px; border-radius: 10px; font-size: 12.8px; }
           .product-proof { margin-top: 12px; padding: 0 8px; font-size: 9.8px; }
+          .hero-offer { justify-content: center; margin-top: 12px; font-size: 10.5px; }
           .dashboard-visual { width: calc(100% + 26px); margin-left: -13px; }
           .dashboard-visual::before { inset: 5% 8% 2%; filter: blur(36px); }
           .browser-frame { padding: 5px; border-radius: 13px; box-shadow: 0 25px 58px rgba(0,0,0,.56), inset 0 1px rgba(255,255,255,.06); }
