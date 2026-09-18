@@ -31,7 +31,7 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
       <nav className={scrolled ? "hero-nav hero-nav-scrolled" : "hero-nav"} aria-label="Navegação principal">
         <div className="nav-inner">
           <a className="brand" href="#top" aria-label="OrganizaPro — início">
-            <span className="brand-mark" aria-hidden="true">👔</span>
+            <span className="brand-mark" aria-hidden="true">OP</span>
             <span>OrganizaPro</span>
           </a>
 
@@ -68,16 +68,16 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
 
       <section id="top" className="hero-content">
         <div className="hero-copy">
-          <div className="eyebrow"><span aria-hidden="true" />Não é mais um sistema. É um Diretor Digital.</div>
-          <h1>Decisões mais claras para o seu negócio. <strong>Todos os dias.</strong></h1>
-          <p className="lead">O OrganizaPro analisa sua agenda, seus clientes e sua reputação para mostrar o que realmente precisa da sua atenção agora.</p>
+          <div className="eyebrow"><span aria-hidden="true" />Operação organizada. Próxima ação mais clara.</div>
+          <h1>Seu negócio em movimento. <strong>Sem perder o que importa.</strong></h1>
+          <p className="lead">O OrganizaPro reúne clientes, agenda, conteúdo, reputação e métricas para transformar sinais reais do negócio em prioridades e ações.</p>
           <div className="hero-ctas">
             <button type="button" className="primary-cta" onClick={onPrimaryCta}>
               Quero meu Diretor Digital <span aria-hidden="true">→</span>
             </button>
             <a className="secondary-cta" href="#como-funciona">Ver como funciona</a>
           </div>
-          <p className="product-proof">Nunca esqueça um compromisso · Clientes organizados · Controle em segundos · Presença profissional · Mais avaliações · Menos trabalho manual</p>
+          <p className="product-proof">Dashboard executivo · Clientes e histórico · Agenda universal · Diretor Digital · Site Premium · Conteúdo IA</p>
         </div>
 
         <div className="dashboard-visual">
@@ -104,13 +104,13 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
       </section>
 
       <style>{`
-        .landing-hero { position: relative; min-height: 100vh; overflow: hidden; background: radial-gradient(820px 560px at 77% 43%, rgba(38,111,130,.23), transparent 72%), radial-gradient(620px 420px at 11% 19%, rgba(31,78,95,.14), transparent 70%), #0d1016; color: #e2e8f0; }
+        .landing-hero { position: relative; min-height: 100vh; overflow: hidden; background: radial-gradient(820px 560px at 77% 43%, rgba(0,198,255,.16), transparent 72%), radial-gradient(620px 420px at 11% 19%, rgba(124,58,237,.14), transparent 70%), #080b13; color: #e2e8f0; }
         .landing-hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px); background-size: 54px 54px; mask-image: linear-gradient(#000, transparent 80%); pointer-events: none; }
         .hero-nav { position: fixed; inset: 0 0 auto; z-index: 100; height: 76px; border-bottom: 1px solid rgba(255,255,255,.025); transition: background .25s ease, border-color .25s ease, backdrop-filter .25s ease; }
         .hero-nav-scrolled { background: rgba(13,16,22,.9); border-bottom-color: rgba(255,255,255,.07); backdrop-filter: blur(16px); }
         .nav-inner { width: min(100%, 1360px); height: 100%; padding: 0 30px; margin: auto; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
         .brand { display: flex; align-items: center; gap: 11px; justify-self: start; color: #f8fafc; font-size: 17px; font-weight: 800; text-decoration: none; }
-        .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: linear-gradient(145deg,#2a6b80,#123b4b); border: 1px solid rgba(127,205,224,.25); box-shadow: inset 0 1px rgba(255,255,255,.1); }
+        .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: linear-gradient(145deg,#00c6ff,#6246ea); border: 1px solid rgba(127,205,224,.35); box-shadow: 0 8px 24px rgba(0,198,255,.2), inset 0 1px rgba(255,255,255,.2); font-size: 11px; letter-spacing: .04em; }
         .nav-links, .nav-actions { display: flex; align-items: center; }
         .nav-links { gap: 34px; }
         .nav-links a, .login-link { color: #9aa8b9; text-decoration: none; font-size: 13px; transition: color .18s ease; }
@@ -120,10 +120,10 @@ export default function LandingHero({ onPrimaryCta }: LandingHeroProps) {
         .nav-cta:hover { transform: translateY(-1px); border-color: rgba(151,221,238,.42); }
         .menu-button, .mobile-menu { display: none; }
         .hero-content { position: relative; z-index: 1; width: min(100%, 1360px); min-height: 100vh; margin: auto; padding: 156px 30px 92px; display: grid; grid-template-columns: 430px minmax(0,1fr); gap: 34px; align-items: center; }
-        .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; margin-bottom: 24px; border-radius: 999px; background: rgba(55,134,154,.08); border: 1px solid rgba(103,187,207,.25); color: #79bdcd; font-size: 11.5px; font-weight: 700; }
-        .eyebrow span { width: 6px; height: 6px; border-radius: 50%; background: #6db8ca; }
+        .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; margin-bottom: 24px; border-radius: 999px; background: rgba(0,198,255,.08); border: 1px solid rgba(0,198,255,.25); color: #79dfff; font-size: 11.5px; font-weight: 700; }
+        .eyebrow span { width: 6px; height: 6px; border-radius: 50%; background: #1de9b6; box-shadow: 0 0 12px #1de9b6; }
         .hero-copy h1 { margin: 0 0 22px; color: #f8fafc; font-size: 46px; line-height: 1.075; letter-spacing: -1.6px; font-weight: 850; }
-        .hero-copy h1 strong { display: block; margin-top: 6px; color: #70b5c6; font: inherit; }
+        .hero-copy h1 strong { display: block; margin-top: 6px; background: linear-gradient(100deg,#00c6ff,#a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; font: inherit; }
         .lead { max-width: 420px; margin: 0 0 31px; color: #a0adbd; font-size: 16px; line-height: 1.7; }
         .hero-ctas { display: flex; align-items: stretch; gap: 11px; }
         .primary-cta, .secondary-cta { min-height: 54px; display: flex; align-items: center; justify-content: center; border-radius: 11px; font-size: 13.5px; font-weight: 760; text-decoration: none; }

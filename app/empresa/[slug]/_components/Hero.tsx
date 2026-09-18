@@ -34,7 +34,12 @@ export default function Hero({ empresa, esp, local, titulo, subtitulo, waLink, w
           <figure className="premium-hero__media"><Image src={mediaUrl} alt={`Imagem de apresentação de ${empresa.nome || "empresa"}`} fill priority sizes="(max-width: 700px) 100vw, 46vw" unoptimized/><span aria-hidden="true"/></figure>
         ) : (
           <div className="premium-hero__fallback" aria-hidden="true">
-            <span className="premium-hero__fallback-mark">{(empresa.nome || "•").charAt(0).toUpperCase()}</span>
+            <div className="premium-hero__fallback-content">
+              <span className="premium-hero__fallback-eyebrow">Apresentação</span>
+              <strong>{empresa.nome || "Empresa"}</strong>
+              {(esp || local) && <span className="premium-hero__fallback-meta">{[esp, local].filter(Boolean).join(" · ")}</span>}
+              <i />
+            </div>
           </div>
         )}
       </div>
@@ -61,9 +66,13 @@ export default function Hero({ empresa, esp, local, titulo, subtitulo, waLink, w
         .premium-hero__media span{position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);border-radius:inherit;pointer-events:none}
         .premium-hero__fallback{background:linear-gradient(155deg,${tema.primarySoft},transparent 55%),linear-gradient(340deg,${tema.emotionalSoft},transparent 60%),${tema.ink2};display:flex;align-items:center;justify-content:center}
         .premium-hero__fallback:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.028) 0 2px,transparent 2px 46px)}
-        .premium-hero__fallback-mark{position:relative;font-family:${font.display};font-size:88px;font-weight:600;color:${tema.primary};opacity:.5}
+        .premium-hero__fallback-content{position:relative;z-index:1;width:78%;padding:34px;border:1px solid ${tema.primaryBorder};border-radius:calc(${tema.radius}px - 6px);background:rgba(8,12,18,.34);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:flex-start;box-shadow:inset 0 1px rgba(255,255,255,.04)}
+        .premium-hero__fallback-eyebrow{color:${tema.primary};font:800 10px/1 ${font.body};letter-spacing:.16em;text-transform:uppercase;margin-bottom:18px}
+        .premium-hero__fallback-content strong{font-family:${font.display};font-size:clamp(28px,3.5vw,42px);line-height:1.05;color:${tema.text};font-weight:600}
+        .premium-hero__fallback-meta{margin-top:12px;color:${tema.textMuted};font:600 12px/1.5 ${font.body}}
+        .premium-hero__fallback-content i{display:block;width:54px;height:3px;border-radius:999px;background:${gradienteDe(tema)};margin-top:24px}
         @media(max-width:960px){.premium-hero--media .premium-hero__inner,.premium-hero--fallback .premium-hero__inner{grid-template-columns:1fr 40%;gap:32px}.premium-hero h1{font-size:clamp(36px,6vw,52px)}}
-        @media(max-width:700px){.premium-hero{min-height:auto;padding:104px 20px 58px}.premium-hero--media .premium-hero__inner,.premium-hero--fallback .premium-hero__inner{grid-template-columns:1fr;gap:30px}.premium-hero h1{font-size:clamp(34px,11vw,46px)}.premium-hero p{font-size:15.5px}.premium-actions{flex-direction:column}.premium-button{width:100%}.premium-proof{gap:10px 16px}.premium-hero__media,.premium-hero__fallback{aspect-ratio:16/10;order:2}.premium-hero__fallback-mark{font-size:56px}}
+        @media(max-width:700px){.premium-hero{min-height:auto;padding:104px 20px 58px}.premium-hero--media .premium-hero__inner,.premium-hero--fallback .premium-hero__inner{grid-template-columns:1fr;gap:30px}.premium-hero h1{font-size:clamp(34px,11vw,46px)}.premium-hero p{font-size:15.5px}.premium-actions{flex-direction:column}.premium-button{width:100%}.premium-proof{gap:10px 16px}.premium-hero__media,.premium-hero__fallback{aspect-ratio:16/10;order:2}.premium-hero__fallback-content{width:88%;padding:24px}.premium-hero__fallback-content strong{font-size:30px}}
       `}</style>
     </section>
   );

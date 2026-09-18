@@ -347,9 +347,9 @@ export default function DashboardView(props: DashboardViewProps) {
         {RECURSOS_INCLUIDOS.map(r => (
           <span key={r.label} style={{
             display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "8px 16px", borderRadius: 999,
+            padding: "6px 11px", borderRadius: 999,
             background: "rgba(74,155,176,0.07)", border: "1px solid rgba(74,155,176,0.18)",
-            color: "#cbd5e1", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+            color: "#94a3b8", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
           }}>
             <span style={{ color: "#4ade80" }}>✔</span> {r.icon} {r.label}
           </span>
@@ -438,22 +438,29 @@ export default function DashboardView(props: DashboardViewProps) {
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         .dc  { animation: fadeUp 0.35s ease both; }
+        .dashboard-surface { position: relative; }
+        .dashboard-surface:before { content:""; position:absolute; inset:-32px -18px auto; height:220px; z-index:-1; pointer-events:none; background:radial-gradient(520px 180px at 18% 0%,rgba(0,198,255,.1),transparent 72%),radial-gradient(460px 180px at 82% 0%,rgba(124,58,237,.09),transparent 72%); }
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
         .indicadores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
         @media (max-width: 860px) { .indicadores-grid { grid-template-columns: repeat(2, 1fr); } }
         .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
         .indicador-tile:hover { border-color: rgba(74,155,176,0.4) !important; }
+        .dash-section-title { display:flex; align-items:center; gap:10px; margin:28px 0 14px; }
+        .dash-section-title:after { content:""; height:1px; flex:1; background:linear-gradient(90deg,rgba(0,198,255,.3),transparent); }
+        .dash-section-title strong { color:#e2e8f0; font-size:13px; letter-spacing:.02em; white-space:nowrap; }
+        .dash-section-title span { color:#00c6ff; font-size:15px; }
+        @media (max-width:700px) { .dash-section-title { margin-top:22px; } }
       `}</style>
 
       {/* ── 1. CABEÇALHO INTELIGENTE ─────────────────────────────────────── */}
-      <div className="dc" style={{
-        background: "linear-gradient(135deg, rgba(74,155,176,0.12), rgba(31,78,95,0.22))",
-        border: "1px solid rgba(74,155,176,0.3)",
+      <div className="dc dashboard-surface" style={{
+        background: "linear-gradient(135deg, rgba(0,198,255,0.11), rgba(98,70,234,0.16))",
+        border: "1px solid rgba(0,198,255,0.28)",
         borderRadius: 16, padding: "22px 24px", marginBottom: 16,
         boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
       }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#79dfff", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
           {dataStr}
         </div>
         <div style={{ fontSize: 20, fontWeight: 800, color: "#f1f5f9" }}>
@@ -470,8 +477,8 @@ export default function DashboardView(props: DashboardViewProps) {
             {ocupacaoPct !== null && (
               <span style={{
                 marginLeft: "auto", padding: "4px 12px", borderRadius: 999,
-                background: "rgba(74,155,176,0.12)", border: "1px solid rgba(74,155,176,0.3)",
-                color: "#4a9bb0", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                background: "rgba(0,198,255,0.1)", border: "1px solid rgba(0,198,255,0.28)",
+                color: "#79dfff", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
               }}>
                 Agenda: {ocupacaoPct}%
               </span>
@@ -501,6 +508,17 @@ export default function DashboardView(props: DashboardViewProps) {
         ))}
       </div>
 
+      {/* STATUS — leitura operacional antes das recomendações. Mesmos dados, nova hierarquia visual. */}
+      <div className="dash-section-title dc"><span>◉</span><strong>Como está seu negócio agora</strong></div>
+      <IndicadoresExecutivos
+        compromissosHoje={indicadores.compromissosHoje}
+        horariosVagosHoje={indicadores.horariosVagosHoje}
+        pendentes={indicadores.pendentes}
+        atrasados={indicadores.atrasados}
+        avaliacoesPendentes={indicadores.avaliacoesPendentes}
+        onNavigate={onNavigate}
+      />
+
       {/* ── ONBOARDING / RECURSOS / CONSULTORIA — topo (só quando ainda não
           há inteligência para mostrar) ───────────────────────────────────── */}
       {!temDados && blocoOnboardingRecursosConsultoria}
@@ -513,10 +531,10 @@ export default function DashboardView(props: DashboardViewProps) {
           <span style={{ fontSize: 20 }}>🧭</span>
           <div>
             <div style={{ fontSize: 17, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2 }}>
-              Seu Diretor Digital hoje
+              Prioridades e oportunidades de hoje
             </div>
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-              A mesma inteligência olhando seu negócio de ângulos diferentes — prioridades, oportunidades e recomendações.
+              O OrganizaPro reuniu os sinais do negócio e colocou primeiro o que merece sua atenção.
             </div>
           </div>
         </div>
@@ -560,15 +578,7 @@ export default function DashboardView(props: DashboardViewProps) {
         />
       )}
 
-      {/* ── 7. INDICADORES EXECUTIVOS ────────────────────────────────────── */}
-      <IndicadoresExecutivos
-        compromissosHoje={indicadores.compromissosHoje}
-        horariosVagosHoje={indicadores.horariosVagosHoje}
-        pendentes={indicadores.pendentes}
-        atrasados={indicadores.atrasados}
-        avaliacoesPendentes={indicadores.avaliacoesPendentes}
-        onNavigate={onNavigate}
-      />
+      <div className="dash-section-title dc"><span>✦</span><strong>Leitura executiva e operação</strong></div>
 
       {/* ── 8. RESUMO DA IA ───────────────────────────────────────────────── */}
       <div className="dc" style={{
@@ -729,6 +739,8 @@ export default function DashboardView(props: DashboardViewProps) {
           </div>
         </div>
       )}
+
+      <div className="dash-section-title dc"><span>✓</span><strong>Acompanhamento do dia</strong></div>
 
       {/* ── 10. OPORTUNIDADES ENCONTRADAS ────────────────────────────────── */}
       {temDados && (

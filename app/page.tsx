@@ -134,7 +134,7 @@ export default function Page() {
   const [refNichos, classNichos] = useReveal<HTMLDivElement>();
 
   return (
-    <div style={{ fontFamily: "Inter, -apple-system, sans-serif", background: "#0f1117", color: "#e2e8f0", overflowX: "hidden", maxWidth: "100vw" }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#080b13", color: "#e2e8f0", overflowX: "hidden", maxWidth: "100vw" }}>
 
       <style>{`
         * { box-sizing: border-box; }
@@ -376,10 +376,10 @@ export default function Page() {
           <div style={{ textAlign: "center", marginBottom: isMobile ? 36 : 52 }}>
             <span className="section-tag">Como ele age</span>
             <h2 style={{ fontSize: isMobile ? 26 : 40, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.15, margin: "0 0 14px" }}>
-              Seis frentes. Uma única inteligência.
+              Tudo o que acontece. Uma próxima ação mais clara.
             </h2>
             <p style={{ fontSize: isMobile ? 15 : 17, color: "#94a3b8", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
-              Não são recursos isolados — é o mesmo Diretor Digital agindo em seis frentes do seu negócio.
+              O OrganizaPro conecta as partes da operação para você enxergar prioridades sem trocar de ferramenta.
             </p>
           </div>
 
@@ -671,7 +671,7 @@ export default function Page() {
               </div>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginBottom: 8 }}>
                 <span style={{ fontSize: 20, fontWeight: 700, color: "rgba(255,255,255,0.65)", marginTop: 12 }}>R$</span>
-                <span style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: "#fff" }}>997</span>
+                <span style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: "#fff" }}>1.497</span>
               </div>
               <p style={{ fontSize: 14, color: "rgba(255,255,255,0.58)", margin: "0 0 28px", lineHeight: 1.65 }}>
                 Pago uma única vez. Inclui configuração completa, Site Premium Profissional e orientação de Google.
@@ -699,10 +699,9 @@ export default function Page() {
               </div>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 2, marginBottom: 8 }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: "#64748b", marginTop: 14 }}>R$</span>
-                <span style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: "#f1f5f9" }}>99</span>
+                <span style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: "#f1f5f9" }}>197</span>
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 20 }}>
-                  <span style={{ fontSize: 26, fontWeight: 800, color: "#f1f5f9", lineHeight: 1 }}>,90</span>
-                  <span style={{ fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>/mês</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#f1f5f9", lineHeight: 1 }}>/mês</span>
                 </div>
               </div>
               <p style={{ fontSize: 14, color: "#94a3b8", margin: "0 0 28px", lineHeight: 1.65 }}>
@@ -735,9 +734,9 @@ export default function Page() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#94a3b8", marginBottom: 4 }}>Primeiro ano completo:</div>
               <div style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: "#4a9bb0" }}>
-                R$997 + 12 × R$99,90 = <span style={{ color: "#f1f5f9" }}>R$2.195,80</span>
+                R$1.497 + 12 × R$197 = <span style={{ color: "#f1f5f9" }}>R$3.861</span>
               </div>
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Diretor Digital + Site Premium Profissional + Google + suporte por 12 meses</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>OrganizaPro + Site Premium Profissional + suporte por 12 meses</div>
             </div>
             <button className="btn-main" style={{ fontSize: isMobile ? 14 : 15, padding: isMobile ? "13px 22px" : "14px 30px", flexShrink: 0 }}
               onClick={() => wpp("Quero saber mais sobre o OrganizaPro — Implantação + Mensalidade")}>

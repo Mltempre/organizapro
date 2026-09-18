@@ -54,7 +54,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const resumo = await buscarResumoEmpresa(slug);
 
   if (!resumo) {
-    return { title: "Site não encontrado | OrganizaPro" };
+    return {
+      title: "OrganizaPro",
+      description: "Site profissional publicado com OrganizaPro.",
+    };
   }
 
   const local = [resumo.cidade, resumo.estado].filter(Boolean).join(", ");

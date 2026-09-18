@@ -59,14 +59,14 @@ export default function AdminShell({
   return (
     <div
       className="ash-root"
-      style={{ display: "flex", minHeight: "100vh", background: "#0f1117", color: "#e2e8f0", fontFamily: "Inter, sans-serif" }}
+      style={{ display: "flex", minHeight: "100vh", background: "#080b13", color: "#e2e8f0", fontFamily: "'DM Sans', sans-serif" }}
     >
       <style>{`
         /* ── Desktop default ── */
         .ash-sidebar {
           width: 220px;
           flex-shrink: 0;
-          background: #0a0d14;
+          background: #070a11;
           border-right: 1px solid #1e2130;
           display: flex;
           flex-direction: column;
@@ -156,12 +156,12 @@ export default function AdminShell({
         {/* Logo + close button */}
         <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid #1e2130", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#1F4E5F,#0d3547)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-              📋
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#00c6ff,#6246ea)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, letterSpacing: ".04em", flexShrink: 0 }}>
+              OP
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", lineHeight: 1.2 }}>OrganizaPro</div>
-              <div style={{ fontSize: 10, color: "#4a9bb0", lineHeight: 1.35, marginTop: 2, maxWidth: 138, textWrap: "balance" as React.CSSProperties["textWrap"] }}>Organize sua empresa com inteligência.</div>
+              <div style={{ fontSize: 10, color: "#79dfff", lineHeight: 1.35, marginTop: 2, maxWidth: 138, textWrap: "balance" as React.CSSProperties["textWrap"] }}>Organize sua empresa com inteligência.</div>
               <div style={{ fontSize: 9, color: "#64748b", marginTop: 4, letterSpacing: "0.02em" }}>✨ Assistente de Gestão</div>
             </div>
           </div>
@@ -193,8 +193,8 @@ export default function AdminShell({
                   fontSize: 13,
                   fontWeight: active ? 600 : 400,
                   color: active ? "#f1f5f9" : "#64748b",
-                  background: active ? "rgba(31,78,95,0.25)" : "transparent",
-                  borderLeft: active ? "2px solid #1F4E5F" : "2px solid transparent",
+                  background: active ? "rgba(0,198,255,0.1)" : "transparent",
+                  borderLeft: active ? "2px solid #00c6ff" : "2px solid transparent",
                   cursor: "pointer",
                   transition: "all 0.15s",
                   userSelect: "none",
@@ -302,7 +302,7 @@ export default function AdminShell({
                 padding: "10px 20px",
                 borderRadius: 8,
                 border: "none",
-                background: "linear-gradient(135deg,#1F4E5F,#0d3547)",
+                background: "linear-gradient(135deg,#00c6ff,#6246ea)",
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 600,
