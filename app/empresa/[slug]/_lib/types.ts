@@ -14,7 +14,13 @@ export type DBGaleria    = { id: string; url: string; categoria: string; titulo:
 export type DBEquipe     = { id: string; foto_url: string | null; nome: string; especialidade: string | null; cro: string | null; descricao: string | null; ordem: number };
 export type DBAntes      = { id: string; antes_url: string | null; depois_url: string | null; titulo: string; descricao: string | null; ordem: number };
 export type DBDepoimento = { id: string; nome: string; cidade: string | null; comentario: string; nota: number; foto_url: string | null; ordem: number };
-export type DBServico    = { id: string; icone: string; imagem_url: string | null; nome: string; descricao: string | null; ordem: number };
+// `preco_centavos`: ainda sem coluna no banco — ver
+// docs/ecommerce-ia-v1-arquitetura.md (migration proposta, NÃO executada).
+// Optional/nullable já hoje: quando a coluna não existir ainda, `select("*")`
+// simplesmente não traz a chave (undefined); quando existir mas o item não
+// tiver preço definido, vem `null`. O componente público trata os dois
+// casos de forma idêntica — "sem preço" — nunca inventa um valor.
+export type DBServico    = { id: string; icone: string; imagem_url: string | null; nome: string; descricao: string | null; ordem: number; preco_centavos?: number | null };
 export type DBEstrutura  = { id: string; imagem_url: string; titulo: string; descricao: string | null; categoria: string; ordem: number };
 // Ainda sem tabela no banco (clinica_faq) — ver supabase/migrations/20260713000001_site_premium_6_faq_redes_seo.sql.
 // Tipo já definido para a seção FAQ passar a consumir dado real assim que a migração for aplicada.

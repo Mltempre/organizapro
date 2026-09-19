@@ -19,7 +19,7 @@ import type { Recomendacao } from "./recomendacoes";
 // precisa deixar isso explícito também nesta camada, para que nenhum
 // consumidor (Próxima Melhor Ação, Missão do Dia) apresente um sinal
 // heurístico com a mesma redação de confiança de um sinal de agenda real.
-const TIPOS_HEURISTICOS: ReadonlySet<TipoSinal> = new Set(["interesse_sem_compra", "demanda_nao_atendida"]);
+const TIPOS_HEURISTICOS: ReadonlySet<TipoSinal> = new Set(["interesse_sem_compra", "demanda_nao_atendida", "interesse_sem_pedido"]);
 
 // Orçamento → Venda → Receita (ver docs/orcamento-venda-receita-v1-arquitetura.md):
 // dado CONFIRMADO (nunca heurístico — um orçamento só existe por ação
@@ -34,6 +34,11 @@ const TIPOS_ORCAMENTO: ReadonlySet<TipoSinal> = new Set([
 // princípio — dado confirmado, fonte própria (`cobrancas`, não
 // `agendamentos` nem `orcamentos`), evidência com texto próprio.
 const TIPOS_COBRANCA: ReadonlySet<TipoSinal> = new Set(["cobranca_vencida"]);
+
+// E-commerce IA (ver docs/ecommerce-ia-v1-arquitetura.md): mesmo princípio
+// — dado confirmado, fonte própria (`pedidos`, não `agendamentos`,
+// `orcamentos` nem `cobrancas`), evidência com texto próprio.
+const TIPOS_PEDIDO: ReadonlySet<TipoSinal> = new Set(["pedido_nao_concluido", "recompra_possivel"]);
 
 export type EspecialistaOrigem = "comercial";
 
@@ -82,6 +87,10 @@ export function adaptarOportunidadesClientes(oportunidades: OportunidadeCliente[
       ? (op.tempoDecorrido
           ? `Identificado no histórico real de cobranças, ${op.tempoDecorrido}.`
           : "Identificado no histórico real de cobranças.")
+      : TIPOS_PEDIDO.has(op.sinais[0].tipo)
+      ? (op.tempoDecorrido
+          ? `Identificado no histórico real de pedidos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de pedidos.")
       : (op.tempoDecorrido
           ? `Identificado no histórico real de agendamentos, ${op.tempoDecorrido}.`
           : "Identificado no histórico real de agendamentos."),
@@ -139,15 +148,20 @@ const TIER: Record<string, number> = {
   orcamento_expirado:               5,
   orcamento_expirando:              6,
   orcamento_sem_resposta:           7,
-  "compromissos-atrasados":       8,
-  "horario-vago-hoje":            9,
-  sem_proximo_compromisso:        10,
+  // E-commerce IA: mesma ordem interna de PESO_TIPO em
+  // lib/oportunidades-clientes.ts — ver docs/ecommerce-ia-v1-arquitetura.md.
+  pedido_nao_concluido:             8,
+  "compromissos-atrasados":       9,
+  "horario-vago-hoje":            10,
+  sem_proximo_compromisso:        11,
+  recompra_possivel:              12,
   // Sinais heurísticos (Smart Commerce) — sempre depois dos sinais de
   // agenda confirmados, nunca competindo por posição de destaque com eles.
-  demanda_nao_atendida:           11,
-  interesse_sem_compra:           12,
+  demanda_nao_atendida:           13,
+  interesse_sem_compra:           14,
+  interesse_sem_pedido:           15,
 };
-const TIER_PADRAO = 13;
+const TIER_PADRAO = 16;
 
 function tierDoSinal(sinal: SinalCanonico): number {
   return TIER[sinal.tipo] ?? TIER_PADRAO;

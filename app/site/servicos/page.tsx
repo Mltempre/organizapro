@@ -5,8 +5,30 @@ import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../components/AdminShell";
 import SiteWorkspaceNav from "../SiteWorkspaceNav";
 
-type Item = { id: string; icone: string; imagem_url: string|null; nome: string; descricao: string|null; ordem: number; };
-type Form = { icone: string; imagem_url: string; nome: string; descricao: string; };
+// `preco_centavos`: coluna ainda não existe no banco — ver
+// docs/ecommerce-ia-v1-arquitetura.md (migration proposta, NÃO executada).
+// Opcional aqui também: `select("*")` simplesmente não traz a chave antes
+// da migration (undefined), e o formulário trata isso como "sem preço".
+type Item = { id: string; icone: string; imagem_url: string|null; nome: string; descricao: string|null; ordem: number; preco_centavos?: number|null; };
+type Form = { icone: string; imagem_url: string; nome: string; descricao: string; precoReais: string; };
+
+// E-commerce IA — conversão texto (reais, vírgula decimal) <-> centavos.
+// Nunca usa float para dinheiro: o valor final sempre passa por
+// Math.round sobre um inteiro de centavos. Campo vazio = sem preço (null),
+// nunca 0 fantasioso.
+function parsePrecoParaCentavos(texto: string): number | null {
+  const limpo = texto.trim();
+  if (!limpo) return null;
+  const normalizado = limpo.replace(/\./g, "").replace(",", ".");
+  const valor = Number(normalizado);
+  if (!Number.isFinite(valor) || valor <= 0) return null;
+  return Math.round(valor * 100);
+}
+
+function formatarCentavosParaInput(centavos: number | null | undefined): string {
+  if (centavos == null) return "";
+  return (centavos / 100).toFixed(2).replace(".", ",");
+}
 
 
 const ICONS = [
@@ -32,10 +54,11 @@ export default function ServicosAdmin() {
   const [itens, setItens]         = useState<Item[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modal, setModal]         = useState<{ mode:"add"|"edit"; item?: Item }|null>(null);
-  const [form, setForm]           = useState<Form>({ icone:"tooth", imagem_url:"", nome:"", descricao:"" });
+  const [form, setForm]           = useState<Form>({ icone:"tooth", imagem_url:"", nome:"", descricao:"", precoReais:"" });
   const [uploading, setUploading] = useState(false);
   const [salvando, setSalvando]   = useState(false);
   const [erro, setErro]           = useState("");
+  const [avisoPreco, setAvisoPreco] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
@@ -70,17 +93,35 @@ export default function ServicosAdmin() {
     setForm(p => ({ ...p, imagem_url: data.url }));
   }
 
+  // E-commerce IA — grava o preço numa chamada SEPARADA e isolada do
+  // salvamento principal (nome/descricao/icone/imagem/ordem, inalterado
+  // acima). Antes da migration (seção "Catálogo/Preço" de
+  // docs/ecommerce-ia-v1-arquitetura.md) rodar, `preco_centavos` não existe
+  // na tabela — este UPDATE falha sozinho, sem nunca impedir ou reverter o
+  // salvamento do serviço em si, que já tinha sucesso garantido antes desta
+  // função existir. Nunca bloqueia a UI principal por uma capacidade ainda
+  // em ativação.
+  async function salvarPreco(itemId: string) {
+    const precoCentavos = parsePrecoParaCentavos(form.precoReais);
+    const { error } = await supabase.from("clinica_servicos").update({ preco_centavos: precoCentavos }).eq("id", itemId);
+    if (error) {
+      setAvisoPreco("O serviço foi salvo, mas o preço ainda não pôde ser registrado (funcionalidade em ativação nesta conta).");
+    }
+  }
+
   async function salvar() {
     if (!form.nome.trim()) { setErro("Informe o nome do servico."); return; }
-    setSalvando(true); setErro("");
+    setSalvando(true); setErro(""); setAvisoPreco("");
     const payload = { clinica_id:clinicaId, icone:form.icone, imagem_url:form.imagem_url||null, nome:form.nome.trim(), descricao:form.descricao.trim()||null };
     if (modal?.mode === "add") {
       const maxOrdem = itens.length ? Math.max(...itens.map(i => i.ordem)) + 1 : 0;
-      const { error } = await supabase.from("clinica_servicos").insert({ ...payload, ordem:maxOrdem });
+      const { data: inserido, error } = await supabase.from("clinica_servicos").insert({ ...payload, ordem:maxOrdem }).select("id").single();
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
+      if (inserido?.id) await salvarPreco(inserido.id);
     } else if (modal?.item) {
       const { error } = await supabase.from("clinica_servicos").update(payload).eq("id", modal.item.id);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
+      await salvarPreco(modal.item.id);
     }
     setSalvando(false); setModal(null); carregar();
   }
@@ -107,9 +148,16 @@ export default function ServicosAdmin() {
   const cor = (icone: string) => ICON_COLORS[icone] ?? "#00c896";
 
   return (
-    <AdminShell title="Servicos" subtitle="Servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Servicos" subtitle="Servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"", precoReais:"" }); setModal({ mode:"add" }); setErro(""); setAvisoPreco(""); }}>
 
       <SiteWorkspaceNav />
+
+      {avisoPreco && (
+        <div style={{ background:"rgba(245,158,11,0.10)", border:"1px solid rgba(245,158,11,0.3)", color:"#fbbf24", borderRadius:8, padding:"10px 14px", marginBottom:16, fontSize:13, display:"flex", justifyContent:"space-between", alignItems:"center", gap:10 }}>
+          <span>{avisoPreco}</span>
+          <button onClick={() => setAvisoPreco("")} style={{ background:"transparent", border:"none", color:"#fbbf24", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>
+        </div>
+      )}
 
       {loading && <p style={{ color:"var(--muted)" }}>Carregando...</p>}
 
@@ -137,10 +185,15 @@ export default function ServicosAdmin() {
                   <div style={{ fontSize:14, fontWeight:700, color:"#f1f5f9" }}>{item.nome}</div>
                 </div>
                 {item.descricao && <p style={{ fontSize:12, color:"#64748b", lineHeight:1.6, margin:"0 0 10px" }}>{item.descricao}</p>}
+                {item.preco_centavos != null && (
+                  <div style={{ fontSize:13, fontWeight:700, color:"#00c896", margin:"0 0 10px" }}>
+                    {(item.preco_centavos/100).toLocaleString("pt-BR", { style:"currency", currency:"BRL" })}
+                  </div>
+                )}
                 <div style={{ display:"flex", gap:5 }}>
                   <button onClick={() => mover(item,-1)} disabled={idx===0} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↑</button>
                   <button onClick={() => mover(item, 1)} disabled={idx===sorted.length-1} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↓</button>
-                  <button onClick={() => { setForm({ icone:item.icone, imagem_url:item.imagem_url??"", nome:item.nome, descricao:item.descricao??"" }); setModal({ mode:"edit", item }); setErro(""); }} style={{ flex:1, padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#94a3b8", fontSize:12, cursor:"pointer" }}>Editar</button>
+                  <button onClick={() => { setForm({ icone:item.icone, imagem_url:item.imagem_url??"", nome:item.nome, descricao:item.descricao??"", precoReais:formatarCentavosParaInput(item.preco_centavos) }); setModal({ mode:"edit", item }); setErro(""); setAvisoPreco(""); }} style={{ flex:1, padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#94a3b8", fontSize:12, cursor:"pointer" }}>Editar</button>
                   <button onClick={() => excluir(item.id)} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(239,68,68,0.3)", background:"transparent", color:"#f87171", fontSize:12, cursor:"pointer" }}>✕</button>
                 </div>
               </div>
@@ -183,9 +236,13 @@ export default function ServicosAdmin() {
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Nome do servico *</label>
               <input value={form.nome} onChange={e => setForm(p => ({...p, nome:e.target.value}))} placeholder="Ex: Corte de Cabelo, Consultoria Financeira..." className="input-field" />
             </div>
-            <div style={{ marginBottom:22 }}>
+            <div style={{ marginBottom:16 }}>
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Descricao</label>
               <textarea value={form.descricao} onChange={e => setForm(p => ({...p, descricao:e.target.value}))} placeholder="Descreva o que torna esse servico especial..." className="input-field" style={{ resize:"vertical", minHeight:70 }} />
+            </div>
+            <div style={{ marginBottom:22 }}>
+              <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Preco (opcional)</label>
+              <input value={form.precoReais} onChange={e => setForm(p => ({...p, precoReais:e.target.value}))} placeholder="Ex: 49,90 — deixe em branco se nao tiver preco fixo" className="input-field" inputMode="decimal" />
             </div>
 
             <div style={{ display:"flex", gap:10 }}>

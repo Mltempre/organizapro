@@ -522,3 +522,118 @@ test("dedup: mesmo telefone com cobranca_vencida e orcamento_aceito_sem_agendame
   assert.equal(out[0].sinaisAdicionais, 1);
   assert.equal(out[0].sinais[0].tipo, "cobranca_vencida");
 });
+
+// ── E-commerce IA: pedido_nao_concluido / recompra_possivel / interesse_sem_pedido ──
+// Ver docs/ecommerce-ia-v1-arquitetura.md.
+
+test("pedido_nao_concluido: aparece com prioridade alta e evidencia propria de pedido", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    pedidosNaoConcluidos: [
+      { id: "ped1", nome: "Gustavo", telefone: "11811110000", valor: 89.9, dataCriacao: "2026-09-14" },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "pedido_nao_concluido");
+  assert.equal(out[0].prioridade, "alta");
+  assert.match(out[0].motivoPrincipal, /pedido/);
+  assert.match(out[0].motivoPrincipal, /R\$\s*89,90/);
+});
+
+test("pedido_nao_concluido: valor ausente nao inventa numero, so omite o trecho de valor", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    pedidosNaoConcluidos: [
+      { id: "ped2", nome: "Helena", telefone: "11822220000", valor: null, dataCriacao: "2026-09-14" },
+    ],
+  }));
+  assert.equal(out[0].motivoPrincipal, "Helena tem um pedido em aberto, ainda sem confirmação ou pagamento.");
+});
+
+test("recompra_possivel: aparece com prioridade media", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesRecompraPossivel: [
+      { id: "rec1", nome: "Igor", telefone: "11833330000", dataUltimoPedidoPago: "2026-08-01" },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "recompra_possivel");
+  assert.equal(out[0].prioridade, "media");
+});
+
+test("interesse_sem_pedido: sinal heuristico, prioridade baixa, texto nunca afirma intencao confirmada", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    conversasComercialSemPedido: [
+      { id: "log20", nome: "Julia", telefone: "11844440000", data: "2026-09-15", tevePedidoApos: false },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinais[0].tipo, "interesse_sem_pedido");
+  assert.equal(out[0].prioridade, "baixa");
+  assert.match(out[0].motivoPrincipal, /sinal heurístico/);
+});
+
+test("interesse_sem_pedido: desaparece quando ja houve pedido apos a conversa (converteu)", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    conversasComercialSemPedido: [
+      { id: "log21", nome: "Kevin", telefone: "11855550000", data: "2026-09-15", tevePedidoApos: true },
+    ],
+  }));
+  assert.equal(out.length, 0);
+});
+
+test("prioridade interna: pedido_nao_concluido vem antes de sem_proximo_compromisso, mas depois do bloco de orcamento", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    clientesSemProximoCompromisso: [
+      { id: "p1", nome: "SemProximo", telefone: "11866660000", proximaConsulta: null },
+    ],
+    orcamentosAceitosSemAgendamento: [
+      { id: "acc3", nome: "AceitouOrc", telefone: "11877770000", valor: 100, dataAceite: "2026-09-17" },
+    ],
+    pedidosNaoConcluidos: [
+      { id: "ped3", nome: "PedidoAberto", telefone: "11888880000", valor: 50, dataCriacao: "2026-09-16" },
+    ],
+  }));
+  assert.deepEqual(out.map(o => o.nome), ["AceitouOrc", "PedidoAberto", "SemProximo"]);
+});
+
+test("dedup: mesmo telefone com pedido_nao_concluido e interesse_sem_pedido gera um unico card, pedido em destaque", () => {
+  const out = gerarOportunidadesClientes(entradaBase({
+    pedidosNaoConcluidos: [
+      { id: "ped4", nome: "Larissa", telefone: "10444440000", valor: 30, dataCriacao: "2026-09-16" },
+    ],
+    conversasComercialSemPedido: [
+      { id: "log22", nome: "Larissa", telefone: "10444440000", data: "2026-09-14", tevePedidoApos: false },
+    ],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].sinaisAdicionais, 1);
+  assert.equal(out[0].sinais[0].tipo, "pedido_nao_concluido");
+});
+
+test("Sinal Canonico: evidencia de pedido_nao_concluido/recompra_possivel cita 'historico real de pedidos', nunca outro dominio", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    pedidosNaoConcluidos: [
+      { id: "ped5", nome: "Marcelo", telefone: "10555550000", valor: 70, dataCriacao: "2026-09-10" },
+    ],
+  }));
+  const canonicos = organizarSinaisCanonicos(adaptarOportunidadesClientes(oportunidades));
+  assert.equal(canonicos.length, 1);
+  assert.match(canonicos[0].evidencia, /histórico real de pedidos/);
+  assert.doesNotMatch(canonicos[0].evidencia, /orçamentos|agendamentos|cobranças/);
+});
+
+test("Diretor Digital: pedido_nao_concluido e recompra_possivel viram recomendacao consultiva, categorias existentes", () => {
+  const oportunidades = gerarOportunidadesClientes(entradaBase({
+    pedidosNaoConcluidos: [
+      { id: "ped6", nome: "Natalia", telefone: "10666660000", valor: 60, dataCriacao: "2026-09-10" },
+    ],
+    clientesRecompraPossivel: [
+      { id: "rec2", nome: "Otavio", telefone: "10777770000", dataUltimoPedidoPago: "2026-07-01" },
+    ],
+  }));
+  const consultivas = gerarRecomendacoesConsultivas({
+    temDadosSuficientes: true, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: null,
+  });
+  assert.equal(consultivas.length, 2);
+  const categorias = consultivas.map(c => c.categoria).sort();
+  assert.deepEqual(categorias, ["cancelamento_confirmacao", "retorno_cliente"]);
+});

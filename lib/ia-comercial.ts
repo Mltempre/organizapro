@@ -191,6 +191,59 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         destino: "/clientes",
         destinoLabel: "Ver cliente",
       });
+    } else if (sinal.tipo === "pedido_nao_concluido") {
+      // E-commerce IA (ver docs/ecommerce-ia-v1-arquitetura.md): dado
+      // CONFIRMADO — um pedido só existe por registro estruturado, nunca
+      // inferido. Reaproveita "cancelamento_confirmacao", mesmo tema dos
+      // sinais de orçamento (negociação em aberto que ainda pode se
+      // resolver sozinha).
+      lista.push({
+        id: `consultivo-pedido-${op.chave}`,
+        categoria: "cancelamento_confirmacao",
+        identificado: `${op.nome} tem um pedido em aberto, ainda sem confirmação ou pagamento.`,
+        motivo: "Um pedido parado é receita prevista sem movimento — vale confirmar ou fazer follow-up antes que o cliente perca o interesse.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Identificado no histórico real de pedidos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de pedidos.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
+    } else if (sinal.tipo === "recompra_possivel") {
+      // Reativação a partir de `pedidos` — mesmo tema de sem_proximo_compromisso
+      // com teveAtendimentoConcluido, reaproveita a categoria "retorno_cliente"
+      // já existente (nenhuma categoria nova).
+      lista.push({
+        id: `consultivo-recompra-${op.chave}`,
+        categoria: "retorno_cliente",
+        identificado: `${op.nome} já fez um pedido antes e pode estar pronto para comprar novamente.`,
+        motivo: "Clientes que já compraram uma vez tendem a comprar de novo quando lembrados — vale oferecer uma novidade do catálogo.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Identificado no histórico real de pedidos, ${op.tempoDecorrido}.`
+          : "Identificado no histórico real de pedidos.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
+    } else if (sinal.tipo === "interesse_sem_pedido") {
+      // Sinal heurístico (E-commerce IA — mesma limitação de
+      // interesse_sem_compra): texto sempre deixa explícito que é uma
+      // leitura de conversa, nunca um registro confirmado de intenção.
+      lista.push({
+        id: `consultivo-interesse-pedido-${op.chave}`,
+        categoria: "retorno_cliente",
+        identificado: `${op.nome} demonstrou interesse por um item do catálogo pelo WhatsApp e, até onde os dados mostram, não chegou a fazer um pedido.`,
+        motivo: "Sinal heurístico, baseado no texto da conversa — não é um registro confirmado de intenção, mas pode ser uma venda perdida se ninguém retomar o contato.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Sinal heurístico a partir de conversas do WhatsApp, ${op.tempoDecorrido} — não é um registro confirmado de interesse.`
+          : "Sinal heurístico a partir de conversas do WhatsApp — não é um registro confirmado de interesse.",
+        prioridade: op.prioridade,
+        destino: "/clientes",
+        destinoLabel: "Ver cliente",
+      });
     } else if (sinal.tipo === "interesse_sem_compra") {
       // Sinal heurístico (Smart Commerce — ver comentário no topo de
       // lib/oportunidades-clientes.ts): texto sempre deixa explícito que é

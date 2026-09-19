@@ -63,6 +63,21 @@
 // financeira confirmada, não uma perda potencial. Este motor só recebe a
 // cobrança já classificada como `vencida` por `lib/cobranca-state-machine.ts`
 // — nunca decide sozinho se algo está vencido.
+//
+// ── E-commerce IA (ainda sem migration) ────────────────────────────────────
+// Três sinais novos — ver docs/ecommerce-ia-v1-arquitetura.md:
+// - "pedido_nao_concluido": CONFIRMADO (um `pedido` é registro estruturado,
+//   nunca inferido) — pedido criado/confirmado que não chegou a `pago` nem
+//   `cancelado` depois de um tempo. Mesmo princípio de `orcamento_sem_resposta`.
+// - "recompra_possivel": CONFIRMADO — cliente com pelo menos um pedido `pago`
+//   no passado, sem pedido novo há um tempo. Mesmo princípio de
+//   `sem_proximo_compromisso` com `teveAtendimentoConcluido`, aplicado ao
+//   domínio de pedidos em vez de agendamentos (fontes de dado diferentes,
+//   por isso um sinal próprio, não uma reutilização literal daquele campo).
+// - "interesse_sem_pedido": HEURÍSTICO, mesmo padrão e mesma limitação de
+//   `interesse_sem_compra` — `chatbot_logs` não persiste se a conversa era
+//   sobre um item de catálogo nem se ela resultou em pedido; quem chama
+//   entrega a classificação já feita a partir do texto real.
 
 import { orcamentoExpirado, orcamentoExpirando } from "./orcamentos-state-machine";
 
@@ -78,7 +93,10 @@ export type TipoSinal =
   | "orcamento_expirando"
   | "orcamento_expirado"
   | "orcamento_aceito_sem_agendamento"
-  | "cobranca_vencida";
+  | "cobranca_vencida"
+  | "pedido_nao_concluido"
+  | "recompra_possivel"
+  | "interesse_sem_pedido";
 
 export type SinalOportunidade = {
   tipo:             TipoSinal;
@@ -136,6 +154,19 @@ export type ConversaChatbotSemConversao = {
   // suposto aqui. Quando true, a conversa já converteu e não é mais
   // oportunidade — o motor descarta o sinal.
   teveAgendamentoApos: boolean;
+};
+
+// ── E-commerce IA · sinal heurístico (ver comentário no topo do arquivo) ───
+// Mesma limitação de `ConversaChatbotSemConversao`: `chatbot_logs` não
+// persiste se a conversa era sobre um item de catálogo. Tipo próprio (não
+// reaproveita `ConversaChatbotSemConversao` literalmente) porque o evento
+// de conversão é diferente — "teve pedido depois", não "teve agendamento".
+export type ConversaComercialSemPedido = {
+  id:              string;
+  nome:            string | null;
+  telefone:        string;
+  data:            string; // YYYY-MM-DD
+  tevePedidoApos:  boolean; // calculado por quem chama a partir de `pedidos`, nunca suposto aqui
 };
 
 export type CompromissoCanceladoSemReagendamento = {
@@ -200,6 +231,29 @@ export type CobrancaVencida = {
   vencimento:  string; // YYYY-MM-DD
 };
 
+// ── E-commerce IA (ver docs/ecommerce-ia-v1-arquitetura.md) ─────────────────
+// Pedido é registro estruturado (nasce de um item de `clinica_servicos` já
+// precificado) — dado CONFIRMADO, nunca inferido de conversa. `status` já
+// vem resolvido por `lib/pedido-state-machine.ts`.
+export type PedidoNaoConcluido = {
+  id:           string;
+  nome:         string;
+  telefone?:    string | null;
+  valor:        number | null; // reais — null só quando o item de origem não tinha preço (não deveria acontecer para um pedido real, mas nunca inventa)
+  dataCriacao:  string; // YYYY-MM-DD
+};
+
+// Recompra possível: cliente com pelo menos um pedido `pago` no passado,
+// sem pedido novo há um tempo — mesmo princípio de `teveAtendimentoConcluido`
+// em ClienteSemProximoCompromisso, mas a partir da fonte `pedidos`, não
+// `agendamentos` (por isso um sinal próprio, não o mesmo campo reaproveitado).
+export type ClienteRecompraPossivel = {
+  id:                     string;
+  nome:                   string;
+  telefone?:              string | null;
+  dataUltimoPedidoPago:   string; // YYYY-MM-DD
+};
+
 export type EntradaOportunidades = {
   hoje: string; // YYYY-MM-DD — referência para todos os cálculos de tempo decorrido
   clientesSemProximoCompromisso: ClienteSemProximoCompromisso[];
@@ -218,6 +272,13 @@ export type EntradaOportunidades = {
   // Opcional — Financeiro Inteligente / Cobrador AI (ver comentário acima).
   // Omitido = comportamento idêntico a antes deste campo existir.
   cobrancasVencidas?: CobrancaVencida[];
+  // Opcionais — E-commerce IA (ver comentário acima). Omitidos =
+  // comportamento idêntico a antes destes campos existirem. Ainda sem
+  // fonte de dado real (nenhuma migration executada) — ver
+  // docs/ecommerce-ia-v1-arquitetura.md.
+  pedidosNaoConcluidos?:        PedidoNaoConcluido[];
+  clientesRecompraPossivel?:    ClienteRecompraPossivel[];
+  conversasComercialSemPedido?: ConversaComercialSemPedido[];
 };
 
 function formatarMoeda(valor: number): string {
@@ -276,13 +337,24 @@ const PESO_TIPO: Record<TipoSinal, number> = {
   orcamento_expirado:               4,
   orcamento_expirando:              5,
   orcamento_sem_resposta:           6,
-  sem_proximo_compromisso:          7,
+  // E-commerce IA (ver docs/ecommerce-ia-v1-arquitetura.md): pedido_nao_concluido
+  // é dado confirmado, mesmo princípio de orcamento_sem_resposta — um
+  // negócio de catálogo pendente de confirmação/pagamento. Vem logo depois
+  // do bloco de orçamento por ser a mesma natureza (negociação em aberto),
+  // fonte de dado diferente.
+  pedido_nao_concluido:             7,
+  sem_proximo_compromisso:          8,
+  // recompra_possivel é prioridade "media" (ver registrar() abaixo), mesma
+  // natureza de sem_proximo_compromisso — reativação, agora a partir de
+  // `pedidos` em vez de `agendamentos`.
+  recompra_possivel:                9,
   // Sinais heurísticos vêm por último — mesmo quando desempatam com um sinal
   // de agenda de mesma prioridade nominal, nunca disputam à frente dele
   // (na prática nem chegam a disputar: entram com prioridade "baixa", que
   // já perde de "media"/"alta" antes mesmo de olhar para PESO_TIPO).
-  demanda_nao_atendida:             8,
-  interesse_sem_compra:             9,
+  demanda_nao_atendida:             10,
+  interesse_sem_compra:             11,
+  interesse_sem_pedido:             12,
 };
 
 function ordenarSinais(sinais: SinalOportunidade[]): SinalOportunidade[] {
@@ -430,6 +502,51 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
       motivo:          `${c.nome} tem uma cobrança${valorTexto} vencida, sem pagamento confirmado.`,
       prioridade:      "alta",
       acaoSugerida:    "Acionar o Cobrador AI (revisar ação sugerida antes de enviar)",
+      diasDesdeEvento: dias,
+      tempoDecorrido:  formatarTempoDecorrido(dias),
+    });
+  }
+
+  // Pedido não concluído (E-commerce IA). `status` já vem decidido por
+  // lib/pedido-state-machine.ts — este motor só organiza e prioriza.
+  for (const p of input.pedidosNaoConcluidos ?? []) {
+    const dias = diasEntre(p.dataCriacao, input.hoje);
+    const valorTexto = p.valor != null ? ` de ${formatarMoeda(p.valor)}` : "";
+    registrar(p.nome, p.telefone, {
+      tipo:            "pedido_nao_concluido",
+      motivo:          `${p.nome} tem um pedido${valorTexto} em aberto, ainda sem confirmação ou pagamento.`,
+      prioridade:      "alta",
+      acaoSugerida:    "Confirmar o pedido ou fazer follow-up do pagamento",
+      diasDesdeEvento: dias,
+      tempoDecorrido:  formatarTempoDecorrido(dias),
+    });
+  }
+
+  // Recompra possível (E-commerce IA) — reativação a partir de `pedidos`,
+  // mesmo princípio de `teveAtendimentoConcluido`, fonte de dado diferente.
+  for (const c of input.clientesRecompraPossivel ?? []) {
+    const dias = diasEntre(c.dataUltimoPedidoPago, input.hoje);
+    registrar(c.nome, c.telefone, {
+      tipo:            "recompra_possivel",
+      motivo:          `${c.nome} já fez um pedido antes e pode estar pronto para comprar novamente.`,
+      prioridade:      "media",
+      acaoSugerida:    "Oferecer um novo pedido ou novidade do catálogo",
+      diasDesdeEvento: dias,
+      tempoDecorrido:  formatarTempoDecorrido(dias),
+    });
+  }
+
+  // Interesse sem pedido (E-commerce IA) — sinal heurístico, mesma
+  // limitação de interesse_sem_compra (ver comentário no topo do arquivo).
+  for (const c of input.conversasComercialSemPedido ?? []) {
+    if (c.tevePedidoApos) continue; // já converteu — não é mais oportunidade
+    const dias = diasEntre(c.data, input.hoje);
+    const nome = c.nome || "Contato sem nome salvo";
+    registrar(nome, c.telefone, {
+      tipo:            "interesse_sem_pedido",
+      motivo:          `${nome} demonstrou interesse por um item do catálogo pelo WhatsApp e, até onde os dados mostram, não chegou a fazer um pedido (sinal heurístico, baseado no texto da conversa — não é um registro confirmado de intenção).`,
+      prioridade:      "baixa",
+      acaoSugerida:    "Retomar contato e oferecer o item",
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });
