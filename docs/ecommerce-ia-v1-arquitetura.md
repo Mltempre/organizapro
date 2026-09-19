@@ -634,3 +634,76 @@ CONEXÃO A STAGING/PRODUCTION REAL NESTA SESSÃO.** Nenhuma credencial
 encontrada em `.env.local` foi usada — decisão tomada em conjunto com o
 Capitão para não conectar a nenhuma instância real sem confirmação
 explícita de que a URL correspondia a staging, não produção.
+
+## 13. Gate de Isolamento de Clientes (`pacientes`) — resultado formal
+
+**RESULTADO: AMARELO — STOP.** Missão dedicada a provar isolamento de
+tenant em `pacientes` via teste real em STAGING com dois tenants
+autenticados. Precheck (Fase 1) não conseguiu identificar com segurança
+qual projeto Supabase é staging — condição de parada já prevista
+explicitamente na própria missão ("Se não for possível identificar com
+segurança o projeto STAGING ou os tenants de teste, STOP").
+
+### 13.1 Por que o precheck falhou (evidência)
+
+- Este worktree tem **um único** arquivo de ambiente: `.env.local`. Não
+  existe `.env.staging`, `.env.production`, nem `.env.example` para
+  comparar contra.
+- Busca por "staging" em toda a árvore do repositório (código, docs,
+  config) só encontra a palavra dentro deste próprio documento — nenhuma
+  referência a um segundo projeto Supabase, nenhum alias de ambiente, nenhum
+  ponteiro que diferencie staging de produção.
+- Sem essa diferenciação, usar as credenciais de `.env.local` para
+  qualquer teste — mesmo somente leitura — arriscaria tocar produção sob a
+  aparência de "staging". Isso é exatamente o cenário que a missão instruiu
+  a nunca assumir.
+
+### 13.2 O que PÔDE ser confirmado nesta sessão (estático, sem conexão)
+
+- **Policies/RPCs/APIs que hoje protegem `pacientes` — mapeamento de
+  código completo**: nenhuma função RPC toca `pacientes` (`grep` por
+  `.rpc(` em todo o repositório não retorna nenhuma relacionada); todo
+  acesso é direto via `supabase.from('pacientes')`, sempre com
+  `.eq('clinica_id', ...)` explícito no código (`app/clientes/page.tsx`,
+  `app/agendamentos/page.tsx`, `app/dashboard/page.tsx`,
+  `app/metricas/page.tsx`, `app/api/raio-x/route.ts`) — essa é a única
+  camada de proteção **confirmável** nesta sessão. A RLS real do banco
+  continua não verificável (seção 12).
+- Reconfirmado: nenhuma migration deste repositório cria/altera
+  `pacientes` (as duas únicas ocorrências da palavra em arquivos `.sql`
+  são a coluna não-relacionada `pacientes_mes`, de `chatbot_leads` — uma
+  tabela completamente diferente, de captação comercial do próprio SaaS).
+
+### 13.3 O que NÃO pôde ser provado
+
+Todos os 8 itens pedidos pela missão (Tenant A só vê os próprios, Tenant B
+só vê os próprios, A não lê B, B não lê A, A não altera/exclui/insere em
+B, futuro `paciente_id` de A não pode apontar para cliente de B, service
+role não é evidência válida, quais policies protegem `pacientes`) — os 7
+primeiros **dependem de execução real contra staging**, que não pôde
+começar por falta do precheck (13.1). O item 8 (mapeamento de código) foi
+respondido o quanto possível na seção 13.2, mas fica incompleto sem ver a
+RLS real.
+
+**Nenhuma segurança foi assumida.** O gate de Clientes → E-commerce IA V1
+permanece **bloqueado**, não aprovado nem reprovado — apenas não testável
+com os meios disponíveis nesta sessão.
+
+### 13.4 Caminho para destravar (ação humana necessária)
+
+1. Confirmar explicitamente (fora deste chat, sem colar a chave) se
+   `NEXT_PUBLIC_SUPABASE_URL` de `.env.local` deste worktree é staging —
+   ou apontar um projeto/URL de staging distinto, com dois usuários de
+   teste já provisionados (Tenant A e Tenant B), se existir.
+2. Com essa confirmação, uma sessão futura pode executar exatamente o
+   plano de prova já documentado na seção 11.6 (mesmo método do incidente
+   real de `clinica_config`): dois tenants descartáveis, sessão
+   autenticada real (nunca service role como evidência), tentativas de
+   leitura/escrita cross-tenant, remoção ao final.
+3. Até lá, a migration de `pedidos` (seção 2) permanece no gate já
+   registrado na seção 12 — nenhuma execução recomendada.
+
+### 13.5 Confirmação explícita
+
+**ZERO Production. ZERO migration. ZERO deploy. ZERO push. ZERO merge.
+ZERO conexão a qualquer instância real de Supabase nesta sessão.**
