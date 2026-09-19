@@ -19,6 +19,7 @@ if (!BUILD) {
 const {
   estadoDaSolicitacao, podeRegistrarClique, gerarCodigoRastreio,
   validarLinkDestino, janelaAntiSpamExpirada, taxaDeCliquePct,
+  classificarEvidenciaRespondeu, rotuloRespondeu,
 } = require(`${BUILD}/motor-reputacao.js`);
 
 // ── estadoDaSolicitacao / podeRegistrarClique ───────────────────────────
@@ -121,4 +122,40 @@ test("taxaDeCliquePct: calcula percentual correto de cliques", () => {
 test("taxaDeCliquePct: 100 quando todas clicaram, 0 quando nenhuma clicou", () => {
   assert.equal(taxaDeCliquePct([{ clicadoEm: "x" }, { clicadoEm: "y" }]), 100);
   assert.equal(taxaDeCliquePct([{ clicadoEm: null }, { clicadoEm: null }]), 0);
+});
+
+// ── classificarEvidenciaRespondeu / rotuloRespondeu (Fase A — verdade dos dados) ──
+// Contra o falso positivo real encontrado em produção: app/reputacao/page.tsx
+// mostrava "✅ Respondeu" para uma coluna que nenhum caminho real do
+// produto jamais escreve como true (só cron insere `false`; só seed de
+// demo escreve `true`). Estes testes travam para sempre a proibição de
+// qualquer rótulo que alegue um evento não verificado.
+
+test("classificarEvidenciaRespondeu: false vira 'sem_evidencia'", () => {
+  assert.equal(classificarEvidenciaRespondeu(false), "sem_evidencia");
+});
+
+test("classificarEvidenciaRespondeu: true vira 'marcado_sem_verificacao', NUNCA 'confirmado'/'respondeu'", () => {
+  const resultado = classificarEvidenciaRespondeu(true);
+  assert.equal(resultado, "marcado_sem_verificacao");
+  assert.notEqual(resultado, "confirmado");
+  assert.notEqual(resultado, "respondeu");
+});
+
+test("rotuloRespondeu: nunca contém a palavra 'Respondeu' sozinha como afirmação de fato, em nenhum dos dois estados", () => {
+  const rotuloTrue  = rotuloRespondeu(true);
+  const rotuloFalse = rotuloRespondeu(false);
+  // A proibição é específica: nenhum rótulo pode ser exatamente uma alegação
+  // de fato verificado como "Respondeu" ou "Cliente respondeu".
+  assert.notEqual(rotuloTrue, "Respondeu");
+  assert.notEqual(rotuloTrue, "✅ Respondeu");
+  assert.notEqual(rotuloFalse, "Respondeu");
+  assert.ok(rotuloTrue.length > 0);
+  assert.ok(rotuloFalse.length > 0);
+  assert.notEqual(rotuloTrue, rotuloFalse);
+});
+
+test("rotuloRespondeu: é determinístico e puro (mesma entrada, mesma saída, sem efeito colateral)", () => {
+  assert.equal(rotuloRespondeu(true), rotuloRespondeu(true));
+  assert.equal(rotuloRespondeu(false), rotuloRespondeu(false));
 });

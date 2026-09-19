@@ -21,6 +21,7 @@ import { gerarSobre, gerarTituloHero, gerarSubtituloHero, normalizarEspecialidad
 import { gradienteDe, brilhoCta } from "./_lib/theme";
 import { resolverFamilia, font } from "./_lib/families";
 import { CTA_CONTEXTUAL } from "./_lib/content";
+import { construirLinkComRastreio } from "../../../lib/atribuicao-origem";
 import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura, DBFaq } from "./_lib/types";
 
 // ── Site Institucional Universal — OrganizaPro (Site Premium 10.0) ──────────
@@ -35,7 +36,7 @@ import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura
 // Uma única arquitetura, quatro identidades visuais — mesmo padrão que já
 // funcionou nos 13 segmentos da IA Universal, agora na camada visual.
 
-export default function SiteEmpresaClient({ slug }: { slug: string }) {
+export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: string; codigoRastreio?: string }) {
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [galeria, setGaleria] = useState<DBGaleria[]>([]);
   const [equipe, setEquipe] = useState<DBEquipe[]>([]);
@@ -135,7 +136,16 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
   );
 
   const whatsappNumber = empresa.whatsapp?.replace(/\D/g, "");
-  const waComMsg = (msg: string) => whatsappNumber ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}` : "#";
+  // Quando a origem foi capturada com sucesso (Fase C), o link do WhatsApp
+  // leva o código de rastreio embutido no texto — é isso que o webhook
+  // (Fase D) reconhece de volta na mensagem recebida. Sem código (captura
+  // falhou, ou origem ainda não persistida), o link continua idêntico ao
+  // de sempre — nunca quebra por causa disto.
+  const waComMsg = (msg: string) => {
+    if (!whatsappNumber) return "#";
+    const link = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+    return codigoRastreio ? construirLinkComRastreio(link, codigoRastreio) : link;
+  };
   const ctaMsgs = CTA_CONTEXTUAL[tema.id];
   const waHero = waComMsg(ctaMsgs.hero);
   const waProblema = waComMsg(ctaMsgs.problema);
@@ -253,7 +263,7 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
       <Sobre empresa={empresa} nome={nome} sobre={sobre} tema={tema} tone={tons.sobre?.tone} variant={tons.sobre?.variant}/>
       <Diferenciais familiaId={tema.id} tema={tema} tone={tons.diferenciais?.tone} variant={tons.diferenciais?.variant}/>
       <Processo familiaId={tema.id} tema={tema} tone={tons.processo?.tone} variant={tons.processo?.variant}/>
-      <Servicos servicos={servicos} empresa={empresa} tema={tema} familiaId={tema.id} waBase={waBase} tone={tons.servicos?.tone} variant={tons.servicos?.variant}/>
+      <Servicos servicos={servicos} empresa={empresa} tema={tema} familiaId={tema.id} waBase={waBase} codigoRastreio={codigoRastreio} tone={tons.servicos?.tone} variant={tons.servicos?.variant}/>
       <Galeria galeria={galeria} estrutura={estrutura} empresa={empresa} tema={tema} tone={tons.galeria?.tone} variant={tons.galeria?.variant}/>
       <Equipe equipe={equipe} tema={tema} tone={tons.equipe?.tone} variant={tons.equipe?.variant}/>
       <Depoimentos depoimentos={depoimentos} tema={tema} tone={tons.depoimentos?.tone} variant={tons.depoimentos?.variant}/>

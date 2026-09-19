@@ -80,6 +80,7 @@
 //   entrega a classificação já feita a partir do texto real.
 
 import { orcamentoExpirado, orcamentoExpirando } from "./orcamentos-state-machine";
+import type { TipoOrigem } from "./atribuicao-origem";
 
 export type PrioridadeOportunidade = "alta" | "media" | "baixa";
 
@@ -118,6 +119,14 @@ export type OportunidadeCliente = {
   tempoDecorrido:  string | null; // tempo decorrido do sinal mais importante, já formatado
   sinaisAdicionais: number;      // quantos outros sinais também foram identificados para este cliente (0 quando só há um)
   sinais:          SinalOportunidade[]; // todos os sinais, já ordenados por importância
+  // Fase 1 — Origem Real (2026-09-19, ainda sem migration): classificação
+  // JÁ COMPROVADA por lib/atribuicao-origem.ts (nunca recalculada aqui, nunca
+  // heurística) — presente só quando quem chama souber, a partir de
+  // `origem_captacoes` vinculada por telefone, qual foi a origem real deste
+  // cliente. `null`/ausente = sem origem conhecida (nunca "direto" por
+  // suposição — "direto" só é usado quando a própria captura confirmou
+  // ausência de dado, não quando a origem nunca foi sequer capturada).
+  origemComprovada?: TipoOrigem | null;
 };
 
 // ── Entradas — dados já carregados pela tela; este motor nunca consulta nada ──
@@ -279,6 +288,13 @@ export type EntradaOportunidades = {
   pedidosNaoConcluidos?:        PedidoNaoConcluido[];
   clientesRecompraPossivel?:    ClienteRecompraPossivel[];
   conversasComercialSemPedido?: ConversaComercialSemPedido[];
+  // Opcional — Fase 1, Origem Real (ver comentário em OportunidadeCliente).
+  // Chave: telefone já normalizado (só dígitos), mesma forma usada
+  // internamente por este motor. Omitido = comportamento idêntico a antes
+  // deste campo existir. Ainda sem fonte de dado real (migration de
+  // origem_captacoes não executada) — ver
+  // docs/atribuicao-origem-fase1-migration-preparada.md.
+  origensPorTelefone?: Record<string, TipoOrigem>;
 };
 
 function formatarMoeda(valor: number): string {
@@ -590,6 +606,7 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
       tempoDecorrido:   principal.tempoDecorrido,
       sinaisAdicionais: sinais.length - 1,
       sinais,
+      origemComprovada: v.telefone ? (input.origensPorTelefone?.[v.telefone] ?? null) : null,
     };
   });
 

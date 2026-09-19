@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { rotuloRespondeu } from '@/lib/motor-reputacao'
 import AdminShell from '../components/AdminShell'
 import EmptyState from '../components/EmptyState'
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback'
@@ -95,15 +96,19 @@ export default function ReputacaoPage() {
     padding: '20px 24px',
   }
 
+  // Rótulos honestos: "recebidas"/"taxa de resposta" implicariam que o
+  // sistema confirmou uma resposta real do cliente — não é o caso hoje (ver
+  // lib/motor-reputacao.ts). Os números continuam os mesmos (dado real,
+  // nunca fabricado); só a alegação embutida no rótulo muda.
   const cards = [
-    { label: 'Avaliações Solicitadas', valor: resumo.total,    cor: '#fbbf24', icon: '⭐' },
-    { label: 'Avaliações Recebidas',    valor: resumo.recebidas, cor: '#4ade80', icon: '✅' },
-    { label: 'Avaliações Pendentes',    valor: resumo.pendentes, cor: '#fb923c', icon: '⏳' },
-    { label: 'Taxa de Resposta',       valor: `${resumo.taxa}%`, cor: '#7c3aed', icon: '📊' },
+    { label: 'Avaliações Solicitadas',      valor: resumo.total,    cor: '#fbbf24', icon: '⭐' },
+    { label: 'Marcadas Sem Verificação',    valor: resumo.recebidas, cor: '#4ade80', icon: '◆' },
+    { label: 'Sem Confirmação de Resposta', valor: resumo.pendentes, cor: '#fb923c', icon: '⏳' },
+    { label: 'Taxa Marcada Sem Verificação', valor: `${resumo.taxa}%`, cor: '#7c3aed', icon: '📊' },
   ]
 
   return (
-    <AdminShell title="Reputação" subtitle="Avaliações enviadas e respondidas pelos clientes">
+    <AdminShell title="Reputação" subtitle="Solicitações de avaliação enviadas pelo WhatsApp">
       <style>{`.rep-btn-atualizar:hover:not(:disabled) { background: rgba(148,163,184,0.08) !important; border-color: #3d4360 !important; }`}</style>
       <div style={{ maxWidth: 1100 }}>
 
@@ -140,7 +145,7 @@ export default function ReputacaoPage() {
               compact
               icon="⭐"
               title="Nenhuma avaliação registrada ainda"
-              description="Assim que seus clientes responderem ao convite enviado pelo WhatsApp, todas as avaliações aparecerão automaticamente nesta tela."
+              description="Assim que uma solicitação de avaliação for enviada pelo WhatsApp, ela aparecerá automaticamente nesta tela."
             />
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -174,7 +179,7 @@ export default function ReputacaoPage() {
                           color:      a.respondeu ? '#4ade80'   : '#475569',
                           border:     a.respondeu ? 'none'      : '1px solid #2d3148',
                         }}>
-                          {a.respondeu ? '✅ Respondeu' : '⏳ Aguardando'}
+                          {rotuloRespondeu(a.respondeu)}
                         </span>
                       </td>
                     </tr>

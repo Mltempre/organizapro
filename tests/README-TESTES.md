@@ -35,3 +35,15 @@ domínio diferente.
 Se este projeto ganhar um test runner de verdade (jest/vitest) no futuro, estes
 testes devem migrar para ele — o formato `node:test`/`assert` foi escolhido só
 porque nenhum runner estava instalado neste worktree isolado.
+
+## Testes PENDENTES DE GATE (não rodam contra o build local)
+
+`origem-captacoes-rls.pendente.test.mjs` é diferente dos demais: não
+compila contra `lib/*.ts` (não testa lógica pura), testa RLS de verdade —
+exige um Supabase de TESTE real com a migration de
+`docs/atribuicao-origem-fase1-migration-preparada.md` aplicada. Roda hoje
+com `node --test tests/origem-captacoes-rls.pendente.test.mjs` e reporta 8
+`SKIP` (nunca PASS) — instruções completas de ativação estão no cabeçalho
+do próprio arquivo. Nenhuma ferramenta deve interpretar esse SKIP como
+prova de isolamento; a prova só existe depois de ativado contra o ambiente
+real.

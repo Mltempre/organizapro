@@ -3,6 +3,7 @@ import { Icon } from "./icons";
 import { gerarTituloServicos } from "../_lib/helpers";
 import { CTA_CONTEXTUAL } from "../_lib/content";
 import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
+import { construirLinkComRastreio } from "../../../../lib/atribuicao-origem";
 import type { DBServico, Empresa } from "../_lib/types";
 
 // E-commerce IA (ver docs/ecommerce-ia-v1-arquitetura.md) — só formata um
@@ -12,10 +13,17 @@ function formatarPreco(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function Servicos({ servicos, empresa, tema, familiaId, waBase, tone = "light", variant = 2 }: { servicos: DBServico[]; empresa: Empresa; tema: Tema; familiaId: FamiliaId; waBase?: string; tone?: Tone; variant?: 1 | 2 }) {
+export default function Servicos({ servicos, empresa, tema, familiaId, waBase, codigoRastreio, tone = "light", variant = 2 }: { servicos: DBServico[]; empresa: Empresa; tema: Tema; familiaId: FamiliaId; waBase?: string; codigoRastreio?: string; tone?: Tone; variant?: 1 | 2 }) {
   if (servicos.length === 0) return null;
   const msg = CTA_CONTEXTUAL[familiaId].servicos;
   const p = paleta(tema, tone, variant);
+  // Fase 1.1 — fecha a inconsistência: este era o único link de WhatsApp do
+  // site que não levava ref:xxxxx. Reaproveita o mesmo helper puro já usado
+  // em SiteEmpresaClient.tsx (waComMsg) — nunca uma segunda implementação.
+  const linkServico = (mensagem: string) => {
+    const link = `${waBase}${encodeURIComponent(mensagem)}`;
+    return codigoRastreio ? construirLinkComRastreio(link, codigoRastreio) : link;
+  };
   return <section id="servicos" className="premium-section premium-services"><Reveal><div className="section-shell">
     <div className="section-heading"><div><span className="section-label">O que oferecemos</span><h2>{gerarTituloServicos(empresa)}</h2></div><p>Soluções apresentadas com clareza para você escolher o atendimento que faz sentido.</p></div>
     <div className="premium-services__grid">{servicos.map((s, i) => {
@@ -34,7 +42,7 @@ export default function Servicos({ servicos, empresa, tema, familiaId, waBase, t
         <div><h3>{s.nome}{temPreco && <span className="service-editorial__preco">{formatarPreco(s.preco_centavos!)}</span>}</h3>{s.descricao && <p>{s.descricao}</p>}</div>
         {!s.imagem_url && <Icon name={s.icone || "target"} size={20} color={p.accent}/>}
       </div>
-      {waBase && <a className="service-editorial__link" href={`${waBase}${encodeURIComponent(`${msg} (${s.nome}${precoTexto})`)}`} target="_blank" rel="noreferrer">{rotuloCta} →</a>}
+      {waBase && <a className="service-editorial__link" href={linkServico(`${msg} (${s.nome}${precoTexto})`)} target="_blank" rel="noreferrer">{rotuloCta} →</a>}
     </article></RevealItem>;
     })}</div>
   </div></Reveal><style>{`.premium-services{background:${p.bg}}

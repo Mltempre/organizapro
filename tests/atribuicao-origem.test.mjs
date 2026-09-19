@@ -20,6 +20,7 @@ const {
   capturarOrigem, classificarOrigem,
   construirLinkComRastreio, extrairCodigoRastreio,
   calcularCAC, calcularROAS,
+  gerarCodigoOrigem, podeVincularOrigem,
 } = require(`${BUILD}/atribuicao-origem.js`);
 
 const AGORA = "2026-09-18T12:00:00.000Z";
@@ -93,9 +94,44 @@ test("classificarOrigem: referrer de terceiro (nao-busca) classifica referencia"
   assert.equal(classificarOrigem(o), "referencia");
 });
 
-test("classificarOrigem: nada capturado classifica direto", () => {
+test("classificarOrigem: nada capturado classifica direto (origem desconhecida/direta, nunca adivinhada)", () => {
   const o = { utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, gclid: null, fbclid: null, referrerHost: null, capturadoEm: AGORA };
   assert.equal(classificarOrigem(o), "direto");
+});
+
+// ── Nenhuma atribuição falsa de Google/Meta ─────────────────────────────
+// Requisito explícito do Capitão: jamais classificar google_ads/meta_ads
+// sem o click id correspondente, mesmo com UTM ou referrer parecidos.
+
+test("classificarOrigem: utm_source='google' SEM gclid NUNCA vira google_ads — só campanha_utm", () => {
+  const o = { utmSource: "google", utmMedium: "cpc", utmCampaign: "promo", utmContent: null, gclid: null, fbclid: null, referrerHost: null, capturadoEm: AGORA };
+  assert.equal(classificarOrigem(o), "campanha_utm");
+  assert.notEqual(classificarOrigem(o), "google_ads");
+});
+
+test("classificarOrigem: utm_source='facebook' SEM fbclid NUNCA vira meta_ads — só campanha_utm", () => {
+  const o = { utmSource: "facebook", utmMedium: "social", utmCampaign: null, utmContent: null, gclid: null, fbclid: null, referrerHost: null, capturadoEm: AGORA };
+  assert.equal(classificarOrigem(o), "campanha_utm");
+  assert.notEqual(classificarOrigem(o), "meta_ads");
+});
+
+test("classificarOrigem: referrer de busca do Google SEM gclid NUNCA vira google_ads — só busca_organica", () => {
+  const o = { utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, gclid: null, fbclid: null, referrerHost: "google.com.br", capturadoEm: AGORA };
+  assert.equal(classificarOrigem(o), "busca_organica");
+  assert.notEqual(classificarOrigem(o), "google_ads");
+});
+
+test("classificarOrigem: nenhuma combinação sem gclid/fbclid produz google_ads/meta_ads (varredura de casos)", () => {
+  const casosSemClickId = [
+    { utmSource: "google", utmMedium: "organic", utmCampaign: null, utmContent: null, gclid: null, fbclid: null, referrerHost: null, capturadoEm: AGORA },
+    { utmSource: null, utmMedium: null, utmCampaign: "meta_ads_manual", utmContent: null, gclid: null, fbclid: null, referrerHost: null, capturadoEm: AGORA },
+    { utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, gclid: null, fbclid: null, referrerHost: "m.facebook.com", capturadoEm: AGORA },
+  ];
+  for (const c of casosSemClickId) {
+    const resultado = classificarOrigem(c);
+    assert.notEqual(resultado, "google_ads");
+    assert.notEqual(resultado, "meta_ads");
+  }
 });
 
 // ── construirLinkComRastreio / extrairCodigoRastreio ────────────────────
@@ -129,6 +165,47 @@ test("extrairCodigoRastreio: null para texto ausente/vazio", () => {
   assert.equal(extrairCodigoRastreio(null), null);
   assert.equal(extrairCodigoRastreio(undefined), null);
   assert.equal(extrairCodigoRastreio(""), null);
+});
+
+test("extrairCodigoRastreio: ref invalido (curto demais, fora do formato) nunca e aceito", () => {
+  assert.equal(extrairCodigoRastreio("ref:ab"), null); // menor que 6 caracteres
+  assert.equal(extrairCodigoRastreio("referencia:ab12cd34"), null); // prefixo errado
+  assert.equal(extrairCodigoRastreio("meu ref e ab12cd34"), null); // sem os dois pontos
+});
+
+test("extrairCodigoRastreio: WhatsApp sem nenhum ref continua funcionando normalmente (retorna null, nunca lanca)", () => {
+  const mensagensReais = [
+    "Oi, qual o horario de funcionamento?",
+    "👍",
+    "Gostaria de agendar um horario para amanha",
+  ];
+  for (const m of mensagensReais) {
+    assert.equal(extrairCodigoRastreio(m), null);
+  }
+});
+
+// ── gerarCodigoOrigem ────────────────────────────────────────────────────
+
+test("gerarCodigoOrigem: gera codigo de 10 caracteres, sem 0/1/i/l/o (sem ambiguidade visual)", () => {
+  const codigo = gerarCodigoOrigem();
+  assert.equal(codigo.length, 10);
+  assert.doesNotMatch(codigo, /[01ilo]/);
+});
+
+test("gerarCodigoOrigem: aceita gerador de aleatoriedade injetado (determinístico em teste)", () => {
+  const semprePrimeiro = () => 0;
+  const codigo = gerarCodigoOrigem(semprePrimeiro);
+  assert.equal(codigo, "2222222222");
+});
+
+// ── podeVincularOrigem — idempotência / replay ──────────────────────────
+
+test("podeVincularOrigem: true quando ainda nao foi vinculado", () => {
+  assert.equal(podeVincularOrigem({ vinculadoEm: null }), true);
+});
+
+test("podeVincularOrigem: false quando ja foi vinculado — replay do webhook nunca revincula", () => {
+  assert.equal(podeVincularOrigem({ vinculadoEm: "2026-09-19T10:00:00.000Z" }), false);
 });
 
 // ── calcularCAC / calcularROAS ───────────────────────────────────────────

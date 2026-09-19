@@ -155,3 +155,36 @@ export function calcularROAS(custoCentavos: number | null, receitaAtribuidaCenta
   if (custoCentavos === null || custoCentavos <= 0) return null;
   return receitaAtribuidaCentavos / custoCentavos;
 }
+
+// ── Persistência de origem (Fase 1 — Origem Real) ───────────────────────────
+// As duas funções abaixo continuam puras (sem Supabase, sem fetch) — só a
+// decisão/formato, nunca a I/O. A gravação de verdade (INSERT/UPDATE em
+// `origem_captacoes`) vive em lib/origem-persistencia.ts, que usa estas
+// funções em vez de reimplementar a lógica. Gerador dedicado (não
+// reaproveita gerarCodigoRastreio de motor-reputacao.ts de propósito —
+// são domínios diferentes: origem de lead vs. clique em avaliação; a
+// separação existe para não acoplar dois conceitos que o Capitão pediu
+// para nunca confundir).
+
+/**
+ * Código curto de rastreio de ORIGEM (distinto do código de rastreio de
+ * avaliação em motor-reputacao.ts). Mesmo alfabeto sem ambiguidade visual.
+ */
+export function gerarCodigoOrigem(random: () => number = Math.random): string {
+  const alfabeto = "23456789abcdefghjkmnpqrstuvwxyz";
+  let codigo = "";
+  for (let i = 0; i < 10; i++) {
+    codigo += alfabeto[Math.floor(random() * alfabeto.length)];
+  }
+  return codigo;
+}
+
+/**
+ * Idempotência do vínculo origem→paciente: só o primeiro webhook que
+ * apresentar o código pode vincular. Replays/retentativas do WhatsApp não
+ * revinculam nem sobrescrevem o vínculo original — mesmo princípio de
+ * `podeRegistrarClique` em motor-reputacao.ts.
+ */
+export function podeVincularOrigem(o: { vinculadoEm: string | null }): boolean {
+  return o.vinculadoEm === null;
+}

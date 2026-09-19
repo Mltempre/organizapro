@@ -100,3 +100,36 @@ export function taxaDeCliquePct(solicitacoes: SolicitacaoAvaliacao[]): number {
   const clicadas = solicitacoes.filter(s => s.clicadoEm !== null).length;
   return Math.round((clicadas / solicitacoes.length) * 100);
 }
+
+// ── Verdade do rótulo `respondeu` (coluna legada de `avaliacoes`) ───────────
+// Auditoria confirmou (ver cabeçalho deste arquivo): `respondeu` nunca é
+// escrita como `true` por nenhum caminho real do produto —
+// `app/api/cron/avaliacoes/route.ts` sempre insere `respondeu: false`, e o
+// único lugar que grava `true` é seed de demonstração
+// (scripts/lib/cenario-barbearia-black-crown.mjs). Rotular isso como
+// "✅ Respondeu" (fato verificado pelo sistema) é exatamente o tipo de
+// alegação que este módulo existe para impedir. `respondeu` continua sendo
+// uma marcação bruta e legítima do banco — só o RÓTULO muda, nunca o dado.
+
+export type EvidenciaRespondeu = "sem_evidencia" | "marcado_sem_verificacao";
+
+/**
+ * Classifica o valor bruto de `respondeu` sem nunca afirmar um evento que o
+ * sistema não verificou. `true` não vira "confirmado"/"respondeu" — vira
+ * "marcado_sem_verificacao", porque nenhuma integração real (Google,
+ * clique rastreado) sustenta essa marcação hoje.
+ */
+export function classificarEvidenciaRespondeu(respondeu: boolean): EvidenciaRespondeu {
+  return respondeu ? "marcado_sem_verificacao" : "sem_evidencia";
+}
+
+/**
+ * Rótulo de UI honesto para a coluna `respondeu`. NUNCA retorna "Respondeu"
+ * nem qualquer variação que implique confirmação real — nem para `true`
+ * nem para `false`.
+ */
+export function rotuloRespondeu(respondeu: boolean): string {
+  return classificarEvidenciaRespondeu(respondeu) === "marcado_sem_verificacao"
+    ? "Marcado sem verificação"
+    : "Sem confirmação de resposta";
+}
