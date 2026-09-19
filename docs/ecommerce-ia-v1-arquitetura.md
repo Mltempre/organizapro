@@ -54,6 +54,19 @@ ALTER TABLE clinica_servicos
 **Impacto**: aditivo, uma coluna nullable numa tabela que já tem RLS e uso
 real. **Rollback**: `ALTER TABLE clinica_servicos DROP COLUMN preco_centavos;`
 
+**Atualização pós-auditoria de segurança (seção 11)**: a proposta também
+passa a incluir uma constraint `UNIQUE (id, clinica_id)` na mesma tabela —
+necessária para o gate de integridade cross-tenant descrito na seção 11.3.
+Custo: verificação única na criação (tabela pequena, por tenant), sem
+reescrita de dados existentes (`id` já é PK, portanto já único sozinho —
+a constraint composta nunca pode falhar por dado já existente).
+
+```sql
+-- PROPOSTA — auditoria apenas, NÃO EXECUTAR sem GO explícito.
+ALTER TABLE clinica_servicos
+  ADD CONSTRAINT clinica_servicos_id_clinica_id_uidx UNIQUE (id, clinica_id);
+```
+
 ## 2. Pedidos — domínio mínimo, convergente, não duplicado
 
 `pedido` **não é** `orcamento` disfarçado — nasce de um item de catálogo
@@ -62,6 +75,10 @@ expirar; pedido só confirma/cancela). São entidades irmãs do mesmo domínio
 econômico, nunca a mesma tabela; convergem no que produzem (receita
 comprovada), não na estrutura interna.
 
+**Versão canônica corrigida na auditoria de segurança (seção 11) — a
+versão original desta seção está preservada, riscada conceitualmente, na
+seção 11.1; esta é a que deve ser revisada/aprovada:**
+
 ```sql
 -- PROPOSTA — auditoria apenas, NÃO EXECUTAR sem GO explícito.
 CREATE TABLE IF NOT EXISTS pedidos (
@@ -69,6 +86,12 @@ CREATE TABLE IF NOT EXISTS pedidos (
   clinica_id              UUID NOT NULL REFERENCES clinicas(id) ON DELETE CASCADE,
   paciente_id             UUID REFERENCES pacientes(id) ON DELETE SET NULL,
   servico_id              UUID REFERENCES clinica_servicos(id) ON DELETE SET NULL,
+  -- Snapshot do que foi pedido NO MOMENTO da criação — nunca recalculado.
+  -- Mesmo princípio de `orcamentos.descricao` (seção 3 daquele
+  -- documento): garante que o pedido continue legível mesmo se o item de
+  -- catálogo for editado ou apagado depois (servico_id vira NULL, mas a
+  -- descrição do que foi vendido não se perde).
+  descricao               TEXT NOT NULL,
   nome_cliente            TEXT NOT NULL,
   telefone                TEXT,
   valor_centavos          INTEGER NOT NULL CHECK (valor_centavos > 0),
@@ -90,17 +113,85 @@ CREATE TABLE IF NOT EXISTS pedidos (
 
 CREATE UNIQUE INDEX IF NOT EXISTS pedidos_idempotency_key_uidx
   ON pedidos (clinica_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
-CREATE INDEX IF NOT EXISTS pedidos_clinica_status_idx ON pedidos (clinica_id, status);
+CREATE INDEX IF NOT EXISTS pedidos_clinica_status_idx  ON pedidos (clinica_id, status);
+CREATE INDEX IF NOT EXISTS pedidos_servico_idx          ON pedidos (servico_id);
+CREATE INDEX IF NOT EXISTS pedidos_paciente_idx         ON pedidos (paciente_id);
+
+-- Integridade cross-tenant de `servico_id` (seção 11.3): uma FK
+-- simples em `servico_id` só garante que o item existe em algum lugar,
+-- NUNCA que pertence à MESMA `clinica_id` do pedido. Uma FK composta
+-- `(servico_id, clinica_id) REFERENCES clinica_servicos(id, clinica_id)`
+-- resolveria isso, mas exigiria `ON DELETE SET NULL` sobre a tupla
+-- inteira — o que tentaria zerar também `clinica_id` (NOT NULL) e
+-- quebraria qualquer DELETE em clinica_servicos. `ON DELETE SET NULL
+-- (coluna)` (só a coluna certa) existe a partir do Postgres 15, e a
+-- versão real do Postgres deste projeto Supabase NÃO PÔDE ser confirmada
+-- nesta auditoria (sem acesso de leitura à instância real — ver seção
+-- 11.4). Por isso a defesa aqui é um TRIGGER, portátil em qualquer versão:
+CREATE OR REPLACE FUNCTION pedidos_valida_tenant_do_servico()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.servico_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM clinica_servicos
+    WHERE id = NEW.servico_id AND clinica_id = NEW.clinica_id
+  ) THEN
+    RAISE EXCEPTION 'servico_id % nao pertence a clinica_id %', NEW.servico_id, NEW.clinica_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER pedidos_valida_tenant_do_servico_trg
+  BEFORE INSERT OR UPDATE OF servico_id, clinica_id ON pedidos
+  FOR EACH ROW EXECUTE FUNCTION pedidos_valida_tenant_do_servico();
+
+-- Mantém `atualizado_em` real a cada UPDATE — a versão original não tinha
+-- nenhum mecanismo para isso (a coluna existiria, mas nunca mudaria
+-- sozinha; ficaria a cargo da aplicação lembrar de setá-la em toda
+-- escrita, o que é frágil). Trigger genérico, sem estado, reaproveitável.
+CREATE OR REPLACE FUNCTION pedidos_atualiza_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.atualizado_em = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER pedidos_atualiza_timestamp_trg
+  BEFORE UPDATE ON pedidos
+  FOR EACH ROW EXECUTE FUNCTION pedidos_atualiza_timestamp();
 
 ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
+
+-- SELECT/INSERT/UPDATE seguem o padrão já usado por clinica_servicos/
+-- clinica_config, com DUAS diferenças deliberadas em relação ao padrão-base
+-- (ver seção 11.2/11.3 — por que endurecer especificamente aqui):
+-- (a) `AND ativo = true` — este endurecimento NÃO existe em nenhuma RLS
+--     hoje em produção neste projeto (confirmado por auditoria de todas
+--     as migrations reais); é adicionado aqui porque `pedidos` lida com
+--     dinheiro, e um vínculo desativado (funcionário que saiu, por
+--     exemplo) não deveria conseguir ler/criar/alterar pedidos mesmo que
+--     a linha em `clinica_usuarios` não tenha sido apagada.
+-- (b) UPDATE com `WITH CHECK` explícito (não implícito) — mesmo padrão
+--     já corrigido, depois de um incidente real confirmado por teste
+--     direto com dois tenants, em
+--     supabase/migrations/20260713000002_fix_clinica_config_rls.sql
+--     (`clinica_config` permitia sequestro de linha para outro tenant via
+--     UPDATE antes dessa correção). Tecnicamente o Postgres reusa USING
+--     como WITH CHECK quando este é omitido — mas a lição real já registrada
+--     neste repositório é: nunca depender do comportamento implícito numa
+--     tabela que guarda dado sensível.
 CREATE POLICY "pedidos_select" ON pedidos FOR SELECT USING (
-  clinica_id IN (SELECT clinica_id FROM clinica_usuarios WHERE usuario_id = auth.uid()));
+  clinica_id IN (SELECT clinica_id FROM clinica_usuarios WHERE usuario_id = auth.uid() AND ativo = true));
 CREATE POLICY "pedidos_insert" ON pedidos FOR INSERT WITH CHECK (
-  clinica_id IN (SELECT clinica_id FROM clinica_usuarios WHERE usuario_id = auth.uid()));
-CREATE POLICY "pedidos_update" ON pedidos FOR UPDATE USING (
-  clinica_id IN (SELECT clinica_id FROM clinica_usuarios WHERE usuario_id = auth.uid()));
+  clinica_id IN (SELECT clinica_id FROM clinica_usuarios WHERE usuario_id = auth.uid() AND ativo = true));
+CREATE POLICY "pedidos_update" ON pedidos FOR UPDATE
+  USING (clinica_id IN (SELECT clinica_id FROM clinica_usuarios WHERE usuario_id = auth.uid() AND ativo = true))
+  WITH CHECK (clinica_id IN (SELECT clinica_id FROM clinica_usuarios WHERE usuario_id = auth.uid() AND ativo = true));
 -- Sem policy de DELETE — fail-closed nativo (mesmo padrão já documentado
 -- em docs/orcamento-venda-receita-v1-arquitetura.md seção 7).
+-- Sem policy de leitura pública (diferente de clinica_servicos) — pedido
+-- é dado interno, nunca exposto a `anon`.
 ```
 
 ### 2.1 State machine (`lib/pedido-state-machine.ts` — construído, testado)
@@ -313,3 +404,148 @@ delas exige nova arquitetura, só nova UI/rota sobre o que já existe.
 - `npx next build` — build de produção completo, todas as rotas
   registradas corretamente, incluindo `/site/servicos` e `/empresa/[slug]`.
 - `git diff --check` — ver saída ao final da entrega.
+
+## 11. Auditoria de segurança SQL pré-staging (gate — nenhum SQL executado)
+
+**Classificação: B — SEGURA COM CORREÇÕES.** As correções já foram
+incorporadas às seções 1 e 2 acima (versão canônica); nada foi executado.
+Nenhuma correção encontrada é do tipo "RLS ausente" (a proposta original
+já era fail-closed por padrão) — todas são endurecimentos de integridade e
+consistência com lições já aprendidas neste repositório.
+
+### 11.1 Método — limitação explícita desta auditoria
+
+Sem acesso de leitura à instância real de staging/produção nesta sessão
+(nenhuma credencial/MCP de Supabase disponível). A verificação de
+compatibilidade foi feita pelos únicos meios read-only disponíveis:
+`supabase/migrations/*.sql` (DDL real, versionado) e inferência a partir
+do código (`.select()`/`.insert()`/`.update()` já em produção). Onde isso
+não foi suficiente para confirmar um fato do schema real, está marcado
+explicitamente abaixo como **NÃO VERIFICADO** — nunca assumido.
+
+### 11.2 `clinica_servicos.preco_centavos` — achados
+
+| Item auditado | Resultado |
+|---|---|
+| Tipo `INTEGER`, nunca `numeric`/`float` | ✅ Confirmado — mesma convenção de `orcamentos.valor_centavos`/`cobrancas.valor_centavos` |
+| Nullable | ✅ Correto — item sem preço continua válido |
+| `CHECK` contra preço negativo/zero | ✅ `IS NULL OR > 0` — bloqueia os dois |
+| Compatibilidade com registros existentes | ✅ `ADD COLUMN` sem `NOT NULL`/`DEFAULT` não reescreve linhas nem tabela — operação O(1), sem lock prolongado mesmo com dados reais |
+| Impacto no Site Premium atual | ✅ Confirmado seguro — `select("*")` já usado em `SiteEmpresaClient.tsx`/`app/site/servicos/page.tsx`; ausência da coluna vira `undefined`, tratado como "sem preço" |
+| Confusão com `clinicas.produto` | ✅ Nenhuma coluna nova chamada `produto`; nomenclatura verificada |
+| Idempotência do `ALTER` | ⚠️ `ADD COLUMN IF NOT EXISTS ... CHECK (...)` é seguro para rodar 2x, mas se a coluna já existir (criada manualmente sem o CHECK), o `IF NOT EXISTS` pula a cláusula inteira e o CHECK não seria adicionado numa re-execução — risco baixo, só relevante se alguém intervier manualmente antes desta migration rodar |
+
+**Correção aplicada**: `UNIQUE (id, clinica_id)` adicionada — pré-requisito
+do gate de integridade da seção 11.3 (`pedidos.servico_id`). Custo
+verificado: zero risco de falha (uma PK já é única sozinha).
+
+### 11.3 `pedidos` — achados
+
+| Item auditado | Resultado |
+|---|---|
+| PK | ✅ `id UUID DEFAULT gen_random_uuid()` — mesma função usada em TODAS as migrations reais deste repo (confirmado por grep em `supabase/migrations/*.sql`), nenhum risco de `uuid_generate_v4()`/extensão diferente |
+| `clinica_id` + `ON DELETE CASCADE` | ✅ Consistente com `orcamentos`/`cobrancas` propostos |
+| `paciente_id` (comprador) | ⚠️ FK simples para `pacientes(id)` — **não garante** que o paciente pertence à mesma `clinica_id`. **NÃO CORRIGIDO** nesta revisão: `pacientes` não é criada por nenhuma migration deste repositório (tabela legada/pré-existente — confirmado, `grep` não encontra `CREATE TABLE.*pacientes`), então não há como propor com segurança um `UNIQUE(id, clinica_id)` nela sem ver o schema real. **Mesma limitação já presente, sem correção, nas propostas anteriores de `orcamentos`/`cobrancas`** — não é uma regressão introduzida aqui, mas continua pendente. Marcado **NÃO VERIFICADO / gate real**. |
+| `servico_id` (item) | 🔧 **Corrigido** — FK simples original não impedia referência cross-tenant (severidade real: integridade de dado, não vazamento de confidencialidade, já que `clinica_servicos` já é publicamente legível — `SELECT USING (true)`, confirmado em `supabase/migrations/20260625000002_site_modules.sql:119`). Trigger `pedidos_valida_tenant_do_servico` adicionado (seção 2). |
+| `descricao` (o que foi pedido) | 🔧 **Adicionado** — ausente na proposta original. Sem isso, um pedido cujo `servico_id` mais tarde vira `NULL` (item apagado) perderia todo registro do que foi vendido — quebra de auditabilidade financeira. Mesmo princípio de `orcamentos.descricao`. |
+| `valor_centavos NOT NULL CHECK > 0` | ✅ Correto e consistente com `capturarValorPedido`/`valorFoiManipulado` (`lib/pedido-state-machine.ts`) — item sem preço no catálogo literalmente não pode virar pedido com valor, por design (mesma trava em código e em banco) |
+| `status` + `CHECK` | ✅ Os 5 valores conferem exatamente com `PedidoStatus` em `lib/pedido-state-machine.ts` — comparação literal feita, sem divergência |
+| `origem` + `CHECK` | ✅ `chatbot_ia` corretamente excluído, mesma disciplina de `orcamentos.origem` |
+| Timestamps | 🔧 `atualizado_em` não tinha nenhum mecanismo de atualização automática (ficaria congelado na criação, a não ser que a aplicação lembrasse de setá-lo manualmente em toda escrita). Trigger `pedidos_atualiza_timestamp` adicionado. |
+| Idempotência | ✅ `idempotency_key` + índice único parcial — mesmo padrão já em `orcamentos`/`cobrancas`. `podeCriarPedido` (código) reforça a mesma regra antes de qualquer INSERT. |
+| Índices | 🔧 Adicionados `pedidos_servico_idx`/`pedidos_paciente_idx` (ausentes na proposta original) — sem eles, qualquer consulta futura por item ou por comprador faria table scan. Não crítico para segurança, mas corrigido por completude ("índices" foi item explícito do escopo desta auditoria). |
+| Consistência com `pedido-state-machine.ts` | ✅ Confirmada linha a linha (status, eventos, transições) |
+| Segunda fonte de verdade para receita | ⚠️ Ver seção 11.5 — aceito para V1, não corrigido, com nota explícita |
+
+### 11.4 RLS — prova conceitual tenant A/B (CRÍTICO)
+
+Provado por leitura das policies (não testado contra staging real —
+plano de teste real na seção 11.6):
+
+| Cenário exigido pela missão | Como a policy corrigida garante |
+|---|---|
+| Tenant A vê seus pedidos | `pedidos_select`: `clinica_id IN (subquery de auth.uid())` — A só aparece nesse conjunto para o próprio A |
+| Tenant A cria somente dentro de A | `pedidos_insert` (`WITH CHECK`) — insere só se `clinica_id` da NOVA linha estiver no conjunto de clínicas de A |
+| Tenant A altera somente A | `pedidos_update` com `USING` E `WITH CHECK` explícitos (idênticos) — impede tanto alvo quanto destino fora do conjunto de A |
+| Tenant B não lê A | Mesmo raciocínio da linha 1, com B no lugar de A — conjuntos disjuntos |
+| Tenant B não escreve/atualiza A | Mesmo raciocínio das linhas 2/3 |
+| Tenant B não forja `clinica_id=A` | `auth.uid()` vem do JWT verificado pelo PostgREST, nunca do corpo da requisição — B não consegue fazer sua própria sessão "virar" A |
+| Anon não obtém pedidos privados | Nenhuma policy com `USING (true)` existe em `pedidos` (diferente, de propósito, de `clinica_servicos`) — RLS ativo sem policy = nega por padrão |
+| Service role só onde necessário | **Atenção explícita**: a service role do Supabase **ignora RLS por completo** (é assim que `SUPABASE_SERVICE_ROLE_KEY` funciona hoje em `app/api/cron/*`, `app/api/whatsapp`, etc.). RLS aqui é a defesa **primária** para acesso direto do navegador (mesmo padrão já usado por `app/site/servicos/page.tsx`, que chama `supabase.from(...)` direto do cliente); para uma futura rota `/api/pedidos` com service role, a defesa primária passa a ser o contrato de aplicação já fechado em `docs/orcamento-venda-receita-v1-arquitetura.md` seção 7.1 — RLS vira secundária, não a única checagem, exatamente como já demonstrado ali. |
+
+**Achado adicional**: nenhuma RLS real deste projeto (auditado em TODAS as
+migrations existentes) verifica `clinica_usuarios.ativo` — só o código de
+aplicação (`lib/auth-clinica.ts:48`) faz essa checagem. A proposta
+corrigida adiciona `AND ativo = true` às três policies de `pedidos` como
+endurecimento **específico** desta tabela (lida com dinheiro), não como
+correção de uma regressão — o padrão-base do resto do projeto permanece
+como está, fora do escopo desta migration.
+
+### 11.5 Segurança econômica
+
+| Requisito da missão | Onde é garantido |
+|---|---|
+| Cliente não define preço final livremente | `capturarValorPedido` — sempre a partir de `clinica_servicos.preco_centavos` real |
+| Preço validado/calculado no servidor | `valorFoiManipulado` — testado (`tests/pedido-state-machine.test.mjs`) |
+| Pagamento informado ≠ confirmado | `aguardando_confirmacao_pagamento` como estado obrigatório intermediário — testado |
+| Pago só com evidência adequada | `pagamento_confirmado_em` só setado pelo evento `pagamento_confirmado`, nunca por `cliente_informou_pagamento` |
+| Cancelamento determinístico | `aplicarEvento` — testado, sem ambiguidade |
+| Nenhuma receita fabricada | Confirmado — nenhum caminho de código soma `pagamento_informado_em` como receita |
+| Nenhuma alteração cross-tenant | RLS (11.4) + trigger de `servico_id` (11.3) — duas camadas |
+| Proteção contra replay/duplicação | `idempotency_key` + índice único parcial + `podeCriarPedido` |
+
+**Nota sobre "nenhuma segunda fonte de verdade para receita"**: a decisão
+de manter `pagamento_confirmado_em` diretamente em `pedidos` (em vez de
+reaproveitar a tabela `pagamentos` do Cobrador AI, ligada a `cobranca_id`)
+significa, na prática, que "receita comprovada total" do negócio exige
+somar DUAS fontes (`pedidos.pagamento_confirmado_em IS NOT NULL` +
+`pagamentos` via cobranças/orçamentos) — não é estritamente uma única
+fonte. Isto já estava documentado como decisão consciente na seção 3
+original; esta auditoria não encontrou motivo para revertê-la (unificar
+agora exigiria retrofitar o desenho já aprovado do Cobrador AI, arriscado
+sem necessidade real comprovada), mas reforça: **qualquer relatório futuro
+de "receita total" precisa somar as duas fontes explicitamente — nunca
+tratar uma como completa sozinha.**
+
+### 11.6 Plano de prova tenant A/B (para quando houver staging real)
+
+Mesmo método já usado no incidente real deste repositório
+(`20260713000002_fix_clinica_config_rls.sql`, comentário de abertura):
+
+1. Criar dois tenants descartáveis em staging (`clinica_teste_a`,
+   `clinica_teste_b`), cada um com um usuário autenticado próprio.
+2. Como usuário de A: criar um `pedido` em `clinica_id=A` — confirmar
+   sucesso.
+3. Como usuário de A: tentar `INSERT`/`UPDATE` forçando `clinica_id=B` —
+   confirmar rejeição pela policy.
+4. Como usuário de B: tentar `SELECT` nos pedidos de A — confirmar 0
+   linhas retornadas.
+5. Como usuário de A: criar um `pedido` com `servico_id` pertencente a B —
+   confirmar rejeição pelo trigger (`RAISE EXCEPTION`).
+6. Sem sessão (anon): tentar `SELECT`/`INSERT` em `pedidos` — confirmar
+   rejeição total.
+7. Remover os dois tenants de teste ao final (mesma disciplina do
+   incidente original).
+
+### 11.7 Plano de rollback / recuperação
+
+```sql
+-- Reversão completa, ordem inversa de dependência:
+DROP TRIGGER IF EXISTS pedidos_atualiza_timestamp_trg ON pedidos;
+DROP FUNCTION IF EXISTS pedidos_atualiza_timestamp();
+DROP TRIGGER IF EXISTS pedidos_valida_tenant_do_servico_trg ON pedidos;
+DROP FUNCTION IF EXISTS pedidos_valida_tenant_do_servico();
+DROP TABLE IF EXISTS pedidos;
+ALTER TABLE clinica_servicos DROP CONSTRAINT IF EXISTS clinica_servicos_id_clinica_id_uidx;
+ALTER TABLE clinica_servicos DROP COLUMN IF EXISTS preco_centavos;
+```
+
+Nenhuma tabela pré-existente (`clinicas`, `pacientes`, `clinica_usuarios`)
+é alterada por esta migration — o rollback nunca toca dado que já existia
+antes dela.
+
+### 11.8 Confirmação explícita
+
+**ZERO SQL EXECUTADO. ZERO MIGRATION EXECUTADA. ZERO PRODUCTION TOCADA.**
+Toda a revisão desta seção foi feita por leitura de arquivo — nenhum
+comando `psql`/`supabase db` /cliente Postgres foi invocado nesta sessão.
