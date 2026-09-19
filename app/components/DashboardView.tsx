@@ -323,6 +323,10 @@ export default function DashboardView(props: DashboardViewProps) {
     exibirWelcomeModal = true, textoBemVindo,
   } = props;
 
+  const totalCentralOportunidades = centralOportunidades.alta.length
+    + centralOportunidades.media.length
+    + centralOportunidades.baixa.length;
+
   // Onboarding + Recursos Incluídos + Consultoria do Dia — mesmo grupo, uma
   // única posição por vez: topo quando ainda não há inteligência para
   // mostrar (temDados = false), rodapé quando já há (Homologação do
@@ -442,14 +446,34 @@ export default function DashboardView(props: DashboardViewProps) {
         .dashboard-surface:before { content:""; position:absolute; inset:-32px -18px auto; height:220px; z-index:-1; pointer-events:none; background:radial-gradient(520px 180px at 18% 0%,rgba(0,198,255,.1),transparent 72%),radial-gradient(460px 180px at 82% 0%,rgba(124,58,237,.09),transparent 72%); }
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
-        .dash-intelligence-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 16px; align-items: start; }
-        .dash-intelligence-grid > * { min-width: 0; }
-        .dash-action-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-        .dash-opportunity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-        .dash-opportunity-grid > * { min-width: 0; }
-        .dash-intelligence-grid .dc,
-        .dash-opportunity-grid .dc { margin-bottom: 0 !important; }
-        .dash-secondary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 16px; align-items: start; }
+        .dashboard-command-layout { display: grid; grid-template-columns: minmax(250px, 292px) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .dashboard-command-sidebar { min-width: 0; position: sticky; top: 88px; display: flex; flex-direction: column; gap: 10px; }
+        .dashboard-operational { min-width: 0; }
+        .dashboard-surface { overflow: hidden; }
+        .command-heading { display: flex; align-items: flex-start; gap: 10px; padding: 2px 2px 8px; }
+        .command-heading-icon { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, rgba(0,198,255,.2), rgba(124,58,237,.2)); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .command-heading strong { display: block; color: #f1f5f9; font-size: 14px; line-height: 1.2; }
+        .command-heading span { display: block; margin-top: 4px; color: #64748b; font-size: 11px; line-height: 1.35; }
+        .command-signal { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid rgba(56,189,248,.2); border-radius: 12px; background: rgba(56,189,248,.06); }
+        .command-signal strong { display: block; color: #f1f5f9; font-size: 12px; }
+        .command-signal p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 4px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.45; }
+        .command-signal-icon { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(56,189,248,.14); }
+        .command-preview { display: flex; align-items: flex-start; gap: 9px; padding: 11px 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: rgba(255,255,255,.025); }
+        .command-preview-icon { color: #79dfff; font-size: 14px; line-height: 1.2; flex-shrink: 0; }
+        .command-preview strong { display: block; color: #cbd5e1; font-size: 11.5px; line-height: 1.35; }
+        .command-preview span { display: block; margin-top: 3px; color: #64748b; font-size: 10.5px; line-height: 1.35; }
+        .command-details { border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: rgba(255,255,255,.018); overflow: hidden; }
+        .command-details summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 12px; color: #94a3b8; font-size: 11px; font-weight: 700; cursor: pointer; list-style: none; }
+        .command-details summary::-webkit-details-marker { display: none; }
+        .command-details summary::after { content: "Ver detalhes +"; color: #4a9bb0; font-size: 10px; font-weight: 700; white-space: nowrap; }
+        .command-details[open] summary::after { content: "Recolher -"; }
+        .command-details > .dc { margin: 0 !important; padding: 14px !important; border: 0 !important; border-top: 1px solid rgba(255,255,255,.07) !important; border-radius: 0 !important; }
+        .command-details .dc [style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
+        .command-details .dc > div:first-child { margin-bottom: 10px !important; }
+        .command-details .dc > div:first-child > div:first-child { font-size: 14px !important; }
+        .command-details .dc > div:first-child > div:last-child { font-size: 10px !important; }
+        .command-details .dc p { font-size: 11.5px !important; }
+        .dash-secondary { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
         .dash-secondary > * { min-width: 0; }
         .indicadores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
         @media (max-width: 860px) { .indicadores-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -459,7 +483,7 @@ export default function DashboardView(props: DashboardViewProps) {
         .dash-section-title:after { content:""; height:1px; flex:1; background:linear-gradient(90deg,rgba(0,198,255,.3),transparent); }
         .dash-section-title strong { color:#e2e8f0; font-size:13px; letter-spacing:.02em; white-space:nowrap; }
         .dash-section-title span { color:#00c6ff; font-size:15px; }
-        @media (max-width:900px) { .dash-intelligence-grid, .dash-opportunity-grid, .dash-secondary { grid-template-columns: 1fr; } }
+        @media (max-width:900px) { .dashboard-command-layout, .dash-secondary { grid-template-columns: 1fr; } .dashboard-command-sidebar { position: static; } }
         @media (max-width:700px) { .dash-section-title { margin-top:22px; } }
       `}</style>
 
@@ -533,53 +557,76 @@ export default function DashboardView(props: DashboardViewProps) {
           há inteligência para mostrar) ───────────────────────────────────── */}
       {!temDados && blocoOnboardingRecursosConsultoria}
 
-      {/* ── 2a. CABEÇALHO DO BLOCO DE INTELIGÊNCIA — nomeia o conjunto abaixo
-          como uma coisa só (Missão → PMA → Diretor Digital → Radar → Central),
-          nunca 5 widgets soltos. Puramente apresentacional, nenhuma regra nova. */}
-      {temDados && (
-        <div className="dc" style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 14px" }}>
-          <span style={{ fontSize: 20 }}>🧭</span>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2 }}>
-              Prioridades e oportunidades de hoje
+      {temDados ? (
+        <div className="dashboard-command-layout">
+          <aside className="dashboard-command-sidebar" aria-label="Painel de comando">
+            <div className="command-heading">
+              <div className="command-heading-icon">🧭</div>
+              <div>
+                <strong>Meu painel de comando</strong>
+                <span>Prioridades, ações e oportunidades essenciais.</span>
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-              O OrganizaPro reuniu os sinais do negócio e colocou primeiro o que merece sua atenção.
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ── 2b. MISSÃO DO DIA ────────────────────────────────────────────── */}
-      {temDados && (
-        <>
-          <div className="dash-intelligence-grid">
-            <DiretorDigitalCard
-              narrativa={narrativaDiretor}
-              recomendacoes={recomendacoesConsultivas}
-              onNavigate={onNavigate}
-            />
-            <div className="dash-action-stack">
+            <div className="command-signal">
+              <div className="command-signal-icon">🧭</div>
+              <div>
+                <strong>Diretor Digital</strong>
+                <p>{narrativaDiretor}</p>
+              </div>
+            </div>
+            <details className="command-details">
+              <summary>Análise consultiva completa</summary>
+              <DiretorDigitalCard
+                narrativa={narrativaDiretor}
+                recomendacoes={recomendacoesConsultivas}
+                onNavigate={onNavigate}
+              />
+            </details>
+
+            <div className="command-preview">
+              <span className="command-preview-icon">🚀</span>
+              <div>
+                <strong>Próxima Melhor Ação</strong>
+                <span>{proximasAcoes[0]?.titulo || "Nenhuma ação prioritária agora."}</span>
+              </div>
+            </div>
+            <details className="command-details">
+              <summary>{proximasAcoes.length} {proximasAcoes.length === 1 ? "ação prioritária" : "ações prioritárias"}</summary>
               <ProximaMelhorAcao acoes={proximasAcoes} onNavigate={onNavigate} />
-              <MissaoDoDiaCard sinais={missaoDoDia} onNavigate={onNavigate} />
+            </details>
+
+            <div className="command-preview">
+              <span className="command-preview-icon">🚩</span>
+              <div>
+                <strong>Missão do Dia</strong>
+                <span>{missaoDoDia.length > 0 ? `${missaoDoDia.length} prioridade${missaoDoDia.length === 1 ? "" : "s"} para avançar hoje.` : "Nenhuma prioridade identificada agora."}</span>
+              </div>
             </div>
-          </div>
+            <details className="command-details">
+              <summary>Ver missão completa</summary>
+              <MissaoDoDiaCard sinais={missaoDoDia} onNavigate={onNavigate} />
+            </details>
 
-          <div className="dash-opportunity-grid" style={{ marginTop: 16 }}>
-            <RadarDeOportunidades
-              oportunidades={oportunidadesClientes}
-              resumo={resumoRadar}
-              onNavigate={onNavigate}
-            />
-            <CentralDeOportunidadesCard
-              central={centralOportunidades}
-              onNavigate={onNavigate}
-            />
-          </div>
-        </>
-      )}
+            <details className="command-details">
+              <summary>Radar · {oportunidadesClientes.length} oportunidade{ oportunidadesClientes.length === 1 ? "" : "s"}</summary>
+              <RadarDeOportunidades
+                oportunidades={oportunidadesClientes}
+                resumo={resumoRadar}
+                onNavigate={onNavigate}
+              />
+            </details>
+            <details className="command-details">
+              <summary>Central · {totalCentralOportunidades} {totalCentralOportunidades === 1 ? "sinal" : "sinais"}</summary>
+              <CentralDeOportunidadesCard
+                central={centralOportunidades}
+                onNavigate={onNavigate}
+              />
+            </details>
+          </aside>
 
-      <div className="dash-section-title dc"><span>✦</span><strong>Leitura executiva e operação</strong></div>
+          <div className="dashboard-operational">
+            <div className="dash-section-title dc"><span>✦</span><strong>Leitura executiva e operação</strong></div>
 
       {/* ── 8. RESUMO DA IA ───────────────────────────────────────────────── */}
       <div className="dc" style={{
@@ -789,6 +836,12 @@ export default function DashboardView(props: DashboardViewProps) {
             ))}
           </div>
         </div>
+      )}
+
+          </div>
+        </div>
+      ) : (
+        <div className="dash-section-title dc"><span>✦</span><strong>Leitura executiva e operação</strong></div>
       )}
 
       {/* ── ONBOARDING / RECURSOS / CONSULTORIA — rodapé (já há inteligência) ─── */}
