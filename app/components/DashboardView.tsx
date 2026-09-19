@@ -442,6 +442,15 @@ export default function DashboardView(props: DashboardViewProps) {
         .dashboard-surface:before { content:""; position:absolute; inset:-32px -18px auto; height:220px; z-index:-1; pointer-events:none; background:radial-gradient(520px 180px at 18% 0%,rgba(0,198,255,.1),transparent 72%),radial-gradient(460px 180px at 82% 0%,rgba(124,58,237,.09),transparent 72%); }
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
+        .dash-intelligence-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 16px; align-items: start; }
+        .dash-intelligence-grid > * { min-width: 0; }
+        .dash-action-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+        .dash-opportunity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+        .dash-opportunity-grid > * { min-width: 0; }
+        .dash-intelligence-grid .dc,
+        .dash-opportunity-grid .dc { margin-bottom: 0 !important; }
+        .dash-secondary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 16px; align-items: start; }
+        .dash-secondary > * { min-width: 0; }
         .indicadores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
         @media (max-width: 860px) { .indicadores-grid { grid-template-columns: repeat(2, 1fr); } }
         .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
@@ -450,6 +459,7 @@ export default function DashboardView(props: DashboardViewProps) {
         .dash-section-title:after { content:""; height:1px; flex:1; background:linear-gradient(90deg,rgba(0,198,255,.3),transparent); }
         .dash-section-title strong { color:#e2e8f0; font-size:13px; letter-spacing:.02em; white-space:nowrap; }
         .dash-section-title span { color:#00c6ff; font-size:15px; }
+        @media (max-width:900px) { .dash-intelligence-grid, .dash-opportunity-grid, .dash-secondary { grid-template-columns: 1fr; } }
         @media (max-width:700px) { .dash-section-title { margin-top:22px; } }
       `}</style>
 
@@ -542,40 +552,31 @@ export default function DashboardView(props: DashboardViewProps) {
 
       {/* ── 2b. MISSÃO DO DIA ────────────────────────────────────────────── */}
       {temDados && (
-        <MissaoDoDiaCard sinais={missaoDoDia} onNavigate={onNavigate} />
-      )}
+        <>
+          <div className="dash-intelligence-grid">
+            <DiretorDigitalCard
+              narrativa={narrativaDiretor}
+              recomendacoes={recomendacoesConsultivas}
+              onNavigate={onNavigate}
+            />
+            <div className="dash-action-stack">
+              <ProximaMelhorAcao acoes={proximasAcoes} onNavigate={onNavigate} />
+              <MissaoDoDiaCard sinais={missaoDoDia} onNavigate={onNavigate} />
+            </div>
+          </div>
 
-      {/* ── 3. PRÓXIMA MELHOR AÇÃO ───────────────────────────────────────── */}
-      {temDados && (
-        <ProximaMelhorAcao acoes={proximasAcoes} onNavigate={onNavigate} />
-      )}
-
-      {/* ── 4. IA COMERCIAL · DIRETOR DIGITAL ─────────────────────────────── */}
-      {temDados && (
-        <DiretorDigitalCard
-          narrativa={narrativaDiretor}
-          recomendacoes={recomendacoesConsultivas}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* ── 5. RADAR DE OPORTUNIDADES ─────────────────────────────────────── */}
-      {temDados && (
-        <RadarDeOportunidades
-          oportunidades={oportunidadesClientes}
-          resumo={resumoRadar}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* ── 6. CENTRAL DE OPORTUNIDADES — sempre renderiza quando há dados;
-          estado vazio explicativo (nunca inventa oportunidade) fica a cargo
-          do próprio componente quando os 3 tiers estão vazios. */}
-      {temDados && (
-        <CentralDeOportunidadesCard
-          central={centralOportunidades}
-          onNavigate={onNavigate}
-        />
+          <div className="dash-opportunity-grid" style={{ marginTop: 16 }}>
+            <RadarDeOportunidades
+              oportunidades={oportunidadesClientes}
+              resumo={resumoRadar}
+              onNavigate={onNavigate}
+            />
+            <CentralDeOportunidadesCard
+              central={centralOportunidades}
+              onNavigate={onNavigate}
+            />
+          </div>
+        </>
       )}
 
       <div className="dash-section-title dc"><span>✦</span><strong>Leitura executiva e operação</strong></div>
@@ -594,7 +595,7 @@ export default function DashboardView(props: DashboardViewProps) {
       </div>
 
       {/* ── 9. AGENDA / PRÓXIMOS COMPROMISSOS ────────────────────────────── */}
-      <div className="dash-grid dc" style={{ marginBottom: 20 }}>
+      <div className="dash-secondary dc" style={{ marginBottom: 20 }}>
 
         {/* FOCO DO DIA */}
         <div style={{
