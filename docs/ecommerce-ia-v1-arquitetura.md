@@ -549,3 +549,88 @@ antes dela.
 **ZERO SQL EXECUTADO. ZERO MIGRATION EXECUTADA. ZERO PRODUCTION TOCADA.**
 Toda a revisão desta seção foi feita por leitura de arquivo — nenhum
 comando `psql`/`supabase db` /cliente Postgres foi invocado nesta sessão.
+
+## 12. Precheck adicional — `pedidos.paciente_id` × `pacientes` (achado novo, gate)
+
+Investigação de acompanhamento, ainda 100% read-only (git + código — sem
+acesso a nenhuma instância real de Supabase nesta sessão; ver seção 11.1
+para o motivo). **Não altera nenhuma SQL desta proposta** — documenta por
+que a lacuna de `paciente_id` (já registrada na seção 11.3) é mais séria
+do que "dado ausente", e por que não deve ser fechada por suposição.
+
+### 12.1 O que foi confirmado
+
+- **`pacientes` continua sem nenhuma DDL neste repositório** —
+  `git log --all` não encontra nenhum commit, em nenhuma branch, que crie
+  ou altere essa tabela. Confirma a mesma limitação já registrada na
+  seção 11.3, agora verificada de novo, explicitamente, para esta missão.
+- **`pacientes` tem uma coluna `user_id`, além de `clinica_id`** —
+  evidenciado por dois pontos reais de código:
+  - `scripts/criar-conta-comercial-demo.mjs:161-166`: insere
+    `pacientes` com `clinica_id` **e** `user_id` lado a lado.
+  - `app/clientes/page.tsx:253-263`: todo `salvar()` (criação **e**
+    edição) grava `user_id: user?.id` no payload, sempre sobrescrevendo
+    para o usuário logado no momento.
+- **Nenhum código de aplicação lê/filtra `pacientes` por `user_id`** — a
+  busca em todo o repositório pelas leituras de `pacientes` (`app/clientes`,
+  `app/agendamentos`, `app/dashboard`, `app/metricas`,
+  `app/api/raio-x`) mostra que **todas** filtram exclusivamente por
+  `clinica_id`. Isso confirma que a APLICAÇÃO já trata `clinica_id` como a
+  chave de tenant real — `user_id` parece vestigial (talvez só "última
+  edição por").
+
+### 12.2 Por que isso é um gate, não só uma lacuna de dado
+
+Isso NÃO prova o que a **RLS real** de `pacientes` verifica no banco — só
+prova o que a aplicação faz. E existe precedente direto, real, e já
+documentado NESTE MESMO REPOSITÓRIO de uma tabela com esse EXATO padrão
+híbrido (`user_id` + `clinica_id`) cuja RLS original era insuficiente:
+`clinica_config` (mesma dupla de colunas — `app/configuracoes/page.tsx`
+usa `onConflict: 'user_id'` no upsert) teve, confirmado por teste direto
+com dois tenants, uma vulnerabilidade real de cross-tenant UPDATE, corrigida
+em `supabase/migrations/20260713000002_fix_clinica_config_rls.sql`
+precisamente por essa migração de modelo "só `user_id`" para
+"`clinica_id IN (SELECT ... FROM clinica_usuarios ...)`".
+
+Não há, nesta sessão, nenhuma forma de confirmar se `pacientes` já passou
+pela mesma correção que `clinica_config` passou, ou se ainda carrega o
+modelo antigo (ou algum modelo intermediário/inconsistente). Propor uma FK
+composta ou um trigger de validação de tenant para
+`pedidos.paciente_id → pacientes`, como foi feito para `servico_id` na
+seção 11.3, exigiria **adivinhar** o nome/tipo exato da PK, se `clinica_id`
+nela é de fato `UUID`, se aceita `NULL`, e sobretudo qual RLS real está
+ativa — qualquer suposição errada nesse ponto seria pior do que deixar o
+gate explicitamente aberto.
+
+### 12.3 Classificação para este ponto específico
+
+**C — existe incerteza estrutural real sobre `pacientes` (não apenas
+ausência de dado, mas evidência concreta de um padrão de risco já
+materializado nesta mesma base de código, numa tabela irmã). STOP.**
+
+Isso não muda a classificação geral **B** da seção 11 para o restante da
+migration (`clinica_servicos`, `pedidos`, `servico_id`, RLS) — essas partes
+seguem corrigidas e prontas para revisão. O que fica bloqueado,
+especificamente, é qualquer garantia de banco (FK composta ou trigger)
+para `pedido.clinica_id = paciente.clinica_id`. **Recomendação**: antes de
+aprovar a migration de `pedidos` para staging, rodar na `pacientes` real a
+mesma auditoria de RLS já feita para `clinica_config` (teste direto com
+dois tenants descartáveis, mesmo método da seção 11.6) — e, se ela
+encontrar o mesmo problema, tratar como uma correção de segurança
+independente, prioritária, antes ou junto da migration de `pedidos`.
+
+Até essa confirmação existir, a única defesa que PODE ser afirmada com
+confiança para `paciente_id` é a de aplicação: qualquer futura rota
+`/api/pedidos` deve sempre filtrar `.eq('clinica_id', ...)` explicitamente
+em toda leitura/escrita que envolva `paciente_id` — mesma disciplina de
+defesa em profundidade já estabelecida em
+`docs/orcamento-venda-receita-v1-arquitetura.md` seção 7.1 — mesmo que a
+RLS real de `pacientes` já esteja correta.
+
+### 12.4 Confirmação explícita
+
+**ZERO SQL EXECUTADO (leitura ou escrita). ZERO MIGRATION EXECUTADA. ZERO
+CONEXÃO A STAGING/PRODUCTION REAL NESTA SESSÃO.** Nenhuma credencial
+encontrada em `.env.local` foi usada — decisão tomada em conjunto com o
+Capitão para não conectar a nenhuma instância real sem confirmação
+explícita de que a URL correspondia a staging, não produção.
