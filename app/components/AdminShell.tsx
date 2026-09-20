@@ -7,6 +7,7 @@ import { supabase } from "../../lib/supabase";
 const nav = [
   { l: "Painel Executivo",  h: "/dashboard",     i: "⚡" },
   { l: "Clientes",          h: "/clientes",      i: "👤" },
+  { l: "Oportunidades",     h: "/oportunidades", i: "📡" },
   { l: "Orçamentos",        h: "/orcamentos",    i: "💰" },
   { l: "Tratamentos",       h: "/tratamentos",   i: "🩺" },
   { l: "Pedidos",           h: "/pedidos",       i: "🛒" },
