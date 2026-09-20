@@ -14,8 +14,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
-const rotaListaCria = readFileSync(path.join(root, "app/api/orcamentos/route.ts"), "utf8");
-const rotaTransicao = readFileSync(path.join(root, "app/api/orcamentos/[id]/transicao/route.ts"), "utf8");
+// Normaliza CRLF->LF: git pode reescrever line endings no checkout
+// (core.autocrlf) dependendo do worktree — os padrões abaixo usam \n
+// literal e não podem depender de como o Windows fez o checkout.
+const rotaListaCria = readFileSync(path.join(root, "app/api/orcamentos/route.ts"), "utf8").replace(/\r\n/g, "\n");
+const rotaTransicao = readFileSync(path.join(root, "app/api/orcamentos/[id]/transicao/route.ts"), "utf8").replace(/\r\n/g, "\n");
 
 test("GET /api/orcamentos: autoriza antes de qualquer leitura, e a leitura é filtrada por clinica_id", () => {
   const idxAuth = rotaListaCria.indexOf("export async function GET");

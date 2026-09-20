@@ -6,6 +6,8 @@ import { gerarCentralOportunidades } from "../../lib/recomendacoes";
 import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import type { Orcamento } from "../../lib/motor-orcamentos";
+
+type PedidoRow = { id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string; pedido_itens?: { descricao: string }[] };
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import DashboardView, {
@@ -52,6 +54,7 @@ type DashData = {
   clientesSemProximoRows: ClienteSemProximoRow[];
   cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[];
   orcamentosParadosRows: Orcamento[];
+  pedidosNaoConcluidosRows: PedidoRow[];
 };
 
 export default function Dashboard() {
@@ -66,6 +69,7 @@ export default function Dashboard() {
     temLogo: false, temEmail: false, temTelefone: false, temEndereco: false, temWhatsapp: false,
     clientesSemProximoRows: [], cancelamentosSemReagendamentoRows: [],
     orcamentosParadosRows: [],
+    pedidosNaoConcluidosRows: [],
   });
 
   const carregarDados = useCallback(async () => {
@@ -99,6 +103,20 @@ export default function Dashboard() {
       })
         .then(async (r) => (r.ok ? ((await r.json()).orcamentos as Orcamento[]) ?? [] : []))
         .catch(() => [] as Orcamento[]);
+
+      // E-commerce IA V1 — mesmo raciocínio: public.pedidos só é acessível
+      // via service role, leitura via /api/pedidos. Filtra client-side por
+      // "criado"/"confirmado" (a API não filtra por múltiplos status numa
+      // única chamada) — falha nunca fabrica pedido, só lista vazia.
+      const pedidosNaoConcluidosPromise = fetch(`/api/pedidos?clinica_id=${cid}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(async (r) => {
+          if (!r.ok) return [] as PedidoRow[];
+          const todos = ((await r.json()).pedidos as PedidoRow[]) ?? [];
+          return todos.filter((p) => p.status === "criado" || p.status === "confirmado");
+        })
+        .catch(() => [] as PedidoRow[]);
 
       const [
         { data: agHoje },
@@ -164,6 +182,7 @@ export default function Dashboard() {
       ]);
 
       const orcamentosParadosRows = await orcamentosParadosPromise;
+      const pedidosNaoConcluidosRows = await pedidosNaoConcluidosPromise;
 
       // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
       // mesmo telefone não tiver nenhum compromisso futuro já remarcado.
@@ -219,6 +238,7 @@ export default function Dashboard() {
         clientesSemProximoRows: (semProximoData || []) as ClienteSemProximoRow[],
         cancelamentosSemReagendamentoRows,
         orcamentosParadosRows,
+        pedidosNaoConcluidosRows,
       });
     } catch (err) {
       console.error(err);
@@ -341,6 +361,17 @@ export default function Dashboard() {
         orcamentosParados: dash.orcamentosParadosRows.map(o => ({
           id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento,
           valor: o.valor, apresentadoEm: o.apresentado_em,
+        })),
+        // E-commerce IA V1 — dados já buscados acima via /api/pedidos
+        // (service role, escopado por clinica_id). "recompra_possivel" não
+        // está ligado aqui ainda — precisa de uma agregação por cliente
+        // (último pedido pago × nenhum pedido novo depois) que este
+        // dashboard não calcula hoje; motor e sinal já prontos e testados
+        // para quando essa consulta for construída (ver relatório).
+        pedidosNaoConcluidos: dash.pedidosNaoConcluidosRows.map(p => ({
+          id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone,
+          descricao: p.pedido_itens?.length ? `${p.pedido_itens.length} ${p.pedido_itens.length === 1 ? "item" : "itens"}` : "pedido",
+          valor: p.valor_centavos / 100, criadoEm: p.criado_em,
         })),
       })
     : [];

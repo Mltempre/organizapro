@@ -52,6 +52,8 @@ const ORIGEM_POR_TIPO: Partial<Record<OportunidadeCliente["sinais"][number]["tip
   // relatório de convergência).
   cobranca_atrasada:      { evidencia: "na cobrança real registrada" },
   tratamento_sem_retorno: { evidencia: "no tratamento real registrado" },
+  pedido_nao_concluido:   { evidencia: "no pedido real registrado", destino: "/pedidos", destinoLabel: "Ver pedido" },
+  recompra_possivel:      { evidencia: "no histórico real de pedidos", destino: "/pedidos", destinoLabel: "Ver pedidos" },
 };
 const ORIGEM_PADRAO = { evidencia: "no histórico real de agendamentos", destino: "/clientes" as string | undefined, destinoLabel: "Ver cliente" as string | undefined };
 

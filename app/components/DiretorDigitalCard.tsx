@@ -15,6 +15,8 @@ const stCategoria: Record<RecomendacaoConsultiva["categoria"], { emoji: string; 
   orcamento_parado:         { emoji: "💰", label: "Orçamento parado" },
   cobranca_atrasada:        { emoji: "🧾", label: "Cobrança atrasada" },
   tratamento_sem_retorno:   { emoji: "🔁", label: "Continuidade sem retorno" },
+  pedido_nao_concluido:     { emoji: "🛒", label: "Pedido não concluído" },
+  recompra_possivel:        { emoji: "🔂", label: "Recompra possível" },
 };
 
 const stPrioridade: Record<"alta" | "media" | "baixa", { bg: string; border: string; color: string; label: string }> = {

@@ -35,6 +35,8 @@ export type TipoSinal =
   | "cobranca_atrasada"
   | "confirmacao_pendente"
   | "tratamento_sem_retorno"
+  | "pedido_nao_concluido"
+  | "recompra_possivel"
   | "sem_proximo_compromisso";
 
 export type SinalOportunidade = {
@@ -122,6 +124,27 @@ export type CobrancaAtrasadaInput = {
   status:       "pendente" | "em_cobranca";
 };
 
+// E-commerce IA V1 (public.pedidos) — "venda" via catálogo, irmã de
+// orçamento/tratamento/cobrança. criadoEm é o timestamptz real de
+// pedidos.criado_em.
+export type PedidoNaoConcluidoInput = {
+  id:           string;
+  pacienteNome: string;
+  telefone?:    string | null;
+  descricao:    string; // ex.: "2 itens" ou o nome do item, resolvido por quem chama
+  valor:        number;
+  criadoEm:     string; // timestamptz ISO
+};
+
+// Sinal agregado por cliente — quem chama já resolveu "qual foi o último
+// pedido pago deste cliente, e não há nenhum pedido mais novo depois
+// dele" (nunca calculado por este arquivo, que só recebe dados prontos).
+export type RecompraPossivelInput = {
+  pacienteNome:       string;
+  telefone?:          string | null;
+  ultimoPedidoPagoEm: string; // timestamptz ISO
+};
+
 export type EntradaOportunidades = {
   hoje: string; // YYYY-MM-DD — referência para todos os cálculos de tempo decorrido
   // timestamptz ISO ("agora") — só necessário quando orcamentosParados ou
@@ -136,6 +159,8 @@ export type EntradaOportunidades = {
   orcamentosParados?:            OrcamentoParadoInput[];
   tratamentosSemRetorno?:        TratamentoSemRetornoInput[];
   cobrancasAtrasadas?:           CobrancaAtrasadaInput[];
+  pedidosNaoConcluidos?:         PedidoNaoConcluidoInput[];
+  recomprasPossiveis?:           RecompraPossivelInput[];
 };
 
 function normalizarTelefone(t?: string | null): string {
@@ -168,13 +193,19 @@ const PESO_PRIORIDADE: Record<PrioridadeOportunidade, number> = { alta: 0, media
 // "orcamento_parado" entra logo depois de cancelamento: representa receita
 // real já apresentada e parada sem decisão — mais urgente que uma simples
 // confirmação pendente, que ainda pode se resolver sozinha.
+// "pedido_nao_concluido" entra logo depois de orçamento/cobrança: mesma
+// natureza (negociação/venda em aberto), fonte diferente (catálogo, não
+// negociação). "recompra_possivel" junto de "sem_proximo_compromisso"
+// (reativação) — mesma prioridade média, motivo parecido.
 const PESO_TIPO: Record<TipoSinal, number> = {
   cancelamento_sem_reagendamento: 0,
   orcamento_parado:               1,
   cobranca_atrasada:              2,
-  confirmacao_pendente:           3,
-  tratamento_sem_retorno:         4,
-  sem_proximo_compromisso:        5,
+  pedido_nao_concluido:           3,
+  confirmacao_pendente:           4,
+  tratamento_sem_retorno:         5,
+  recompra_possivel:              6,
+  sem_proximo_compromisso:        7,
 };
 
 function ordenarSinais(sinais: SinalOportunidade[]): SinalOportunidade[] {
@@ -307,6 +338,48 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
           tempoDecorrido:  formatarTempoDecorrido(dias),
         });
       }
+    }
+  }
+
+  // E-commerce IA V1 (public.pedidos) — pedido criado/confirmado sem
+  // avançar há alguns dias. Limiar mais curto que orçamento (2 dias, não
+  // 3): um pedido de catálogo já tem preço fechado, hesitar em confirmar
+  // ou pagar costuma resolver mais rápido que uma negociação de orçamento.
+  const DIAS_PARA_PEDIDO_PARADO = 2;
+  if (input.pedidosNaoConcluidos?.length && input.agora) {
+    const agora = input.agora;
+    for (const p of input.pedidosNaoConcluidos) {
+      const dias = diasSemAtividade(p.criadoEm, agora);
+      if (dias < DIAS_PARA_PEDIDO_PARADO) continue;
+      const valorFormatado = p.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      registrar(p.pacienteNome, p.telefone, {
+        tipo:            "pedido_nao_concluido",
+        motivo:          `${p.pacienteNome} tem um pedido de ${p.descricao} (${valorFormatado}) parado há ${dias} dia${dias === 1 ? "" : "s"} sem confirmação/pagamento.`,
+        prioridade:      "alta",
+        acaoSugerida:    "Confirmar o pedido com o cliente",
+        diasDesdeEvento: dias,
+        tempoDecorrido:  formatarTempoDecorrido(dias),
+      });
+    }
+  }
+
+  // Recompra possível — agregado, resolvido por quem chama (ver comentário
+  // do tipo). Janela de 60 dias sem pedido novo é um limiar de produto
+  // documentado, não uma verdade objetiva provada.
+  const DIAS_PARA_RECOMPRA = 60;
+  if (input.recomprasPossiveis?.length && input.agora) {
+    const agora = input.agora;
+    for (const r of input.recomprasPossiveis) {
+      const dias = diasSemAtividade(r.ultimoPedidoPagoEm, agora);
+      if (dias < DIAS_PARA_RECOMPRA) continue;
+      registrar(r.pacienteNome, r.telefone, {
+        tipo:            "recompra_possivel",
+        motivo:          `${r.pacienteNome} não faz um pedido novo há ${dias} dias — pode ser hora de reativar.`,
+        prioridade:      "media",
+        acaoSugerida:    "Oferecer um novo pedido",
+        diasDesdeEvento: dias,
+        tempoDecorrido:  formatarTempoDecorrido(dias),
+      });
     }
   }
 

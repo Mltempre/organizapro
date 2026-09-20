@@ -5,22 +5,37 @@ import { CTA_CONTEXTUAL } from "../_lib/content";
 import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
 import type { DBServico, Empresa } from "../_lib/types";
 
+// Nunca float — mesma convenção de preco_centavos em todo o schema real.
+function formatarPreco(centavos: number): string {
+  return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export default function Servicos({ servicos, empresa, tema, familiaId, waBase, tone = "light", variant = 2 }: { servicos: DBServico[]; empresa: Empresa; tema: Tema; familiaId: FamiliaId; waBase?: string; tone?: Tone; variant?: 1 | 2 }) {
-  if (servicos.length === 0) return null;
+  // disponivel === false: item pausado pelo lojista, some do site (nunca
+  // fabrica indisponibilidade — undefined/true continuam visíveis, mesmo
+  // padrão de "ausência de coluna = comportamento anterior" já usado pelo
+  // preco_centavos opcional).
+  const visiveis = servicos.filter((s) => s.disponivel !== false);
+  if (visiveis.length === 0) return null;
   const msg = CTA_CONTEXTUAL[familiaId].servicos;
   const p = paleta(tema, tone, variant);
   return <section id="servicos" className="premium-section premium-services"><Reveal><div className="section-shell">
     <div className="section-heading"><div><span className="section-label">O que oferecemos</span><h2>{gerarTituloServicos(empresa)}</h2></div><p>Soluções apresentadas com clareza para você escolher o atendimento que faz sentido.</p></div>
-    <div className="premium-services__grid">{servicos.map((s, i) => <RevealItem key={s.id} index={i}><article className={`service-editorial ${s.imagem_url ? "has-image" : ""} ${i === 0 ? "is-feature" : ""}`}>
+    <div className="premium-services__grid">{visiveis.map((s, i) => {
+      const temPreco = typeof s.preco_centavos === "number" && s.preco_centavos > 0;
+      const mensagem = temPreco ? `${msg} (${s.nome} — ${formatarPreco(s.preco_centavos!)})` : `${msg} (${s.nome})`;
+      return <RevealItem key={s.id} index={i}><article className={`service-editorial ${s.imagem_url ? "has-image" : ""} ${i === 0 ? "is-feature" : ""}`}>
       {s.imagem_url && <img src={s.imagem_url} alt={s.nome} loading="lazy"/>}
       <div className="service-editorial__body">
         <span className="service-editorial__number">{String(i + 1).padStart(2,"0")}</span>
-        <div><h3>{s.nome}</h3>{s.descricao && <p>{s.descricao}</p>}</div>
+        <div><h3>{s.nome}</h3>{s.descricao && <p>{s.descricao}</p>}{temPreco && <p className="service-editorial__preco">{formatarPreco(s.preco_centavos!)}</p>}</div>
         {!s.imagem_url && <Icon name={s.icone || "target"} size={20} color={p.accent}/>}
       </div>
-      {waBase && <a className="service-editorial__link" href={`${waBase}${encodeURIComponent(`${msg} (${s.nome})`)}`} target="_blank" rel="noreferrer">Perguntar sobre este serviço →</a>}
-    </article></RevealItem>)}</div>
+      {waBase && <a className="service-editorial__link" href={`${waBase}${encodeURIComponent(mensagem)}`} target="_blank" rel="noreferrer">{temPreco ? "Pedir este item →" : "Perguntar sobre este serviço →"}</a>}
+    </article></RevealItem>;
+    })}</div>
   </div></Reveal><style>{`.premium-services{background:${p.bg}}
+    .service-editorial__preco{margin-top:8px !important;font-weight:800;color:${p.accent} !important}
     .premium-services .section-label{color:${p.accent}}
     .premium-services .section-heading h2{color:${p.text};font-family:${font.display};font-weight:600}
     .premium-services .section-heading>p{color:${p.textMuted}}

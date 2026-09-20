@@ -8,6 +8,7 @@ const nav = [
   { l: "Painel Executivo",  h: "/dashboard",     i: "⚡" },
   { l: "Clientes",          h: "/clientes",      i: "👤" },
   { l: "Orçamentos",        h: "/orcamentos",    i: "💰" },
+  { l: "Pedidos",           h: "/pedidos",       i: "🛒" },
   { l: "Agenda",            h: "/agendamentos",  i: "📅" },
   { l: "Site",              h: "/site",          i: "🌐" },
   { l: "Conteúdo IA",       h: "/conteudo",      i: "✍️" },

@@ -11,13 +11,17 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
+// Normaliza CRLF->LF: git pode reescrever line endings no checkout
+// (core.autocrlf) dependendo do worktree — os padrões abaixo usam \n
+// literal e não podem depender de como o Windows fez o checkout.
+const normalizar = (s) => s.replace(/\r\n/g, "\n");
 const rotasTratamento = {
-  lista: readFileSync(path.join(root, "app/api/tratamentos/route.ts"), "utf8"),
-  transicao: readFileSync(path.join(root, "app/api/tratamentos/[id]/transicao/route.ts"), "utf8"),
+  lista: normalizar(readFileSync(path.join(root, "app/api/tratamentos/route.ts"), "utf8")),
+  transicao: normalizar(readFileSync(path.join(root, "app/api/tratamentos/[id]/transicao/route.ts"), "utf8")),
 };
 const rotasCobranca = {
-  lista: readFileSync(path.join(root, "app/api/cobrancas/route.ts"), "utf8"),
-  transicao: readFileSync(path.join(root, "app/api/cobrancas/[id]/transicao/route.ts"), "utf8"),
+  lista: normalizar(readFileSync(path.join(root, "app/api/cobrancas/route.ts"), "utf8")),
+  transicao: normalizar(readFileSync(path.join(root, "app/api/cobrancas/[id]/transicao/route.ts"), "utf8")),
 };
 
 for (const [nome, rotas, entidade] of [["tratamentos", rotasTratamento, "tratamento"], ["cobrancas", rotasCobranca, "cobranca"]]) {

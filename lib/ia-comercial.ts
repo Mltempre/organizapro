@@ -26,7 +26,9 @@ export type CategoriaConsultiva =
   | "reputacao"
   | "orcamento_parado"
   | "cobranca_atrasada"
-  | "tratamento_sem_retorno";
+  | "tratamento_sem_retorno"
+  | "pedido_nao_concluido"
+  | "recompra_possivel";
 
 // Estrutura obrigatória de toda recomendação consultiva (missão desta versão):
 // o que foi identificado, por que importa, o que fazer agora, e a evidência
@@ -152,6 +154,37 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
           ? `Tratamento real registrado no sistema, ${op.tempoDecorrido}.`
           : "Tratamento real registrado no sistema.",
         prioridade: op.prioridade,
+      });
+    } else if (sinal.tipo === "pedido_nao_concluido") {
+      // E-commerce IA V1 — mesma disciplina: reformula o sinal real do
+      // Radar (lib/oportunidades-clientes.ts, que delega a lib/motor-
+      // pedidos.ts), nunca recalcula nem inventa valor/probabilidade.
+      lista.push({
+        id: `consultivo-pedido-${op.chave}`,
+        categoria: "pedido_nao_concluido",
+        identificado: sinal.motivo,
+        motivo: "Um pedido criado e parado sem confirmação ou pagamento é venda real que ainda pode não se concretizar.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Pedido real registrado no sistema, ${op.tempoDecorrido}.`
+          : "Pedido real registrado no sistema.",
+        prioridade: op.prioridade,
+        destino: "/pedidos",
+        destinoLabel: "Ver pedido",
+      });
+    } else if (sinal.tipo === "recompra_possivel") {
+      lista.push({
+        id: `consultivo-recompra-${op.chave}`,
+        categoria: "recompra_possivel",
+        identificado: sinal.motivo,
+        motivo: "Um cliente que já comprou antes e não voltou é uma oportunidade de receita mais fácil que atrair alguém novo.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Histórico real de pedidos, ${op.tempoDecorrido}.`
+          : "Histórico real de pedidos.",
+        prioridade: op.prioridade,
+        destino: "/pedidos",
+        destinoLabel: "Ver pedidos",
       });
     }
   }

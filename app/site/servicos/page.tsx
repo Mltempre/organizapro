@@ -5,8 +5,21 @@ import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../components/AdminShell";
 import SiteWorkspaceNav from "../SiteWorkspaceNav";
 
-type Item = { id: string; icone: string; imagem_url: string|null; nome: string; descricao: string|null; ordem: number; };
-type Form = { icone: string; imagem_url: string; nome: string; descricao: string; };
+type Item = { id: string; icone: string; imagem_url: string|null; nome: string; descricao: string|null; ordem: number; preco_centavos?: number|null; disponivel?: boolean; };
+type Form = { icone: string; imagem_url: string; nome: string; descricao: string; preco: string; disponivel: boolean; };
+
+// Nunca float — mesma convenção de preco_centavos em todo o schema real.
+function parsePrecoParaCentavos(texto: string): number | null {
+  const limpo = texto.trim().replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3},)/g, "").replace(",", ".");
+  if (!limpo) return null;
+  const valor = Number(limpo);
+  if (!Number.isFinite(valor) || valor <= 0) return null;
+  return Math.round(valor * 100);
+}
+function formatarCentavosParaInput(centavos?: number | null): string {
+  if (centavos === null || centavos === undefined) return "";
+  return (centavos / 100).toFixed(2).replace(".", ",");
+}
 
 
 const ICONS = [
@@ -32,7 +45,8 @@ export default function ServicosAdmin() {
   const [itens, setItens]         = useState<Item[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modal, setModal]         = useState<{ mode:"add"|"edit"; item?: Item }|null>(null);
-  const [form, setForm]           = useState<Form>({ icone:"tooth", imagem_url:"", nome:"", descricao:"" });
+  const [form, setForm]           = useState<Form>({ icone:"tooth", imagem_url:"", nome:"", descricao:"", preco:"", disponivel:true });
+  const [avisoPreco, setAvisoPreco] = useState("");
   const [uploading, setUploading] = useState(false);
   const [salvando, setSalvando]   = useState(false);
   const [erro, setErro]           = useState("");
@@ -70,18 +84,37 @@ export default function ServicosAdmin() {
     setForm(p => ({ ...p, imagem_url: data.url }));
   }
 
+  // Decisão de segurança deliberada (mesma da auditoria de
+  // docs/ecommerce-ia-v1-arquitetura.md): o salvamento de preco/disponivel
+  // é uma chamada Supabase SEPARADA e isolada do salvamento principal
+  // (nome/descrição/ícone/imagem/ordem, que permanece byte-a-byte idêntico
+  // ao que já está em produção). Antes da migration 20260920000001 rodar,
+  // essas colunas não existem — essa segunda chamada falha sozinha, exibe
+  // um aviso não-bloqueante, e NUNCA impede nem reverte o salvamento do
+  // serviço em si.
+  async function salvarPreco(id: string) {
+    const precoCentavos = parsePrecoParaCentavos(form.preco);
+    const { error } = await supabase.from("clinica_servicos").update({ preco_centavos: precoCentavos, disponivel: form.disponivel }).eq("id", id);
+    if (error) setAvisoPreco("Preço/disponibilidade ainda não pôde ser salvo (funcionalidade em ativação).");
+    else setAvisoPreco("");
+  }
+
   async function salvar() {
     if (!form.nome.trim()) { setErro("Informe o nome do servico."); return; }
     setSalvando(true); setErro("");
     const payload = { clinica_id:clinicaId, icone:form.icone, imagem_url:form.imagem_url||null, nome:form.nome.trim(), descricao:form.descricao.trim()||null };
+    let idParaPreco: string | null = null;
     if (modal?.mode === "add") {
       const maxOrdem = itens.length ? Math.max(...itens.map(i => i.ordem)) + 1 : 0;
-      const { error } = await supabase.from("clinica_servicos").insert({ ...payload, ordem:maxOrdem });
+      const { data, error } = await supabase.from("clinica_servicos").insert({ ...payload, ordem:maxOrdem }).select("id").single();
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
+      idParaPreco = data.id;
     } else if (modal?.item) {
       const { error } = await supabase.from("clinica_servicos").update(payload).eq("id", modal.item.id);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
+      idParaPreco = modal.item.id;
     }
+    if (idParaPreco) await salvarPreco(idParaPreco);
     setSalvando(false); setModal(null); carregar();
   }
 
@@ -107,7 +140,7 @@ export default function ServicosAdmin() {
   const cor = (icone: string) => ICON_COLORS[icone] ?? "#00c896";
 
   return (
-    <AdminShell title="Servicos" subtitle="Servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Servicos" subtitle="Servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"", preco:"", disponivel:true }); setModal({ mode:"add" }); setErro(""); }}>
 
       <SiteWorkspaceNav />
 
@@ -137,10 +170,16 @@ export default function ServicosAdmin() {
                   <div style={{ fontSize:14, fontWeight:700, color:"#f1f5f9" }}>{item.nome}</div>
                 </div>
                 {item.descricao && <p style={{ fontSize:12, color:"#64748b", lineHeight:1.6, margin:"0 0 10px" }}>{item.descricao}</p>}
+                {typeof item.preco_centavos === "number" && item.preco_centavos > 0 && (
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                    <span style={{ fontSize:14, fontWeight:800, color:"#00c896" }}>{(item.preco_centavos/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span>
+                    {item.disponivel === false && <span style={{ fontSize:10, fontWeight:700, color:"#f87171", background:"rgba(239,68,68,0.12)", padding:"2px 8px", borderRadius:20 }}>Indisponível</span>}
+                  </div>
+                )}
                 <div style={{ display:"flex", gap:5 }}>
                   <button onClick={() => mover(item,-1)} disabled={idx===0} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↑</button>
                   <button onClick={() => mover(item, 1)} disabled={idx===sorted.length-1} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↓</button>
-                  <button onClick={() => { setForm({ icone:item.icone, imagem_url:item.imagem_url??"", nome:item.nome, descricao:item.descricao??"" }); setModal({ mode:"edit", item }); setErro(""); }} style={{ flex:1, padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#94a3b8", fontSize:12, cursor:"pointer" }}>Editar</button>
+                  <button onClick={() => { setForm({ icone:item.icone, imagem_url:item.imagem_url??"", nome:item.nome, descricao:item.descricao??"", preco:formatarCentavosParaInput(item.preco_centavos), disponivel:item.disponivel !== false }); setModal({ mode:"edit", item }); setErro(""); setAvisoPreco(""); }} style={{ flex:1, padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#94a3b8", fontSize:12, cursor:"pointer" }}>Editar</button>
                   <button onClick={() => excluir(item.id)} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(239,68,68,0.3)", background:"transparent", color:"#f87171", fontSize:12, cursor:"pointer" }}>✕</button>
                 </div>
               </div>
@@ -183,10 +222,21 @@ export default function ServicosAdmin() {
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Nome do servico *</label>
               <input value={form.nome} onChange={e => setForm(p => ({...p, nome:e.target.value}))} placeholder="Ex: Corte de Cabelo, Consultoria Financeira..." className="input-field" />
             </div>
-            <div style={{ marginBottom:22 }}>
+            <div style={{ marginBottom:16 }}>
               <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Descricao</label>
               <textarea value={form.descricao} onChange={e => setForm(p => ({...p, descricao:e.target.value}))} placeholder="Descreva o que torna esse servico especial..." className="input-field" style={{ resize:"vertical", minHeight:70 }} />
             </div>
+
+            {/* Preço/disponibilidade — E-commerce IA V1 (funcionalidade em ativação até a migration rodar) */}
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontSize:12, color:"#64748b", display:"block", marginBottom:6 }}>Preço (opcional — item sem preço continua exibido)</label>
+              <input value={form.preco} onChange={e => setForm(p => ({...p, preco:e.target.value}))} placeholder="Ex: 150,00" className="input-field" />
+            </div>
+            <div style={{ marginBottom:22, display:"flex", alignItems:"center", gap:10 }}>
+              <input type="checkbox" id="disponivel" checked={form.disponivel} onChange={e => setForm(p => ({...p, disponivel:e.target.checked}))} style={{ width:16, height:16 }} />
+              <label htmlFor="disponivel" style={{ fontSize:13, color:"#94a3b8", cursor:"pointer" }}>Disponível para novos pedidos</label>
+            </div>
+            {avisoPreco && <div style={{ background:"rgba(251,191,36,0.10)", border:"1px solid rgba(251,191,36,0.3)", color:"#fbbf24", borderRadius:8, padding:"8px 12px", marginBottom:14, fontSize:12 }}>{avisoPreco}</div>}
 
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={() => setModal(null)} className="button-secondary" style={{ flex:1, padding:12, fontSize:14 }}>Cancelar</button>
