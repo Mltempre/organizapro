@@ -47,9 +47,7 @@ export type SinalCanonico = {
 const ORIGEM_POR_TIPO: Partial<Record<OportunidadeCliente["sinais"][number]["tipo"], { evidencia: string; destino?: string; destinoLabel?: string }>> = {
   orcamento_parado:       { evidencia: "no orçamento real registrado",  destino: "/orcamentos", destinoLabel: "Ver orçamento" },
   cobranca_atrasada:      { evidencia: "na cobrança real registrada",   destino: "/cobrancas",  destinoLabel: "Ver cobrança" },
-  // tratamento_sem_retorno ainda não tem superfície própria (/tratamentos)
-  // — sem destino, em vez de apontar para uma tela sem relação com o dado.
-  tratamento_sem_retorno: { evidencia: "no tratamento real registrado" },
+  tratamento_sem_retorno: { evidencia: "no tratamento real registrado", destino: "/tratamentos", destinoLabel: "Ver tratamento" },
   pedido_nao_concluido:   { evidencia: "no pedido real registrado", destino: "/pedidos", destinoLabel: "Ver pedido" },
   recompra_possivel:      { evidencia: "no histórico real de pedidos", destino: "/pedidos", destinoLabel: "Ver pedidos" },
 };

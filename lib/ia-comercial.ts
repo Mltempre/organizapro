@@ -143,8 +143,8 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         destinoLabel: "Ver cobrança",
       });
     } else if (sinal.tipo === "tratamento_sem_retorno") {
-      // Etapa "venda" da cadeia — idem, /tratamentos ainda não tem
-      // superfície própria.
+      // Etapa "venda" da cadeia — /tratamentos já existe (última milha
+      // operacional, Tratamentos V1), destino real.
       lista.push({
         id: `consultivo-tratamento-${op.chave}`,
         categoria: "tratamento_sem_retorno",
@@ -155,6 +155,8 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
           ? `Tratamento real registrado no sistema, ${op.tempoDecorrido}.`
           : "Tratamento real registrado no sistema.",
         prioridade: op.prioridade,
+        destino: "/tratamentos",
+        destinoLabel: "Ver tratamento",
       });
     } else if (sinal.tipo === "pedido_nao_concluido") {
       // E-commerce IA V1 — mesma disciplina: reformula o sinal real do
