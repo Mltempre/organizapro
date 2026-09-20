@@ -12,6 +12,9 @@ const stCategoria: Record<RecomendacaoConsultiva["categoria"], { emoji: string; 
   cancelamento_confirmacao: { emoji: "📵", label: "Cancelamento / confirmação" },
   agenda_ociosa:            { emoji: "🗓️", label: "Agenda ociosa" },
   reputacao:                { emoji: "⭐", label: "Reputação" },
+  orcamento_parado:         { emoji: "💰", label: "Orçamento parado" },
+  cobranca_atrasada:        { emoji: "🧾", label: "Cobrança atrasada" },
+  tratamento_sem_retorno:   { emoji: "🔁", label: "Continuidade sem retorno" },
 };
 
 const stPrioridade: Record<"alta" | "media" | "baixa", { bg: string; border: string; color: string; label: string }> = {

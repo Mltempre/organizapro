@@ -37,28 +37,45 @@ export type SinalCanonico = {
 };
 
 // ── Adaptador do Especialista Comercial ──────────────────────────────────
-// Traduz literalmente o que os dois motores já existentes calculam — mesmo
+// Traduz literalmente o que os motores já existentes calculam — mesmo
 // texto (motivo, ação, título) que já aparece hoje no Radar, na Central de
 // Oportunidades e no Diretor Digital. Nenhuma regra de priorização nova.
+//
+// Cada tipo de sinal sabe de qual motor real veio — a evidência e o
+// destino nunca herdam o texto genérico de agendamentos para sinais de
+// outra origem (cadeia orçamento → venda → receita, convergência).
+const ORIGEM_POR_TIPO: Partial<Record<OportunidadeCliente["sinais"][number]["tipo"], { evidencia: string; destino?: string; destinoLabel?: string }>> = {
+  orcamento_parado:       { evidencia: "no orçamento real registrado",  destino: "/orcamentos", destinoLabel: "Ver orçamento" },
+  // cobranca_atrasada/tratamento_sem_retorno ainda não têm superfície
+  // própria (/cobrancas, /tratamentos) — sem destino, em vez de apontar
+  // para uma tela que não tem relação com o dado (ver pendências do
+  // relatório de convergência).
+  cobranca_atrasada:      { evidencia: "na cobrança real registrada" },
+  tratamento_sem_retorno: { evidencia: "no tratamento real registrado" },
+};
+const ORIGEM_PADRAO = { evidencia: "no histórico real de agendamentos", destino: "/clientes" as string | undefined, destinoLabel: "Ver cliente" as string | undefined };
 
 export function adaptarOportunidadesClientes(oportunidades: OportunidadeCliente[]): SinalCanonico[] {
-  return oportunidades.map(op => ({
-    id:           `cliente-${op.chave}`,
-    especialista: "comercial",
-    tipo:         op.sinais[0].tipo,
-    prioridade:   op.prioridade,
-    titulo:       `${op.nome} — ${op.acaoSugerida}`,
-    motivo:       op.motivoPrincipal,
-    evidencia:    op.tempoDecorrido
-      ? `Identificado no histórico real de agendamentos, ${op.tempoDecorrido}.`
-      : "Identificado no histórico real de agendamentos.",
-    acaoSugerida: op.acaoSugerida,
-    contexto:     { tipo: "cliente", nome: op.nome, telefone: op.telefone },
-    chaveDedup:   op.chave,
-    criadoEm:     null,
-    destino:      "/clientes",
-    destinoLabel: "Ver cliente",
-  }));
+  return oportunidades.map(op => {
+    const origem = ORIGEM_POR_TIPO[op.sinais[0].tipo] ?? ORIGEM_PADRAO;
+    return {
+      id:           `cliente-${op.chave}`,
+      especialista: "comercial",
+      tipo:         op.sinais[0].tipo,
+      prioridade:   op.prioridade,
+      titulo:       `${op.nome} — ${op.acaoSugerida}`,
+      motivo:       op.motivoPrincipal,
+      evidencia:    op.tempoDecorrido
+        ? `Identificado ${origem.evidencia}, ${op.tempoDecorrido}.`
+        : `Identificado ${origem.evidencia}.`,
+      acaoSugerida: op.acaoSugerida,
+      contexto:     { tipo: "cliente" as const, nome: op.nome, telefone: op.telefone },
+      chaveDedup:   op.chave,
+      criadoEm:     null,
+      destino:      origem.destino,
+      destinoLabel: origem.destinoLabel,
+    };
+  });
 }
 
 export function adaptarRecomendacoes(recomendacoes: Recomendacao[]): SinalCanonico[] {

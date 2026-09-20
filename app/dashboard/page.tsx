@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 import { gerarCentralOportunidades } from "../../lib/recomendacoes";
 import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
+import type { Orcamento } from "../../lib/motor-orcamentos";
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import DashboardView, {
@@ -50,6 +51,7 @@ type DashData = {
   temWhatsapp:      boolean;
   clientesSemProximoRows: ClienteSemProximoRow[];
   cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[];
+  orcamentosParadosRows: Orcamento[];
 };
 
 export default function Dashboard() {
@@ -63,6 +65,7 @@ export default function Dashboard() {
     cancelamentosHoje: 0, horariosVagosHoje: 0, avaliacoesPendentes: 0, nomeNegocio: "",
     temLogo: false, temEmail: false, temTelefone: false, temEndereco: false, temWhatsapp: false,
     clientesSemProximoRows: [], cancelamentosSemReagendamentoRows: [],
+    orcamentosParadosRows: [],
   });
 
   const carregarDados = useCallback(async () => {
@@ -84,6 +87,18 @@ export default function Dashboard() {
       const amanha  = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
       const fimSete = new Date(Date.UTC(ano, mes - 1, dia + 6)).toISOString().split("T")[0];
       const trintaDiasAtras = new Date(Date.UTC(ano, mes - 1, dia - 30)).toISOString().split("T")[0];
+
+      // Convergência de Orçamentos — public.orcamentos só é acessível via
+      // service role (RLS sem policy para authenticated/anon, confirmado no
+      // dump de schema real), então a leitura passa pela API já autorizada
+      // (/api/orcamentos), nunca por uma query direta do client aqui. Corre
+      // em paralelo com o bloco abaixo; falha de rede/autorização nunca
+      // fabrica orçamento — só resulta em lista vazia (nenhum sinal novo).
+      const orcamentosParadosPromise = fetch(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(async (r) => (r.ok ? ((await r.json()).orcamentos as Orcamento[]) ?? [] : []))
+        .catch(() => [] as Orcamento[]);
 
       const [
         { data: agHoje },
@@ -148,6 +163,8 @@ export default function Dashboard() {
           .order("data", { ascending: false }).limit(50),
       ]);
 
+      const orcamentosParadosRows = await orcamentosParadosPromise;
+
       // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
       // mesmo telefone não tiver nenhum compromisso futuro já remarcado.
       const canceladosComTelefone = (canceladosRecentes || []).filter(a => a.telefone) as
@@ -201,6 +218,7 @@ export default function Dashboard() {
         temWhatsapp:      !!cfg?.zapi_instance && !!cfg?.zapi_token,
         clientesSemProximoRows: (semProximoData || []) as ClienteSemProximoRow[],
         cancelamentosSemReagendamentoRows,
+        orcamentosParadosRows,
       });
     } catch (err) {
       console.error(err);
@@ -212,6 +230,7 @@ export default function Dashboard() {
   useEffect(() => { carregarDados(); }, [carregarDados]);
 
   // Date helpers
+  const agoraIso   = new Date().toISOString(); // referência de "agora" para o motor de orçamentos (timestamptz, não data-only)
   const hojeStr    = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const [ano, mes, dia] = hojeStr.split("-").map(Number);
   const amanhaStr  = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
@@ -306,6 +325,7 @@ export default function Dashboard() {
   const oportunidadesClientes: OportunidadeCliente[] = insights.temDados
     ? gerarOportunidadesClientes({
         hoje: hojeStr,
+        agora: agoraIso,
         clientesSemProximoCompromisso: dash.clientesSemProximoRows.map(c => ({
           id: c.id, nome: c.nome, telefone: c.telefone, whatsapp: c.whatsapp, proximaConsulta: c.proxima_consulta,
         })),
@@ -315,6 +335,13 @@ export default function Dashboard() {
         confirmacoesPendentes: dash.agendaHoje
           .filter(a => a.status === "agendado")
           .map(a => ({ id: a.id, nome: a.paciente_nome, telefone: a.telefone || null, data: a.data })),
+        // Convergência de Orçamentos — dados já buscados acima via
+        // /api/orcamentos (service role, escopado por clinica_id); o cálculo
+        // de "parado" continua delegado ao motor real dentro do Radar.
+        orcamentosParados: dash.orcamentosParadosRows.map(o => ({
+          id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento,
+          valor: o.valor, apresentadoEm: o.apresentado_em,
+        })),
       })
     : [];
 

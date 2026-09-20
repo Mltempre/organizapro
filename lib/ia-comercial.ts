@@ -23,7 +23,10 @@ export type CategoriaConsultiva =
   | "retorno_cliente"
   | "cancelamento_confirmacao"
   | "agenda_ociosa"
-  | "reputacao";
+  | "reputacao"
+  | "orcamento_parado"
+  | "cobranca_atrasada"
+  | "tratamento_sem_retorno";
 
 // Estrutura obrigatória de toda recomendação consultiva (missão desta versão):
 // o que foi identificado, por que importa, o que fazer agora, e a evidência
@@ -102,6 +105,53 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         prioridade: op.prioridade,
         destino: "/clientes",
         destinoLabel: "Ver cliente",
+      });
+    } else if (sinal.tipo === "orcamento_parado") {
+      // Convergência de Orçamentos — mesma disciplina dos ramos acima:
+      // reformula o sinal real do Radar (lib/oportunidades-clientes.ts,
+      // que delega o cálculo de "parado" a lib/motor-orcamentos.ts), nunca
+      // recalcula nem inventa valor/probabilidade.
+      lista.push({
+        id: `consultivo-orcamento-${op.chave}`,
+        categoria: "orcamento_parado",
+        identificado: sinal.motivo,
+        motivo: "Um orçamento apresentado e parado sem decisão é receita real que ainda pode ser perdida para a concorrência ou para o esquecimento.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Orçamento real registrado no sistema, ${op.tempoDecorrido}.`
+          : "Orçamento real registrado no sistema.",
+        prioridade: op.prioridade,
+        destino: "/orcamentos",
+        destinoLabel: "Ver orçamento",
+      });
+    } else if (sinal.tipo === "cobranca_atrasada") {
+      // Etapa "receita" da cadeia — /cobrancas ainda não tem superfície
+      // própria, então sem destino (nunca aponta para uma tela sem relação
+      // com o dado real).
+      lista.push({
+        id: `consultivo-cobranca-${op.chave}`,
+        categoria: "cobranca_atrasada",
+        identificado: sinal.motivo,
+        motivo: "Dinheiro já vencido e não recebido é receita real em risco — quanto mais tempo passa, menor a chance de recuperação.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Cobrança real registrada no sistema, ${op.tempoDecorrido}.`
+          : "Cobrança real registrada no sistema.",
+        prioridade: op.prioridade,
+      });
+    } else if (sinal.tipo === "tratamento_sem_retorno") {
+      // Etapa "venda" da cadeia — idem, /tratamentos ainda não tem
+      // superfície própria.
+      lista.push({
+        id: `consultivo-tratamento-${op.chave}`,
+        categoria: "tratamento_sem_retorno",
+        identificado: sinal.motivo,
+        motivo: "Continuidade interrompida sem um próximo passo definido é um risco real de abandono — e de receita futura que não vai se realizar.",
+        acao: op.acaoSugerida,
+        evidencia: op.tempoDecorrido
+          ? `Tratamento real registrado no sistema, ${op.tempoDecorrido}.`
+          : "Tratamento real registrado no sistema.",
+        prioridade: op.prioridade,
       });
     }
   }
