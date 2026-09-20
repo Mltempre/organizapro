@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolverComCamadaUniversal, resolverModuloSegmento, type DadosEmpresaUniversal } from "../../../../lib/ia-universal";
+import { extrairCodigoRastreio } from "../../../../lib/atribuicao-origem";
+import { vincularOrigemPorCodigo } from "../../../../lib/origem-persistencia";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -398,6 +400,53 @@ function sufixoTelefone(tel: string, n = 10): string {
   return tel.replace(/\D/g, "").slice(-n);
 }
 
+// ── Atribuição de Origem — Fase D (vínculo origem→paciente pelo WhatsApp) ──
+// Reconhece um código de rastreio (`ref:xxxxx`, ver lib/atribuicao-origem.ts)
+// dentro do texto de uma mensagem recebida — mensagens comuns, sem `ref:`
+// nenhum, seguem exatamente como antes desta fase. Nunca atribui origem por
+// suposição: sem código reconhecido OU sem paciente correspondente já
+// cadastrado NESTE tenant, não faz nada — nunca cria um paciente novo aqui
+// (isso fabricaria dado) e nunca busca em outra clínica.
+
+async function localizarPacientePorTelefone(clinica_id: string, telefone: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("pacientes")
+      .select("id")
+      .eq("clinica_id", clinica_id)
+      .eq("telefone", telefone)
+      .maybeSingle();
+    if (!error && data) return (data as { id: string }).id;
+
+    // Mesmo ajuste de sufixo já usado em fetchLead — Z-API varia o formato do telefone.
+    const sufixo = sufixoTelefone(telefone, 8);
+    const { data: d2, error: e2 } = await supabase
+      .from("pacientes")
+      .select("id")
+      .eq("clinica_id", clinica_id)
+      .ilike("telefone", `%${sufixo}`)
+      .maybeSingle();
+    if (!e2 && d2) return (d2 as { id: string }).id;
+    return null;
+  } catch (e) {
+    console.warn("[CHATBOT] localizarPacientePorTelefone falhou:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function vincularOrigemSeReferenciada(clinica_id: string, telefone: string, mensagem: string): Promise<void> {
+  const codigo = extrairCodigoRastreio(mensagem);
+  if (!codigo) return; // caso comum — a maioria das mensagens não carrega ref:, sem isso ser um erro
+
+  const pacienteId = await localizarPacientePorTelefone(clinica_id, telefone);
+  if (!pacienteId) {
+    console.log("[CHATBOT] ref: reconhecido mas ainda sem paciente correspondente cadastrado — nada a vincular", { codigo });
+    return;
+  }
+
+  await vincularOrigemPorCodigo(supabase, { clinicaId: clinica_id, codigo, pacienteId });
+}
+
 async function fetchLead(clinica_id: string, telefone: string): Promise<Lead | null> {
   const COLS = "etapa, score, nome, cidade, especialidade, pacientes_mes, porte_clinica, sistema_atual, dor_principal";
   const COLS_MIN = "etapa, score, nome, cidade, especialidade, pacientes_mes";
@@ -554,6 +603,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Fase D — nunca bloqueia nem altera o fluxo do chatbot abaixo; roda em
+    // paralelo à lógica normal, mesmo para uma mensagem de confirmação de
+    // consulta (é evidência real de contato de qualquer forma).
+    await vincularOrigemSeReferenciada(clinica_id, telefone, mensagem).catch((e) => {
+      console.warn("[CHATBOT] vincularOrigemSeReferenciada falhou (ignorado):", e instanceof Error ? e.message : e);
+    });
 
     if (ehConfirmacaoDeConsulta(mensagem)) {
       console.log("[CHATBOT] retorno antecipado: confirmação de consulta detectada — ignorada pelo chatbot");

@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 import AdminShell from '../components/AdminShell'
 import EmptyState from '../components/EmptyState'
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback'
+import { rotuloRespondeu, taxaDeCliquePct } from '../../lib/motor-reputacao'
+import { calcularPresencaDigital, type DiagnosticoPresenca } from '../../lib/presenca-digital'
 
 interface Avaliacao {
   id: string
@@ -15,6 +17,8 @@ interface Avaliacao {
   telefone: string
   enviado_em: string
   respondeu: boolean
+  codigo: string | null
+  clicado_em: string | null
 }
 
 interface Resumo {
@@ -22,21 +26,46 @@ interface Resumo {
   recebidas: number
   pendentes: number
   taxa: number
+  cliques: number
+  taxaClique: number
 }
 
 export default function ReputacaoPage() {
   const router = useRouter()
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([])
-  const [resumo, setResumo] = useState<Resumo>({ total: 0, recebidas: 0, pendentes: 0, taxa: 0 })
+  const [resumo, setResumo] = useState<Resumo>({ total: 0, recebidas: 0, pendentes: 0, taxa: 0, cliques: 0, taxaClique: 0 })
   const [carregando, setCarregando] = useState(true)
   const [clinicaId, setClinicaId] = useState<string | null>(null)
+  const [presenca, setPresenca] = useState<DiagnosticoPresenca | null>(null)
   const [erro, setErro] = useState('')
+
+  // Presença Digital — completude de cadastro (lib/presenca-digital.ts),
+  // nunca performance real no Google (não há integração/OAuth com a Google
+  // Business Profile API nesta versão — ver diagnostico.observacaoIntegracao).
+  async function carregarPresenca(cid: string) {
+    const { data } = await supabase
+      .from('clinica_config')
+      .select('slug, link_google, nota_google, num_avaliacoes, telefone, endereco, horario_funcionamento, seo_titulo, seo_descricao')
+      .eq('clinica_id', cid)
+      .maybeSingle()
+    setPresenca(calcularPresencaDigital({
+      slug: data?.slug ?? null,
+      linkGoogle: data?.link_google ?? null,
+      notaGoogle: data?.nota_google ?? null,
+      numAvaliacoes: data?.num_avaliacoes ?? null,
+      telefone: data?.telefone ?? null,
+      endereco: data?.endereco ?? null,
+      horarioFuncionamento: data?.horario_funcionamento ?? null,
+      seoTitulo: data?.seo_titulo ?? null,
+      seoDescricao: data?.seo_descricao ?? null,
+    }))
+  }
 
   async function carregarDados(cid: string) {
     setCarregando(true); setErro('')
     const { data, error } = await supabase
       .from('avaliacoes')
-      .select('id, clinica_id, agendamento_id, paciente_nome, telefone, enviado_em, respondeu')
+      .select('id, clinica_id, agendamento_id, paciente_nome, telefone, enviado_em, respondeu, codigo, clicado_em')
       .eq('clinica_id', cid)
       .order('enviado_em', { ascending: false })
 
@@ -46,7 +75,14 @@ export default function ReputacaoPage() {
       const recebidas = data.filter(a => a.respondeu).length
       const pendentes = total - recebidas
       const taxa = total > 0 ? Math.round((recebidas / total) * 100) : 0
-      setResumo({ total, recebidas, pendentes, taxa })
+      // Cliques: único fato que o próprio sistema pode confirmar de verdade
+      // (é ele quem serve o redirect em /r/[codigo]) — nunca "respondeu",
+      // que ninguém confirma sem integração real com o Google.
+      const cliques = data.filter(a => a.clicado_em !== null).length
+      const taxaClique = taxaDeCliquePct(data.map(a => ({
+        id: a.id, codigoRastreio: a.codigo ?? '', linkDestino: '', enviadoEm: a.enviado_em, clicadoEm: a.clicado_em,
+      })))
+      setResumo({ total, recebidas, pendentes, taxa, cliques, taxaClique })
     } else if (error) {
       console.error(error)
       setErro(MSG_ERRO_PADRAO)
@@ -68,7 +104,7 @@ export default function ReputacaoPage() {
 
       if (cid) {
         setClinicaId(cid)
-        await carregarDados(cid)
+        await Promise.all([carregarDados(cid), carregarPresenca(cid)])
       }
     }
     init()
@@ -100,6 +136,10 @@ export default function ReputacaoPage() {
     { label: 'Avaliações Recebidas',    valor: resumo.recebidas, cor: '#4ade80', icon: '✅' },
     { label: 'Avaliações Pendentes',    valor: resumo.pendentes, cor: '#fb923c', icon: '⏳' },
     { label: 'Taxa de Resposta',       valor: `${resumo.taxa}%`, cor: '#7c3aed', icon: '📊' },
+    // Único dado que o próprio sistema confirma de verdade (é ele quem
+    // serve o redirect em /r/[codigo]) — "respondeu" acima é uma marcação
+    // sem verificação (ver lib/motor-reputacao.ts, rotuloRespondeu).
+    { label: 'Cliques Confirmados',    valor: `${resumo.cliques} (${resumo.taxaClique}%)`, cor: '#38bdf8', icon: '🔗' },
   ]
 
   return (
@@ -109,6 +149,29 @@ export default function ReputacaoPage() {
 
         {erro && (
           <Feedback type="erro" message={erro} onClose={() => setErro('')} />
+        )}
+
+        {/* Presença Digital — completude de cadastro, NUNCA performance real
+            no Google (sem OAuth/API do Google Business Profile nesta versão) */}
+        {presenca && (
+          <div style={{ background: '#1e2130', borderRadius: 12, border: '1px solid #2d3148', padding: '18px 22px', marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>📍 Presença Digital — {presenca.pontuacao}% do cadastro completo</div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>Sem integração com o Google (nota/avaliações digitadas manualmente)</div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {presenca.itens.map(item => (
+                <span key={item.chave} style={{
+                  fontSize: 11, padding: '4px 10px', borderRadius: 20,
+                  background: item.completo ? 'rgba(74,222,128,0.12)' : 'rgba(148,163,184,0.1)',
+                  color: item.completo ? '#4ade80' : '#64748b',
+                  border: item.completo ? 'none' : '1px solid #2d3148',
+                }}>
+                  {item.completo ? '✓' : '○'} {item.label}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Cards de métricas */}
@@ -147,7 +210,7 @@ export default function ReputacaoPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#161827' }}>
-                    {['Cliente', 'Telefone', 'Enviado em', 'Status'].map(h => (
+                    {['Cliente', 'Telefone', 'Enviado em', 'Clique', 'Status'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #2d3148', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                         {h}
                       </th>
@@ -167,6 +230,17 @@ export default function ReputacaoPage() {
                         {formatarData(a.enviado_em)}
                       </td>
                       <td style={{ padding: '12px 16px', borderBottom: '1px solid #1a1d2e' }}>
+                        {a.clicado_em ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#0ea5e922', color: '#38bdf8' }}>
+                            🔗 Clicou em {formatarData(a.clicado_em)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#475569' }}>— sem clique</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #1a1d2e' }}>
+                        {/* Rótulo honesto (lib/motor-reputacao.ts): `respondeu` nunca é
+                            confirmado por nenhuma integração real — nunca dizemos "Respondeu". */}
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 6,
                           padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
@@ -174,7 +248,7 @@ export default function ReputacaoPage() {
                           color:      a.respondeu ? '#4ade80'   : '#475569',
                           border:     a.respondeu ? 'none'      : '1px solid #2d3148',
                         }}>
-                          {a.respondeu ? '✅ Respondeu' : '⏳ Aguardando'}
+                          {a.respondeu ? `⚠️ ${rotuloRespondeu(a.respondeu)}` : '⏳ Aguardando'}
                         </span>
                       </td>
                     </tr>

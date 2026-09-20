@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { gerarCodigoRastreio } from "../../../../lib/motor-reputacao";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -104,13 +105,19 @@ export async function GET(req: NextRequest) {
           const template = config.msg_avaliacao ||
             "Olá, {nome}! 😊\n\nEsperamos que seu atendimento tenha sido excelente! Sua opinião é muito importante para nós e ajuda outros clientes a nos encontrar.\n\nPoderia nos avaliar no Google? Leva menos de 1 minuto:\n👉 {link}\n\nMuito obrigado pela confiança! 🙏";
 
+          const baseUrl = req.nextUrl.origin;
+          // Link rastreável (/r/[codigo], lib/motor-reputacao.ts) em vez do
+          // link direto do Google — é o que permite saber se o cliente
+          // clicou de verdade (avaliacoes.clicado_em), nunca inferido.
+          const codigo = gerarCodigoRastreio();
+          const linkRastreavel = `${baseUrl}/r/${codigo}`;
+
           const mensagem = montarMensagem(
             template,
             ag.paciente_nome || "paciente",
-            config.link_google
+            linkRastreavel
           );
 
-          const baseUrl = req.nextUrl.origin;
           const res = await fetch(`${baseUrl}/api/whatsapp`, {
             method:  "POST",
             headers: {
@@ -139,6 +146,7 @@ export async function GET(req: NextRequest) {
               telefone:       ag.telefone,
               enviado_em:     new Date().toISOString(),
               respondeu:      false,
+              codigo,
             });
 
             enviados++;

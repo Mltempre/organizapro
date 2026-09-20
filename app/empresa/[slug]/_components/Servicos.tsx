@@ -4,13 +4,14 @@ import { gerarTituloServicos } from "../_lib/helpers";
 import { CTA_CONTEXTUAL } from "../_lib/content";
 import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
 import type { DBServico, Empresa } from "../_lib/types";
+import { construirLinkComRastreio } from "../../../../lib/atribuicao-origem";
 
 // Nunca float — mesma convenção de preco_centavos em todo o schema real.
 function formatarPreco(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function Servicos({ servicos, empresa, tema, familiaId, waBase, tone = "light", variant = 2 }: { servicos: DBServico[]; empresa: Empresa; tema: Tema; familiaId: FamiliaId; waBase?: string; tone?: Tone; variant?: 1 | 2 }) {
+export default function Servicos({ servicos, empresa, tema, familiaId, waBase, codigoRastreio, tone = "light", variant = 2 }: { servicos: DBServico[]; empresa: Empresa; tema: Tema; familiaId: FamiliaId; waBase?: string; codigoRastreio?: string; tone?: Tone; variant?: 1 | 2 }) {
   // disponivel === false: item pausado pelo lojista, some do site (nunca
   // fabrica indisponibilidade — undefined/true continuam visíveis, mesmo
   // padrão de "ausência de coluna = comportamento anterior" já usado pelo
@@ -31,7 +32,11 @@ export default function Servicos({ servicos, empresa, tema, familiaId, waBase, t
         <div><h3>{s.nome}</h3>{s.descricao && <p>{s.descricao}</p>}{temPreco && <p className="service-editorial__preco">{formatarPreco(s.preco_centavos!)}</p>}</div>
         {!s.imagem_url && <Icon name={s.icone || "target"} size={20} color={p.accent}/>}
       </div>
-      {waBase && <a className="service-editorial__link" href={`${waBase}${encodeURIComponent(mensagem)}`} target="_blank" rel="noreferrer">{temPreco ? "Pedir este item →" : "Perguntar sobre este serviço →"}</a>}
+      {waBase && (() => {
+        const link = `${waBase}${encodeURIComponent(mensagem)}`;
+        const href = codigoRastreio ? construirLinkComRastreio(link, codigoRastreio) : link;
+        return <a className="service-editorial__link" href={href} target="_blank" rel="noreferrer">{temPreco ? "Pedir este item →" : "Perguntar sobre este serviço →"}</a>;
+      })()}
     </article></RevealItem>;
     })}</div>
   </div></Reveal><style>{`.premium-services{background:${p.bg}}
