@@ -10,9 +10,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
-const rotaListaCria = readFileSync(path.join(root, "app/api/pedidos/route.ts"), "utf8");
-const rotaTransicao = readFileSync(path.join(root, "app/api/pedidos/[id]/transicao/route.ts"), "utf8");
-const migration = readFileSync(path.join(root, "supabase/migrations/20260920000001_pedidos_ecommerce_ia_v1.sql"), "utf8");
+// Normaliza CRLF->LF: git pode reescrever line endings no checkout
+// (core.autocrlf) dependendo do worktree — os padrões abaixo usam \n
+// literal e não podem depender de como o Windows fez o checkout.
+const normalizar = (s) => s.replace(/\r\n/g, "\n");
+const rotaListaCria = normalizar(readFileSync(path.join(root, "app/api/pedidos/route.ts"), "utf8"));
+const rotaTransicao = normalizar(readFileSync(path.join(root, "app/api/pedidos/[id]/transicao/route.ts"), "utf8"));
+const migration = normalizar(readFileSync(path.join(root, "supabase/migrations/20260920000001_pedidos_ecommerce_ia_v1.sql"), "utf8"));
 
 test("GET /api/pedidos: autoriza antes de qualquer leitura, e a leitura é filtrada por clinica_id", () => {
   const idxGet = rotaListaCria.indexOf("export async function GET");

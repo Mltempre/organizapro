@@ -6,6 +6,8 @@ import { gerarCentralOportunidades } from "../../lib/recomendacoes";
 import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import type { Orcamento } from "../../lib/motor-orcamentos";
+import type { Tratamento } from "../../lib/motor-tratamento";
+import type { Cobranca } from "../../lib/motor-cobranca";
 
 type PedidoRow = { id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string; pedido_itens?: { descricao: string }[] };
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
@@ -55,6 +57,8 @@ type DashData = {
   cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[];
   orcamentosParadosRows: Orcamento[];
   pedidosNaoConcluidosRows: PedidoRow[];
+  tratamentosAtivosRows: Tratamento[];
+  cobrancasAbertasRows: Cobranca[];
 };
 
 export default function Dashboard() {
@@ -70,6 +74,8 @@ export default function Dashboard() {
     clientesSemProximoRows: [], cancelamentosSemReagendamentoRows: [],
     orcamentosParadosRows: [],
     pedidosNaoConcluidosRows: [],
+    tratamentosAtivosRows: [],
+    cobrancasAbertasRows: [],
   });
 
   const carregarDados = useCallback(async () => {
@@ -117,6 +123,32 @@ export default function Dashboard() {
           return todos.filter((p) => p.status === "criado" || p.status === "confirmado");
         })
         .catch(() => [] as PedidoRow[]);
+
+      // Smart Commerce Canônico — mesmo raciocínio: public.tratamentos e
+      // public.cobrancas só são acessíveis via service role, leitura via
+      // /api/tratamentos e /api/cobrancas. Sem filtro de status na URL
+      // (mesmo padrão de pedidos) — o filtro real acontece aqui e dentro
+      // do próprio Radar (estaAtrasada/precisaRetorno). Falha nunca
+      // fabrica tratamento/cobrança, só resulta em lista vazia.
+      const tratamentosAtivosPromise = fetch(`/api/tratamentos?clinica_id=${cid}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(async (r) => {
+          if (!r.ok) return [] as Tratamento[];
+          const todos = ((await r.json()).tratamentos as Tratamento[]) ?? [];
+          return todos.filter((t) => t.status === "em_andamento" || t.status === "interrompido");
+        })
+        .catch(() => [] as Tratamento[]);
+
+      const cobrancasAbertasPromise = fetch(`/api/cobrancas?clinica_id=${cid}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(async (r) => {
+          if (!r.ok) return [] as Cobranca[];
+          const todas = ((await r.json()).cobrancas as Cobranca[]) ?? [];
+          return todas.filter((c) => c.status === "pendente" || c.status === "em_cobranca");
+        })
+        .catch(() => [] as Cobranca[]);
 
       const [
         { data: agHoje },
@@ -183,6 +215,8 @@ export default function Dashboard() {
 
       const orcamentosParadosRows = await orcamentosParadosPromise;
       const pedidosNaoConcluidosRows = await pedidosNaoConcluidosPromise;
+      const tratamentosAtivosRows = await tratamentosAtivosPromise;
+      const cobrancasAbertasRows = await cobrancasAbertasPromise;
 
       // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
       // mesmo telefone não tiver nenhum compromisso futuro já remarcado.
@@ -239,6 +273,8 @@ export default function Dashboard() {
         cancelamentosSemReagendamentoRows,
         orcamentosParadosRows,
         pedidosNaoConcluidosRows,
+        tratamentosAtivosRows,
+        cobrancasAbertasRows,
       });
     } catch (err) {
       console.error(err);
@@ -372,6 +408,22 @@ export default function Dashboard() {
           id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone,
           descricao: p.pedido_itens?.length ? `${p.pedido_itens.length} ${p.pedido_itens.length === 1 ? "item" : "itens"}` : "pedido",
           valor: p.valor_centavos / 100, criadoEm: p.criado_em,
+        })),
+        // Smart Commerce Canônico — Convergência de Tratamentos/Cobranças:
+        // dados já buscados acima via /api/tratamentos e /api/cobrancas
+        // (service role, escopado por clinica_id). "recompra_possivel"
+        // continua sem ligação aqui — precisa de uma agregação por cliente
+        // (último pedido pago × nenhum pedido novo depois) que este
+        // dashboard não calcula hoje; motor e sinal já prontos e testados.
+        tratamentosSemRetorno: dash.tratamentosAtivosRows.map(t => ({
+          id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone,
+          tipoTratamento: t.tipo_tratamento, status: t.status,
+          proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em,
+        })),
+        cobrancasAtrasadas: dash.cobrancasAbertasRows.map(c => ({
+          id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone,
+          descricao: c.descricao, valor: c.valor, vencimento: c.vencimento,
+          status: c.status as "pendente" | "em_cobranca",
         })),
       })
     : [];
