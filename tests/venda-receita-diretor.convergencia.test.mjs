@@ -19,7 +19,7 @@ const radar = await import(pathToFileURL(path.join(buildDir, "oportunidades-clie
 const nucleo = await import(pathToFileURL(path.join(buildDir, "nucleo-inteligente.js")));
 const diretor = await import(pathToFileURL(path.join(buildDir, "ia-comercial.js")));
 
-test("cobranca_atrasada: Radar -> Missão do Dia -> Diretor Digital, sem destino inventado", () => {
+test("cobranca_atrasada: Radar -> Missão do Dia -> Diretor Digital, destino real /cobrancas (Financeiro/Cobrador AI V1)", () => {
   const oportunidades = radar.gerarOportunidadesClientes({
     hoje: "2026-09-19",
     clientesSemProximoCompromisso: [],
@@ -34,7 +34,7 @@ test("cobranca_atrasada: Radar -> Missão do Dia -> Diretor Digital, sem destino
   assert.equal(oportunidades[0].prioridade, "alta");
 
   const sinaisCanonicos = nucleo.adaptarOportunidadesClientes(oportunidades);
-  assert.equal(sinaisCanonicos[0].destino, undefined); // /cobrancas ainda não existe — nunca aponta para tela errada
+  assert.equal(sinaisCanonicos[0].destino, "/cobrancas");
   assert.match(sinaisCanonicos[0].evidencia, /cobrança real registrada/i);
 
   const missaoDoDia = nucleo.gerarMissaoDoDia(sinaisCanonicos);
@@ -44,7 +44,7 @@ test("cobranca_atrasada: Radar -> Missão do Dia -> Diretor Digital, sem destino
     temDadosSuficientes: true, oportunidadesClientes: oportunidades, recomendacoes: [], ocupacaoPct: 50,
   });
   assert.equal(recomendacoes[0].categoria, "cobranca_atrasada");
-  assert.equal(recomendacoes[0].destino, undefined);
+  assert.equal(recomendacoes[0].destino, "/cobrancas");
 });
 
 test("cobranca_atrasada: cobrança dentro do vencimento nunca vira sinal (nunca fabrica atraso)", () => {

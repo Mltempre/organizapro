@@ -127,9 +127,8 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         destinoLabel: "Ver orçamento",
       });
     } else if (sinal.tipo === "cobranca_atrasada") {
-      // Etapa "receita" da cadeia — /cobrancas ainda não tem superfície
-      // própria, então sem destino (nunca aponta para uma tela sem relação
-      // com o dado real).
+      // Etapa "receita" da cadeia — /cobrancas já existe (Financeiro/
+      // Cobrador AI V1), destino real.
       lista.push({
         id: `consultivo-cobranca-${op.chave}`,
         categoria: "cobranca_atrasada",
@@ -140,6 +139,8 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
           ? `Cobrança real registrada no sistema, ${op.tempoDecorrido}.`
           : "Cobrança real registrada no sistema.",
         prioridade: op.prioridade,
+        destino: "/cobrancas",
+        destinoLabel: "Ver cobrança",
       });
     } else if (sinal.tipo === "tratamento_sem_retorno") {
       // Etapa "venda" da cadeia — idem, /tratamentos ainda não tem

@@ -46,11 +46,9 @@ export type SinalCanonico = {
 // outra origem (cadeia orçamento → venda → receita, convergência).
 const ORIGEM_POR_TIPO: Partial<Record<OportunidadeCliente["sinais"][number]["tipo"], { evidencia: string; destino?: string; destinoLabel?: string }>> = {
   orcamento_parado:       { evidencia: "no orçamento real registrado",  destino: "/orcamentos", destinoLabel: "Ver orçamento" },
-  // cobranca_atrasada/tratamento_sem_retorno ainda não têm superfície
-  // própria (/cobrancas, /tratamentos) — sem destino, em vez de apontar
-  // para uma tela que não tem relação com o dado (ver pendências do
-  // relatório de convergência).
-  cobranca_atrasada:      { evidencia: "na cobrança real registrada" },
+  cobranca_atrasada:      { evidencia: "na cobrança real registrada",   destino: "/cobrancas",  destinoLabel: "Ver cobrança" },
+  // tratamento_sem_retorno ainda não tem superfície própria (/tratamentos)
+  // — sem destino, em vez de apontar para uma tela sem relação com o dado.
   tratamento_sem_retorno: { evidencia: "no tratamento real registrado" },
   pedido_nao_concluido:   { evidencia: "no pedido real registrado", destino: "/pedidos", destinoLabel: "Ver pedido" },
   recompra_possivel:      { evidencia: "no histórico real de pedidos", destino: "/pedidos", destinoLabel: "Ver pedidos" },
