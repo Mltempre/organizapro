@@ -7,6 +7,7 @@ import Banner from "./_components/Banner";
 import Problema from "./_components/Problema";
 import Sobre from "./_components/Sobre";
 import Servicos from "./_components/Servicos";
+import PedidoPublico from "./_components/PedidoPublico";
 import Diferenciais from "./_components/Diferenciais";
 import Processo from "./_components/Processo";
 import Galeria from "./_components/Galeria";
@@ -254,6 +255,7 @@ export default function SiteEmpresaClient({ slug }: { slug: string }) {
       <Diferenciais familiaId={tema.id} tema={tema} tone={tons.diferenciais?.tone} variant={tons.diferenciais?.variant}/>
       <Processo familiaId={tema.id} tema={tema} tone={tons.processo?.tone} variant={tons.processo?.variant}/>
       <Servicos servicos={servicos} empresa={empresa} tema={tema} familiaId={tema.id} waBase={waBase} tone={tons.servicos?.tone} variant={tons.servicos?.variant}/>
+      <PedidoPublico slug={slug} servicos={servicos}/>
       <Galeria galeria={galeria} estrutura={estrutura} empresa={empresa} tema={tema} tone={tons.galeria?.tone} variant={tons.galeria?.variant}/>
       <Equipe equipe={equipe} tema={tema} tone={tons.equipe?.tone} variant={tons.equipe?.variant}/>
       <Depoimentos depoimentos={depoimentos} tema={tema} tone={tons.depoimentos?.tone} variant={tons.depoimentos?.variant}/>
