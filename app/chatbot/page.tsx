@@ -154,6 +154,7 @@ export default function ChatbotPage() {
       setCarregando(false)
     }
     init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only por design (carrega uma vez); carregarConfig/carregarTreinamentos são funções locais recriadas a cada render — incluí-las causaria um novo loop (mesma classe de bug já corrigida em AdminShell.tsx nesta missão), não uma correção real.
   }, [])
 
   async function authHeaders(): Promise<Record<string, string>> {

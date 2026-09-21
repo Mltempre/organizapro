@@ -109,7 +109,7 @@ export default function AutomacaoPage() {
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
 

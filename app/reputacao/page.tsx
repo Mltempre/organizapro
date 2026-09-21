@@ -108,7 +108,7 @@ export default function ReputacaoPage() {
       }
     }
     init()
-  }, [])
+  }, [router])
 
   function formatarData(iso: string) {
     if (!iso) return '—'
