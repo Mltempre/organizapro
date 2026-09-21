@@ -475,6 +475,13 @@ export default function ClientesPage() {
                       🕐 Histórico
                     </button>
                     <button
+                      className="cli-btn-360"
+                      onClick={() => router.push(`/clientes/${p.id}`)}
+                      style={{ padding:'6px 14px', borderRadius:8, border:'1px solid rgba(31,78,95,0.4)', background:'transparent', color:'#4a9bb0', fontSize:12, cursor:'pointer', fontWeight:600 }}
+                    >
+                      🔎 360°
+                    </button>
+                    <button
                       className="cli-btn-editar"
                       onClick={() => abrirEdicao(p)}
                       style={{ padding:'6px 14px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', fontSize:12, cursor:'pointer', transition:'background 0.15s, border-color 0.15s, color 0.15s' }}
