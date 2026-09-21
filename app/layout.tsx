@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ShellGate from "./components/ShellGate";
 
 export const metadata: Metadata = {
   title: "OrganizaPro",
@@ -9,7 +10,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body style={{margin:0,padding:0,fontFamily:"Inter, sans-serif"}}>{children}</body>
+      <body style={{margin:0,padding:0,fontFamily:"Inter, sans-serif"}}>
+        <ShellGate>{children}</ShellGate>
+      </body>
     </html>
   );
 }

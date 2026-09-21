@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, ClipboardCheck, FileText, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ArrowRight, ClipboardCheck, ShieldAlert } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import type { NotaFacilOperacao } from "../../lib/notafacil-inteligente";
+import AdminShell from "../components/AdminShell";
 
 type Resposta = {
   operacoes?: NotaFacilOperacao[];
@@ -52,18 +53,9 @@ export default function NotaFacilPage() {
   }, []);
 
   return (
-    <main style={{ minHeight: "100vh", background: "#f4f7f6", color: "#17231f", padding: "32px 20px" }}>
+    <AdminShell title="NotaFácil Inteligente" subtitle="Preparação de documento, nunca emissão fiscal">
+    <div style={{ minHeight: "100%", background: "#f4f7f6", color: "#17231f", margin: "-28px -32px", padding: "32px 20px" }}>
       <div style={{ maxWidth: 1040, margin: "0 auto" }}>
-        <header style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#176b52", fontSize: 13, fontWeight: 800, letterSpacing: ".08em" }}>
-            <FileText size={18} /> PREPARAÇÃO DE DOCUMENTO
-          </div>
-          <h1 style={{ margin: "10px 0 8px", fontSize: "clamp(28px, 5vw, 44px)", letterSpacing: 0 }}>NotaFácil Inteligente</h1>
-          <p style={{ margin: 0, color: "#53645d", maxWidth: 700, lineHeight: 1.6 }}>
-            Organize operações pagas e veja o que ainda precisa ser confirmado antes de uma emissão fiscal externa.
-          </p>
-        </header>
-
         <section style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "#fff8e8", border: "1px solid #f0d38a", borderRadius: 8, padding: 16, marginBottom: 22 }}>
           <ShieldAlert size={21} color="#9a6700" aria-hidden="true" />
           <div>
@@ -88,7 +80,8 @@ export default function NotaFacilPage() {
           </section>
         )}
       </div>
-    </main>
+    </div>
+    </AdminShell>
   );
 }
 

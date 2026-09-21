@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { CheckCircle2, ExternalLink, ShieldCheck, XCircle } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { montarPromptRespostaAvaliacao } from "../../lib/google-business-profile";
+import AdminShell from "../components/AdminShell";
 
 type Status = { conectado: boolean; conexao?: { conta: string | null; local: string | null; conectadoEm: string } | null; error?: string };
 type Avaliacao = {
@@ -133,10 +134,10 @@ export default function GooglePresencaPage() {
     }
   }
 
-  return <main style={{ minHeight: "100vh", background: "#f4f7f6", color: "#17231f", padding: "32px 20px" }}><div style={{ maxWidth: 800, margin: "0 auto" }}>
+  return <AdminShell title="Google Presença" subtitle="Conexão oficial com o Google Business Profile">
+  <div style={{ minHeight: "100%", background: "#f4f7f6", color: "#17231f", margin: "-28px -32px", padding: "32px 20px" }}><div style={{ maxWidth: 800, margin: "0 auto" }}>
     <p style={{ margin: 0, color: "#176b52", fontWeight: 800, letterSpacing: ".08em", fontSize: 12 }}>GOOGLE PRESENÇA REAL</p>
-    <h1 style={{ margin: "10px 0 8px", fontSize: "clamp(28px, 5vw, 42px)" }}>Conectar Perfil da Empresa</h1>
-    <p style={{ color: "#53645d", lineHeight: 1.6 }}>Conexão oficial para ler a conta e o primeiro local autorizado no Google Business Profile.</p>
+    <p style={{ color: "#53645d", lineHeight: 1.6, marginTop: 8 }}>Conexão oficial para ler a conta e o primeiro local autorizado no Google Business Profile.</p>
     <section style={{ background: "#fff", border: "1px solid #d9e2dd", borderRadius: 8, padding: 22, marginTop: 22 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}><ShieldCheck size={22} color="#176b52" /><div><strong>O que esta V1 faz</strong><p style={{ color: "#53645d", lineHeight: 1.6 }}>Solicita autorização Google, lê contas e locais disponíveis e registra a conexão com segurança. Lê avaliações reais, prepara uma resposta sugerida e só publica no Google depois de você aprovar explicitamente — nunca responde automaticamente.</p></div></div>
       {resultado === "connected" && <p style={{ color: "#176b52", display: "flex", gap: 7, alignItems: "center" }}><CheckCircle2 size={18} /> Google conectado e leitura inicial concluída.</p>}
@@ -188,5 +189,6 @@ export default function GooglePresencaPage() {
         ))}
       </section>
     )}
-  </div></main>;
+  </div></div>
+  </AdminShell>;
 }

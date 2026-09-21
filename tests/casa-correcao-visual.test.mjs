@@ -14,7 +14,11 @@ import { fileURLToPath } from "node:url";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ler = (p) => fs.readFileSync(path.join(root, p), "utf8").replace(/\r\n/g, "\n");
 
-const adminShell = ler("app/components/AdminShell.tsx");
+// Gate Funcional da Navegação V1: a sidebar/nav foi extraída de AdminShell.tsx
+// (agora um shim leve) para AdminShellFrame.tsx (chrome persistente, montada
+// uma única vez via ShellGate em app/layout.tsx) — testes de estrutura da
+// navegação passam a ler o novo arquivo.
+const adminShell = ler("app/components/AdminShellFrame.tsx");
 const dashboardView = ler("app/components/DashboardView.tsx");
 const missaoDoDiaCard = ler("app/components/MissaoDoDiaCard.tsx");
 const radar = ler("app/components/RadarDeOportunidades.tsx");
@@ -46,7 +50,8 @@ test("AdminShell: páginas antes reais mas ausentes de qualquer menu (Follow-up,
 });
 
 test("AdminShell: continua UMA única barra lateral (aside), com drawer/hamburger responsivo em mobile — nunca duas sidebars simultâneas", () => {
-  const totalAside = (adminShell.match(/<aside/g) ?? []).length;
+  const codigoReal = adminShell.split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*")).join("\n");
+  const totalAside = (codigoReal.match(/<aside/g) ?? []).length;
   assert.equal(totalAside, 1, "deveria haver exatamente um <aside> (uma única barra lateral)");
   assert.match(adminShell, /@media \(max-width: 767px\)/);
   assert.match(adminShell, /transform: translateX\(-100%\)/);

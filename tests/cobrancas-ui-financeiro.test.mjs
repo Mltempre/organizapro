@@ -34,7 +34,10 @@ test("/cobrancas: indicadores financeiros vêm de calcularIndicadoresCobranca so
 });
 
 test("AdminShell: item de navegação de Cobranças aponta para /cobrancas", () => {
-  const shell = normalizar(readFileSync(path.join(root, "app/components/AdminShell.tsx"), "utf8"));
+  // Gate Funcional da Navegação V1: a lista de navegação (navGrupos) foi
+  // extraída para AdminShellFrame.tsx (chrome persistente) — AdminShell.tsx
+  // virou um shim sem sidebar própria.
+  const shell = normalizar(readFileSync(path.join(root, "app/components/AdminShellFrame.tsx"), "utf8"));
   assert.match(shell, /h:\s*"\/cobrancas"/);
 });
 

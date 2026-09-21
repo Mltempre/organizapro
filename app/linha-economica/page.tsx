@@ -57,7 +57,7 @@ export default function LinhaEconomicaPage() {
 
       const cuRes = await fetch('/api/minha-clinica', { headers: auth });
       const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
-      if (!cid) { setResumo(null); setCarregando(false); return; }
+      if (!cid) { setResumo(null); setErro('Negócio não vinculado ao usuário.'); setCarregando(false); return; }
 
       // Mesmo padrão de fetch já usado em app/receita-perdida/page.tsx —
       // falha em qualquer domínio nunca fabrica dado, só resulta em lista
