@@ -84,3 +84,115 @@ export function assertGoogleEnv(): { clientId: string; clientSecret: string; sta
   if (Object.values(values).some((value) => !value)) throw new Error("Integração Google Business Profile não configurada no servidor");
   return values as { clientId: string; clientSecret: string; stateSecret: string; encryptionSecret: string };
 }
+
+// ── Última milha V1 — avaliações, resposta sugerida, publicação, posts ────
+// Funções puras (sem fetch/DB) que completam o contrato já iniciado acima.
+// A leitura/escrita real na API do Google e no eventos_dominio vive em
+// lib/google-business-profile-api.ts (I/O) e nas rotas — este arquivo
+// continua só com regra determinística e criptografia.
+
+// ── Estado real de uma avaliação (nunca um flag manual solto) ──────────
+// "respondida" só é verdade quando o próprio Google confirma (campo
+// reviewReply presente na resposta da API) — nunca inferido do nosso
+// rascunho local. Mesmo princípio já usado em lib/motor-reputacao.ts
+// para a coluna `respondeu` (nunca afirmar um evento que o sistema não
+// verificou).
+export type EstadoAvaliacaoGoogle = "sem_resposta" | "resposta_preparada" | "respondida";
+
+export function estadoAvaliacaoGoogle(input: { temRespostaGoogle: boolean; temRascunhoLocal: boolean }): EstadoAvaliacaoGoogle {
+  if (input.temRespostaGoogle) return "respondida";
+  if (input.temRascunhoLocal) return "resposta_preparada";
+  return "sem_resposta";
+}
+
+/**
+ * Chave de idempotência para o registro do RASCUNHO — inclui uma chave
+ * gerada pelo cliente (mesmo padrão já usado em app/cobrancas/page.tsx,
+ * crypto.randomUUID() por tentativa de ação) para nunca duplicar um
+ * duplo-clique, mas sempre permitir gerar um novo rascunho depois.
+ */
+export function chaveIdempotenciaRascunhoAvaliacao(reviewId: string, idempotencyKey: string): string {
+  return `${reviewId}:gbp.resposta_rascunho:${idempotencyKey}`;
+}
+
+/**
+ * Chave de idempotência para a PUBLICAÇÃO real no Google — mesmo
+ * princípio: nunca duplica por duplo-clique/retry do mesmo pedido, mas
+ * uma nova tentativa deliberada (novo idempotencyKey) sempre é permitida
+ * (ex.: depois de uma falha real do Google).
+ */
+export function chaveIdempotenciaPublicacaoAvaliacao(reviewId: string, idempotencyKey: string): string {
+  return `${reviewId}:gbp.resposta_publicada:${idempotencyKey}`;
+}
+
+/**
+ * Fail-closed: só permite publicar quando a avaliação ainda está
+ * "sem_resposta" (relido do Google, nunca do rascunho local) e existe um
+ * texto real e não vazio para publicar. Nunca publica um rascunho vazio,
+ * nunca publica em cima de uma avaliação já respondida (mesmo que por
+ * outro caminho, fora do OrganizaPro).
+ */
+export function podePublicarResposta(estadoAtual: EstadoAvaliacaoGoogle, texto: string): boolean {
+  return estadoAtual === "sem_resposta" && texto.trim().length > 0;
+}
+
+// ── Prompt para a resposta sugerida — reaproveita /api/ia existente ────
+// Nunca cria uma segunda chamada de IA: o texto abaixo é o PROMPT que a
+// TELA envia para o já existente /api/ia (mesmo endpoint de app/conteudo/
+// page.tsx), nunca uma chamada nova ao OpenAI feita daqui.
+
+export type DadosAvaliacaoParaPrompt = {
+  nomeEmpresa: string;
+  nota: number; // 1-5, real, do Google
+  comentario: string | null; // texto real do cliente, ou null quando a avaliação não tem comentário (só nota)
+};
+
+/**
+ * Monta o prompt determinístico para /api/ia — nunca inclui um fato que
+ * não veio da avaliação real (nunca inventa produto/atendimento/entrega
+ * específicos), nunca instrui a admitir culpa/responsabilidade jurídica,
+ * nunca instrui a oferecer desconto/reembolso/promessa.
+ */
+export function montarPromptRespostaAvaliacao(dados: DadosAvaliacaoParaPrompt): string {
+  const comentarioTexto = dados.comentario && dados.comentario.trim()
+    ? `O comentário do cliente foi: "${dados.comentario.trim()}"`
+    : "O cliente não deixou comentário, só a nota.";
+  return [
+    `Escreva uma resposta profissional e cordial, em português do Brasil, para uma avaliação do Google recebida pela empresa "${dados.nomeEmpresa}".`,
+    `A nota dada foi ${dados.nota} de 5 estrelas. ${comentarioTexto}`,
+    "Regras obrigatórias: nunca invente detalhes sobre a compra, atendimento, entrega ou produto que não estejam no comentário acima.",
+    "Nunca admita culpa ou responsabilidade jurídica. Nunca ofereça desconto, reembolso, indenização ou qualquer promessa.",
+    "Se a nota for baixa, agradeça o retorno e convide a pessoa a entrar em contato diretamente para resolver, sem prometer nada específico.",
+    "Responda só com o texto da resposta, sem aspas, sem explicações, com no máximo 3 frases.",
+  ].join(" ");
+}
+
+// ── Bloco 8 — sinal para Reputação/Diretor Digital (provado isoladamente) ──
+// NÃO integrado a lib/oportunidades-clientes.ts (Radar), lib/follow-up-
+// comercial.ts nem lib/ia-comercial.ts (Diretor) nesta missão — instrumentar
+// essas áreas centrais exigiria decidir prioridade/peso frente aos sinais
+// já existentes, uma mudança estrutural fora do escopo desta última milha.
+// Esta função só PROVA o critério puro e determinístico (nunca um score
+// novo, nunca duplica o que Reputação já mede) para uma convergência
+// futura conectar sem redesenho.
+
+export type AvaliacaoParaAtencao = {
+  reviewId: string;
+  nota: number;
+  temRespostaGoogle: boolean;
+  diasSemResposta: number;
+};
+
+export const DIAS_PARA_AVALIACAO_CRITICA_SEM_RESPOSTA = 2;
+const NOTA_MAXIMA_CRITICA = 2;
+
+/**
+ * Avaliação crítica (nota <= 2) sem resposta há dias reais — mesmo
+ * princípio de "dias desde o evento" já usado em todos os outros
+ * motores desta sessão, nunca um score/probabilidade inventado.
+ */
+export function avaliacaoPrecisaAtencao(avaliacao: AvaliacaoParaAtencao): boolean {
+  if (avaliacao.temRespostaGoogle) return false;
+  if (avaliacao.nota > NOTA_MAXIMA_CRITICA || avaliacao.nota <= 0) return false;
+  return avaliacao.diasSemResposta >= DIAS_PARA_AVALIACAO_CRITICA_SEM_RESPOSTA;
+}
