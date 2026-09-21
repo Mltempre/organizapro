@@ -1,9 +1,11 @@
 "use client";
 // ── Faixa Executiva — Bloco C da Casa (Dashboard/Casa Premium V1) ────────
 // Puramente apresentação: recebe números já calculados alhures (Radar,
-// Orçamentos, Cobranças, Agenda) e um callback de navegação — nunca
-// consulta o Supabase, nunca calcula nada. Só 4 indicadores (regra da
-// missão: "não queremos dez KPIs"), cada um leva a uma ação real.
+// Orçamentos, Cobranças, Agenda, Avaliações) e um callback de navegação —
+// nunca consulta o Supabase, nunca calcula nada. "poucos indicadores
+// executivos": Correção Visual Final V1 absorveu aqui o antigo bloco
+// IndicadoresExecutivos (que ficava mais abaixo, repetindo a mesma ideia
+// de "números do dia" numa segunda faixa) — uma única faixa, nunca duas.
 // value === null (nunca fabricar) mostra "—", não "0".
 import { stTom } from "./estilos-prioridade";
 
@@ -19,15 +21,17 @@ type Props = {
   orcamentosParados: number;
   cobrancasAbertas: number | null;
   compromissosHoje: number;
+  avaliacoesPendentes: number;
   onNavigate: (destino: string) => void;
 };
 
-export default function FaixaExecutiva({ oportunidades, orcamentosParados, cobrancasAbertas, compromissosHoje, onNavigate }: Props) {
+export default function FaixaExecutiva({ oportunidades, orcamentosParados, cobrancasAbertas, compromissosHoje, avaliacoesPendentes, onNavigate }: Props) {
   const indicadores: Indicador[] = [
-    { label: "Oportunidades",     valor: oportunidades,      destino: "/oportunidades", tom: oportunidades > 0 ? "atencao" : "neutro" },
-    { label: "Orçamentos parados", valor: orcamentosParados, destino: "/orcamentos",    tom: orcamentosParados > 0 ? "atencao" : "neutro" },
-    { label: "A receber",          valor: cobrancasAbertas,  destino: "/cobrancas",     tom: (cobrancasAbertas ?? 0) > 0 ? "atencao" : "neutro" },
-    { label: "Agenda hoje",        valor: compromissosHoje,  destino: "/agendamentos",  tom: "neutro" },
+    { label: "Oportunidades",      valor: oportunidades,        destino: "/oportunidades", tom: oportunidades > 0 ? "atencao" : "neutro" },
+    { label: "Orçamentos parados", valor: orcamentosParados,    destino: "/orcamentos",    tom: orcamentosParados > 0 ? "atencao" : "neutro" },
+    { label: "A receber",          valor: cobrancasAbertas,     destino: "/cobrancas",     tom: (cobrancasAbertas ?? 0) > 0 ? "atencao" : "neutro" },
+    { label: "Agenda hoje",        valor: compromissosHoje,     destino: "/agendamentos",  tom: "neutro" },
+    { label: "Avaliações aguardando", valor: avaliacoesPendentes, destino: "/reputacao",   tom: avaliacoesPendentes > 0 ? "atencao" : "neutro" },
   ];
 
   return (

@@ -8,11 +8,10 @@
 // exatamente como processariam dado real. Esta página nunca consulta o
 // Supabase, nunca persiste o cenário, nunca escreve texto final na mão.
 //
-// Etapa 6 (KENSA Comercial Final): agendaHoje/proximosDias (também vindos do
-// gerador) alimentam Foco do Dia, Próximos 7 Dias e Lembretes — mesmos
-// componentes, mesma regra de agrupamento por data já usada em
-// app/dashboard/page.tsx, só que a partir do cenário sintético em vez de
-// dash.agendaHoje/dash.proximos.
+// Correção Visual Final V1: a Home foi enxugada (ver app/components/
+// DashboardView.tsx) — Foco do Dia/Próximos 7 Dias/Lembretes saíram do
+// centro (viraram profundidade de /agendamentos), então agendaHoje/
+// proximosDias do cenário sintético não são mais consumidos aqui.
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gerarCenarioDemonstracao } from "../../lib/dados-demonstracao";
@@ -21,8 +20,7 @@ import { gerarOportunidadesClientes, gerarResumoRadar } from "../../lib/oportuni
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import DashboardView, {
-  gerarIdeia, gerarInsights, gerarSaudacaoCard, gerarResumoIA, gerarProximasAcoes,
-  type AgItem,
+  gerarIdeia, gerarInsights, gerarSaudacaoCard,
 } from "../components/DashboardView";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
@@ -32,48 +30,31 @@ const mesesArr   = ["janeiro","fevereiro","março","abril","maio","junho","julho
 
 export default function DashboardDemo() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [cenario, setCenario] = useState<ReturnType<typeof gerarCenarioDemonstracao> | null>(null);
 
   useEffect(() => {
     // Gerado em memória, no navegador — sempre relativo ao momento real da
     // visita (nunca uma data fixa gravada no código), nunca uma consulta ao
-    // Supabase, nunca persistido.
+    // Supabase, nunca persistido. Deliberadamente client-only (nunca no
+    // useState inicial): gerarCenarioDemonstracao() usa a data/hora real do
+    // momento — computá-lo durante o render (inclusive o render de servidor
+    // do Next.js) causaria um cenário diferente entre servidor e cliente
+    // (erro de hidratação); o useEffect garante que só roda no navegador.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- setState único, mount-only, client-only por design (ver comentário acima); não é um "derived state" sincronizável de outro jeito.
     setCenario(gerarCenarioDemonstracao());
-    setLoading(false);
   }, []);
 
-  if (loading || !cenario) return (
+  if (!cenario) return (
     <AdminShell title="Painel Executivo">
       <PageLoader title="Preparando seu painel..." />
     </AdminShell>
   );
 
-  const { hoje: hojeStr, entradaOportunidades, contextoNegocio: ctxNegocio, agendaHoje, proximosDias } = cenario;
+  const { hoje: hojeStr, entradaOportunidades, contextoNegocio: ctxNegocio } = cenario;
 
   const [ano, mes, dia] = hojeStr.split("-").map(Number);
   const hojeDate  = new Date(ano, mes - 1, dia);
-  const amanhaStr = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
   const dataStr   = `${diasSemana[hojeDate.getDay()]}, ${hojeDate.getDate()} de ${mesesArr[hojeDate.getMonth()]}`;
-
-  // Foco do Dia — próximo compromisso de hoje ainda não concluído/cancelado
-  // (mesma regra de app/dashboard/page.tsx).
-  const focoDoDia: AgItem | null = agendaHoje.find(
-    a => !["concluido", "cancelado", "faltou"].includes(a.status)
-  ) ?? null;
-
-  // Próximos 7 Dias — agrupa hoje (não cancelado/faltou) + próximos dias por
-  // data, mesma regra de app/dashboard/page.tsx.
-  const gruposDias: Record<string, AgItem[]> = {};
-  agendaHoje
-    .filter(a => !["cancelado", "faltou"].includes(a.status))
-    .forEach(a => { (gruposDias[a.data] ??= []).push(a); });
-  proximosDias.forEach(a => { (gruposDias[a.data] ??= []).push(a); });
-  const diasOrdenados = Object.keys(gruposDias).sort();
-
-  // Lembretes = atrasados (sempre nenhum no cenário sintético) + pendentes
-  // de hoje — mesma regra de app/dashboard/page.tsx.
-  const lembretes: AgItem[] = agendaHoje.filter(a => a.status === "agendado");
 
   const ideia = gerarIdeia({
     totalPacientes: ctxNegocio.totalPacientes,
@@ -115,20 +96,11 @@ export default function DashboardDemo() {
   const todasRecomendacoesAcionaveis = [
     ...centralOportunidades.alta, ...centralOportunidades.media, ...centralOportunidades.baixa,
   ];
-  const proximasAcoes = insights.temDados
-    ? gerarProximasAcoes(todasRecomendacoesAcionaveis, oportunidadesClientes)
-    : [];
 
   const sinaisCanonicos = insights.temDados
     ? [...adaptarOportunidadesClientes(oportunidadesClientes), ...adaptarRecomendacoes(todasRecomendacoesAcionaveis)]
     : [];
   const missaoDoDia: SinalCanonico[] = gerarMissaoDoDia(sinaisCanonicos);
-
-  const resumoIA = gerarResumoIA({
-    ocupacaoPct,
-    horariosVagosHoje: ctxNegocio.horariosVagosHoje,
-    pendentes: ctxNegocio.pendentesHoje,
-  });
 
   const recomendacoesConsultivas = gerarRecomendacoesConsultivas({
     temDadosSuficientes: insights.temDados,
@@ -139,13 +111,6 @@ export default function DashboardDemo() {
   const narrativaDiretor = insights.temDados
     ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
     : gerarMensagemDadosInsuficientes();
-
-  const objetivosDoDia = [
-    { label: "Confirmar todos os atendimentos", feito: ctxNegocio.pendentesHoje === 0 && ctxNegocio.atrasados === 0 },
-    { label: "Preencher horários livres",       feito: ctxNegocio.horariosVagosHoje === 0 },
-    { label: "Solicitar avaliações",            feito: ctxNegocio.avaliacoesPendentes === 0 },
-    { label: "Encerrar o dia sem pendências",   feito: ctxNegocio.atrasados === 0 && ctxNegocio.pendentesHoje === 0 },
-  ];
 
   const contaMadura = ctxNegocio.temEmail && ctxNegocio.temTelefone && ctxNegocio.temEndereco
     && ctxNegocio.temWhatsapp && ctxNegocio.totalPacientes > 0 && ctxNegocio.totalAgendamentos > 0;
@@ -176,7 +141,6 @@ export default function DashboardDemo() {
       }}
       ideia={ideia}
       missaoDoDia={missaoDoDia}
-      proximasAcoes={proximasAcoes}
       indicadores={{
         compromissosHoje: ctxNegocio.compromissosHoje,
         horariosVagosHoje: ctxNegocio.horariosVagosHoje,
@@ -184,15 +148,7 @@ export default function DashboardDemo() {
         atrasados: ctxNegocio.atrasados,
         avaliacoesPendentes: ctxNegocio.avaliacoesPendentes,
       }}
-      resumoIA={resumoIA}
       narrativaDiretor={narrativaDiretor}
-      focoDoDia={focoDoDia}
-      hojeStr={hojeStr}
-      amanhaStr={amanhaStr}
-      diasOrdenados={diasOrdenados}
-      gruposDias={gruposDias}
-      lembretes={lembretes}
-      objetivosDoDia={objetivosDoDia}
       oportunidadesClientes={oportunidadesClientes}
       resumoRadar={resumoRadar}
       orcamentosParadosCount={0}

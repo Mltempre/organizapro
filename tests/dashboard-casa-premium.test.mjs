@@ -167,9 +167,9 @@ test("RadarDeOportunidades continua recebendo oportunidadesClientes sem transfor
 
 // ── 14. Mobile não depende de tabela desktop ─────────────────────────────
 
-test("Faixa Executiva e Indicadores Executivos colapsam para 2 colunas em telas estreitas (mesmo breakpoint já usado no resto do Dashboard)", () => {
-  assert.match(dashboardView, /\.faixa-executiva-grid \{ display: grid; grid-template-columns: repeat\(4, 1fr\); gap: 12px; \}/);
-  assert.match(dashboardView, /@media \(max-width: 860px\) \{ \.faixa-executiva-grid \{ grid-template-columns: repeat\(2, 1fr\); \} \}/);
+test("Faixa Executiva usa grid auto-fit (nunca uma coluna fixa que force overflow em telas estreitas) — Correção Visual Final V1 absorveu o antigo bloco separado Indicadores Executivos", () => {
+  assert.match(dashboardView, /\.faixa-executiva-grid \{ display: grid; grid-template-columns: repeat\(auto-fit,minmax\(130px,1fr\)\); gap: 12px; \}/);
+  assert.doesNotMatch(dashboardView, /<IndicadoresExecutivos/);
 });
 
 test("regressão de overflow mobile corrigida: Diretor Digital e Agora não forçam minWidth fixo nas linhas com botão (causava corte de texto em telas estreitas)", () => {

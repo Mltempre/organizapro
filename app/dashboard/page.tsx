@@ -19,7 +19,7 @@ type PedidoRow = {
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import DashboardView, {
-  gerarIdeia, gerarInsights, gerarSaudacaoCard, gerarResumoIA, gerarProximasAcoes,
+  gerarIdeia, gerarInsights, gerarSaudacaoCard,
   type AgItem,
 } from "../components/DashboardView";
 import AdminShell from "../components/AdminShell";
@@ -321,37 +321,10 @@ export default function Dashboard() {
   // Date helpers
   const agoraIso   = new Date().toISOString(); // referência de "agora" para o motor de orçamentos (timestamptz, não data-only)
   const hojeStr    = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-  const [ano, mes, dia] = hojeStr.split("-").map(Number);
-  const amanhaStr  = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
   const hojeDate   = new Date();
   const diasSemana = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
   const mesesArr   = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
   const dataStr    = `${diasSemana[hojeDate.getDay()]}, ${hojeDate.getDate()} de ${mesesArr[hojeDate.getMonth()]}`;
-
-  // Próximo compromisso de hoje ainda não concluído/cancelado
-  const focoDoDia = dash.agendaHoje.find(
-    a => !["concluido", "cancelado", "faltou"].includes(a.status)
-  ) ?? null;
-
-  // Agrupar agenda (hoje + próximos) por data para os 7 dias
-  const gruposDias: Record<string, AgItem[]> = {};
-  dash.agendaHoje
-    .filter(a => !["cancelado", "faltou"].includes(a.status))
-    .forEach(a => {
-      if (!gruposDias[a.data]) gruposDias[a.data] = [];
-      gruposDias[a.data].push(a);
-    });
-  dash.proximos.forEach(a => {
-    if (!gruposDias[a.data]) gruposDias[a.data] = [];
-    gruposDias[a.data].push(a);
-  });
-  const diasOrdenados = Object.keys(gruposDias).sort();
-
-  // Lembretes = atrasados + pendentes de hoje
-  const lembretes: AgItem[] = [
-    ...dash.atrasadosList,
-    ...dash.agendaHoje.filter(a => a.status === "agendado"),
-  ];
 
   // Botões Rápidos — Bloco H da Casa (Convergência Final V1: Orçamentos e
   // Reputação adicionados, ambos já reais e agora diretamente referenciados
@@ -498,14 +471,11 @@ export default function Dashboard() {
     ? Math.round((dash.compromissosHoje / totalSlotsHoje) * 100)
     : null;
 
-  // "Próxima Melhor Ação" — mescla de Central de Oportunidades + Radar,
-  // nenhuma regra de negócio nova (ver gerarProximasAcoes acima).
+  // Central de Oportunidades continua alimentando Missão do Dia/Diretor
+  // Digital abaixo — nenhuma regra de negócio nova.
   const todasRecomendacoesAcionaveis = [
     ...centralOportunidades.alta, ...centralOportunidades.media, ...centralOportunidades.baixa,
   ];
-  const proximasAcoes = insights.temDados
-    ? gerarProximasAcoes(todasRecomendacoesAcionaveis, oportunidadesClientes)
-    : [];
 
   // ── 🎯 Missão do Dia (Núcleo Inteligente V1.1, Fase 1) ───────────────────
   // Mesmos sinais canônicos que alimentam a Próxima Melhor Ação — nenhuma
@@ -515,12 +485,6 @@ export default function Dashboard() {
     ? [...adaptarOportunidadesClientes(oportunidadesClientes), ...adaptarRecomendacoes(todasRecomendacoesAcionaveis)]
     : [];
   const missaoDoDia: SinalCanonico[] = gerarMissaoDoDia(sinaisCanonicos);
-
-  const resumoIA = gerarResumoIA({
-    ocupacaoPct,
-    horariosVagosHoje: dash.horariosVagosHoje,
-    pendentes: dash.pendentes,
-  });
 
   // ── IA Comercial V1 · Diretor Digital (docs/ia-comercial-v1-arquitetura.md) ──
   // Reaproveita 100% os mesmos dados já calculados acima para o Radar e para
@@ -535,14 +499,6 @@ export default function Dashboard() {
   const narrativaDiretor = insights.temDados
     ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
     : gerarMensagemDadosInsuficientes();
-
-  // Objetivos do Dia — checklist real, derivado de dados já calculados.
-  const objetivosDoDia = [
-    { label: "Confirmar todos os atendimentos", feito: dash.pendentes === 0 && dash.atrasados === 0 },
-    { label: "Preencher horários livres",       feito: dash.horariosVagosHoje === 0 },
-    { label: "Solicitar avaliações",            feito: dash.avaliacoesPendentes === 0 },
-    { label: "Encerrar o dia sem pendências",   feito: lembretes.length === 0 },
-  ];
 
   // Conta nova vs. madura — mesma condição já usada pelo OnboardingCard
   // (temEmpresa/temWhatsapp/temCliente/temCompromisso), decide só a
@@ -576,7 +532,6 @@ export default function Dashboard() {
       }}
       ideia={ideia}
       missaoDoDia={missaoDoDia}
-      proximasAcoes={proximasAcoes}
       indicadores={{
         compromissosHoje: dash.compromissosHoje,
         horariosVagosHoje: dash.horariosVagosHoje,
@@ -584,15 +539,7 @@ export default function Dashboard() {
         atrasados: dash.atrasados,
         avaliacoesPendentes: dash.avaliacoesPendentes,
       }}
-      resumoIA={resumoIA}
       narrativaDiretor={narrativaDiretor}
-      focoDoDia={focoDoDia}
-      hojeStr={hojeStr}
-      amanhaStr={amanhaStr}
-      diasOrdenados={diasOrdenados}
-      gruposDias={gruposDias}
-      lembretes={lembretes}
-      objetivosDoDia={objetivosDoDia}
       oportunidadesClientes={oportunidadesClientes}
       resumoRadar={resumoRadar}
       orcamentosParadosCount={dash.orcamentosParadosRows.length}

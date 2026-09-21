@@ -4,24 +4,69 @@ import { ReactNode, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
-const nav = [
-  { l: "Painel Executivo",  h: "/dashboard",     i: "⚡" },
-  { l: "Receita Perdida",   h: "/receita-perdida", i: "📉" },
-  { l: "Clientes",          h: "/clientes",      i: "👤" },
-  { l: "Oportunidades",     h: "/oportunidades", i: "📡" },
-  { l: "Orçamentos",        h: "/orcamentos",    i: "💰" },
-  { l: "Tratamentos",       h: "/tratamentos",   i: "🩺" },
-  { l: "Pedidos",           h: "/pedidos",       i: "🛒" },
-  { l: "Cobranças",         h: "/cobrancas",     i: "🧾" },
-  { l: "Agenda",            h: "/agendamentos",  i: "📅" },
-  { l: "Site",              h: "/site",          i: "🌐" },
-  { l: "Conteúdo IA",       h: "/conteudo",      i: "✍️" },
-  { l: "Chatbot",           h: "/chatbot",       i: "💬" },
-  { l: "Automação",         h: "/automacao",     i: "🤖" },
-  { l: "Reputação",         h: "/reputacao",     i: "⭐" },
-  { l: "Métricas",          h: "/metricas",      i: "📈" },
-  { l: "Raio-X",            h: "/raio-x",        i: "📊" },
-  { l: "Configurações",     h: "/configuracoes", i: "⚙️" },
+// ── Navegação lateral agrupada (Casa Premium — Correção Visual Final) ────
+// Cada rota é real e já existia antes desta missão (auditado via `ls
+// app/*/page.tsx` — nenhuma rota inventada). Alguns grupos reúnem páginas
+// que já existiam mas não apareciam em NENHUM menu (Follow-up, Google
+// Presença, Agenda Autônoma, Previsor de Faturamento, Linha Econômica,
+// NotaFácil) — "pronto e escondido" identificado na auditoria desta
+// missão, corrigido só tornando a rota alcançável, nenhum código novo.
+// "Dinheiro" (INÍCIO) e "Cobranças" (COMERCIAL) apontam para a MESMA rota
+// real (/cobrancas) com rótulos diferentes — mesmo padrão já usado em
+// botoesRapidos ("WhatsApp" → /chatbot): quando não existe uma página
+// dedicada, aponta para a página real mais próxima, nunca inventa uma
+// nova. Não existe hoje uma página própria de "Diretor Digital" nem
+// "Prioridades" — ambos continuam vivendo dentro de Visão Geral (Home),
+// registrado como gap no relatório da missão, não construído aqui.
+const navGrupos: { titulo: string; itens: { l: string; h: string; i: string }[] }[] = [
+  {
+    titulo: "Início",
+    itens: [
+      { l: "Visão Geral",   h: "/dashboard",     i: "⚡" },
+      { l: "Oportunidades", h: "/oportunidades", i: "📡" },
+      { l: "Dinheiro",      h: "/cobrancas",     i: "💵" },
+    ],
+  },
+  {
+    titulo: "Comercial",
+    itens: [
+      { l: "Clientes",        h: "/clientes",        i: "👤" },
+      { l: "Orçamentos",      h: "/orcamentos",       i: "💰" },
+      { l: "Follow-up",       h: "/follow-up",        i: "🔁" },
+      { l: "Cobranças",       h: "/cobrancas",        i: "🧾" },
+      { l: "Pedidos",         h: "/pedidos",          i: "🛒" },
+      { l: "Tratamentos",     h: "/tratamentos",      i: "🩺" },
+      { l: "Receita Perdida", h: "/receita-perdida",  i: "📉" },
+    ],
+  },
+  {
+    titulo: "Operação",
+    itens: [
+      { l: "Agenda",          h: "/agendamentos",    i: "📅" },
+      { l: "Agenda Autônoma", h: "/agenda-autonoma", i: "🔄" },
+      { l: "Chatbot",         h: "/chatbot",          i: "💬" },
+      { l: "Automação",       h: "/automacao",        i: "🤖" },
+    ],
+  },
+  {
+    titulo: "Presença",
+    itens: [
+      { l: "Google",     h: "/google-presenca", i: "📍" },
+      { l: "Reputação",  h: "/reputacao",        i: "⭐" },
+      { l: "Site",       h: "/site",             i: "🌍" },
+      { l: "Conteúdo IA", h: "/conteudo",        i: "✍️" },
+    ],
+  },
+  {
+    titulo: "Inteligência",
+    itens: [
+      { l: "Métricas",              h: "/metricas",              i: "📈" },
+      { l: "Raio-X",                h: "/raio-x",                i: "🔍" },
+      { l: "Previsor de Faturamento", h: "/previsor-faturamento", i: "🔮" },
+      { l: "Linha Econômica",       h: "/linha-economica",       i: "📐" },
+      { l: "NotaFácil",             h: "/notafacil",             i: "📄" },
+    ],
+  },
 ];
 
 interface AdminShellProps {
@@ -182,51 +227,82 @@ export default function AdminShell({
           </button>
         </div>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: "12px 10px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
-          {nav.map((item) => {
-            const active = pathname === item.h || pathname.startsWith(item.h + "/");
+        {/* Nav — agrupada por área (Início/Comercial/Operação/Presença/
+            Inteligência), uma única barra lateral (nunca duas), mesmo
+            comportamento de drawer em mobile já existente abaixo. */}
+        <nav style={{ flex: 1, padding: "14px 10px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+          {navGrupos.map((grupo) => (
+            <div key={grupo.titulo}>
+              <div style={{ padding: "0 12px 6px", fontSize: 10, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#3d4360" }}>
+                {grupo.titulo}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {grupo.itens.map((item) => {
+                  const active = pathname === item.h || pathname.startsWith(item.h + "/");
+                  return (
+                    <div
+                      key={`${grupo.titulo}-${item.h}-${item.l}`}
+                      onClick={() => navigate(item.h)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "9px 12px",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: active ? 600 : 400,
+                        color: active ? "#f1f5f9" : "#64748b",
+                        background: active ? "rgba(31,78,95,0.25)" : "transparent",
+                        borderLeft: active ? "2px solid #1F4E5F" : "2px solid transparent",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                        userSelect: "none",
+                      }}
+                      onMouseEnter={e => {
+                        if (!active) {
+                          (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.04)";
+                          (e.currentTarget as HTMLDivElement).style.color = "#94a3b8";
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!active) {
+                          (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                          (e.currentTarget as HTMLDivElement).style.color = "#64748b";
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 }}>{item.i}</span>
+                      {item.l}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* Configurações + Logout */}
+        <div style={{ padding: "12px 10px 16px", borderTop: "1px solid #1e2130", display: "flex", flexDirection: "column", gap: 4 }}>
+          {(() => {
+            const active = pathname === "/configuracoes" || pathname.startsWith("/configuracoes/");
             return (
               <div
-                key={item.h}
-                onClick={() => navigate(item.h)}
+                onClick={() => navigate("/configuracoes")}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "9px 12px",
-                  borderRadius: 8,
-                  fontSize: 13,
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 12px", borderRadius: 8, fontSize: 13,
                   fontWeight: active ? 600 : 400,
                   color: active ? "#f1f5f9" : "#64748b",
                   background: active ? "rgba(31,78,95,0.25)" : "transparent",
                   borderLeft: active ? "2px solid #1F4E5F" : "2px solid transparent",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  userSelect: "none",
-                }}
-                onMouseEnter={e => {
-                  if (!active) {
-                    (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.04)";
-                    (e.currentTarget as HTMLDivElement).style.color = "#94a3b8";
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!active) {
-                    (e.currentTarget as HTMLDivElement).style.background = "transparent";
-                    (e.currentTarget as HTMLDivElement).style.color = "#64748b";
-                  }
+                  cursor: "pointer", userSelect: "none",
                 }}
               >
-                <span style={{ fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 }}>{item.i}</span>
-                {item.l}
+                <span style={{ fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 }}>⚙️</span>
+                Configurações
               </div>
             );
-          })}
-        </nav>
-
-        {/* Logout */}
-        <div style={{ padding: "16px 10px", borderTop: "1px solid #1e2130" }}>
+          })()}
           <button
             onClick={handleSignOut}
             style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #1e2130", background: "transparent", color: "#64748b", fontSize: 13, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10, transition: "all 0.15s" }}

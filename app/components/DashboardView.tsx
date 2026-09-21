@@ -19,8 +19,7 @@ import AdminShell from "./AdminShell";
 import WelcomeModal from "./onboarding/WelcomeModal";
 import OnboardingCard from "./onboarding/OnboardingCard";
 import MissaoDoDiaCard from "./MissaoDoDiaCard";
-import ProximaMelhorAcao, { type AcaoPrioritaria } from "./ProximaMelhorAcao";
-import IndicadoresExecutivos from "./IndicadoresExecutivos";
+import { type AcaoPrioritaria } from "./ProximaMelhorAcao";
 import RadarDeOportunidades from "./RadarDeOportunidades";
 import type { OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import type { Recomendacao } from "../../lib/recomendacoes";
@@ -185,29 +184,6 @@ function gerarResumoIA(ctx: { ocupacaoPct: number | null; horariosVagosHoje: num
   return partes.join(" ");
 }
 
-function formatarDataBR(d: string): string {
-  const [y, m, dd] = d.split("-");
-  return `${dd}/${m}/${y}`;
-}
-
-function labelDia(d: string, hoje: string, amanha: string): string {
-  if (d === hoje)   return "Hoje";
-  if (d === amanha) return "Amanhã";
-  const [y, m, dd] = d.split("-");
-  const dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(dd));
-  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  return `${dias[dt.getDay()]}, ${dd}/${m}`;
-}
-
-const stStatus: Record<string, { bg: string; color: string; label: string }> = {
-  confirmado: { bg: "#00FF8722", color: "#00FF87", label: "Confirmado" },
-  agendado:   { bg: "#00C6FF22", color: "#00C6FF", label: "Agendado"   },
-  concluido:  { bg: "#1F4E5F22", color: "#4a9bb0", label: "Concluído"  },
-  faltou:     { bg: "#FF444422", color: "#f87171", label: "Faltou"     },
-  cancelado:  { bg: "#64748b22", color: "#94a3b8", label: "Cancelado"  },
-  reagendar:  { bg: "#ea580c22", color: "#fb923c", label: "Reagendar"  },
-};
-
 // Lapidação comercial — reforço visual de que o OrganizaPro já entrega uma
 // plataforma completa (nenhuma dessas ferramentas é nova: todas já existem
 // e estão navegáveis pelo menu lateral). Puramente decorativo.
@@ -288,17 +264,8 @@ export type DashboardViewProps = {
   onboarding: { temEmpresa: boolean; temWhatsapp: boolean; temCliente: boolean; temCompromisso: boolean };
   ideia: IdeiaDodia;
   missaoDoDia: SinalCanonico[];
-  proximasAcoes: AcaoPrioritaria[];
   indicadores: { compromissosHoje: number; horariosVagosHoje: number; pendentes: number; atrasados: number; avaliacoesPendentes: number };
-  resumoIA: string;
   narrativaDiretor: string;
-  focoDoDia: AgItem | null;
-  hojeStr: string;
-  amanhaStr: string;
-  diasOrdenados: string[];
-  gruposDias: Record<string, AgItem[]>;
-  lembretes: AgItem[];
-  objetivosDoDia: { label: string; feito: boolean }[];
   oportunidadesClientes: OportunidadeCliente[];
   resumoRadar: string;
   orcamentosParadosCount: number;
@@ -320,9 +287,8 @@ export type DashboardViewProps = {
 export default function DashboardView(props: DashboardViewProps) {
   const {
     clinicaId, dataStr, saudacaoCard, temDados, situacaoEmoji, situacaoTom, ocupacaoPct,
-    botoesRapidos, onboarding, ideia, missaoDoDia, proximasAcoes, indicadores,
-    resumoIA, narrativaDiretor, focoDoDia, hojeStr, amanhaStr,
-    diasOrdenados, gruposDias, lembretes, objetivosDoDia,
+    botoesRapidos, onboarding, ideia, missaoDoDia, indicadores,
+    narrativaDiretor,
     oportunidadesClientes, resumoRadar,
     orcamentosParadosCount, cobrancasAbertasCount, indicadoresCobranca, itensAtividade, atividadeIndisponivel,
     onNavigate,
@@ -446,10 +412,7 @@ export default function DashboardView(props: DashboardViewProps) {
         .dc  { animation: fadeUp 0.35s ease both; }
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
-        .indicadores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-        @media (max-width: 860px) { .indicadores-grid { grid-template-columns: repeat(2, 1fr); } }
-        .faixa-executiva-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-        @media (max-width: 860px) { .faixa-executiva-grid { grid-template-columns: repeat(2, 1fr); } }
+        .faixa-executiva-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 12px; }
         .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
         .indicador-tile:hover { border-color: rgba(74,155,176,0.4) !important; }
       `}</style>
@@ -513,242 +476,62 @@ export default function DashboardView(props: DashboardViewProps) {
           há inteligência para mostrar) ───────────────────────────────────── */}
       {!temDados && blocoOnboardingRecursosConsultoria}
 
-      {/* ── BLOCO B · DIRETOR DIGITAL — narrativa curta + 3 prioridades reais
-          (Núcleo Inteligente, mesma priorização/desempate do Radar). Um único
-          bloco executivo, nunca meia tela: substitui o que antes eram três
-          cartões empilhados mostrando o mesmo conjunto de sinais (Missão do
-          Dia + Próxima Melhor Ação + Diretor Digital). ─────────────────── */}
-      {temDados && (
-        <MissaoDoDiaCard narrativa={narrativaDiretor} sinais={missaoDoDia} onNavigate={onNavigate} />
+      {/* ── BLOCO B · PRIORIDADE DO DIA — a ação mais importante agora, uma
+          só (não 3 nem 5). Núcleo Inteligente, mesma priorização/desempate
+          do Radar — sem card próprio para "Diretor Digital" nem "Agora": a
+          Home mostra o essencial, a profundidade (Diretor Digital completo,
+          Próxima Melhor Ação) ainda não tem página dedicada — registrado
+          como gap no relatório desta missão, não construído aqui. ─────── */}
+      {temDados && missaoDoDia.length > 0 && (
+        <MissaoDoDiaCard
+          narrativa={narrativaDiretor}
+          sinais={missaoDoDia.slice(0, 1)}
+          onNavigate={onNavigate}
+          titulo="Prioridade do Dia"
+          subtitulo="A ação mais importante agora, com base no seu histórico real"
+        />
       )}
 
-      {/* ── BLOCO C · FAIXA EXECUTIVA — 4 números que respondem "onde existe
-          dinheiro/oportunidade", cada um leva à tela real. ──────────────── */}
+      {/* ── BLOCO C · FAIXA EXECUTIVA — únicos números do dia (absorveu o
+          antigo bloco separado "Indicadores Executivos", que repetia a
+          mesma ideia numa segunda faixa mais abaixo). ────────────────── */}
       {temDados && (
         <FaixaExecutiva
           oportunidades={oportunidadesClientes.length}
           orcamentosParados={orcamentosParadosCount}
           cobrancasAbertas={cobrancasAbertasCount}
           compromissosHoje={indicadores.compromissosHoje}
+          avaliacoesPendentes={indicadores.avaliacoesPendentes}
           onNavigate={onNavigate}
         />
       )}
 
-      {/* ── BLOCO D · RADAR DE OPORTUNIDADES — um cartão por cliente, com
-          motivo, tempo decorrido e ação real. ───────────────────────────── */}
+      {/* ── BLOCO D · RADAR DE OPORTUNIDADES — RESUMIDO (top 3), não o motor
+          inteiro. "Ver todas" abre /oportunidades (profundidade real). ── */}
       {temDados && (
         <RadarDeOportunidades
           oportunidades={oportunidadesClientes}
           resumo={resumoRadar}
           onNavigate={onNavigate}
+          limite={3}
+          verTodasDestino="/oportunidades"
         />
       )}
 
-      {/* ── BLOCO E · AGORA — o que precisa de você, com CTA (inclui WhatsApp
-          quando há telefone). ───────────────────────────────────────────── */}
-      {temDados && (
-        <ProximaMelhorAcao acoes={proximasAcoes} onNavigate={onNavigate} />
-      )}
-
-      {/* ── BLOCO F · DINHEIRO — só o que public.cobrancas comprova; nunca um
-          sistema financeiro novo, nunca oportunidade tratada como venda. ── */}
+      {/* ── BLOCO F · DINHEIRO — resumo (4 números); só o que public.
+          cobrancas comprova, nunca oportunidade tratada como venda.
+          Profundidade real: /cobrancas. ──────────────────────────────── */}
       <DinheiroCard indicadores={indicadoresCobranca} onNavigate={onNavigate} />
-
-      {/* ── INDICADORES DE AGENDA (operacional, já existia) ──────────────── */}
-      <IndicadoresExecutivos
-        compromissosHoje={indicadores.compromissosHoje}
-        horariosVagosHoje={indicadores.horariosVagosHoje}
-        pendentes={indicadores.pendentes}
-        atrasados={indicadores.atrasados}
-        avaliacoesPendentes={indicadores.avaliacoesPendentes}
-        onNavigate={onNavigate}
-      />
 
       {/* ── BLOCO G · ORGANIZAPRO TRABALHANDO — atividade real dos últimos
           dias (eventos_dominio), nunca ROI/receita atribuída. ───────────── */}
       <OrganizaProTrabalhandoCard itens={itensAtividade} indisponivel={atividadeIndisponivel} dias={7} />
 
-      {/* ── 8. RESUMO DA IA ───────────────────────────────────────────────── */}
-      <div className="dc" style={{
-        background: "rgba(74,155,176,0.06)", border: "1px solid rgba(74,155,176,0.18)",
-        borderRadius: 14, padding: "18px 20px", marginBottom: 20,
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
-          💬 Resumo da IA
-        </div>
-        <p style={{ fontSize: 13.5, color: "#cbd5e1", lineHeight: 1.6, margin: 0 }}>
-          {resumoIA}
-        </p>
-      </div>
-
-      {/* ── 9. AGENDA / PRÓXIMOS COMPROMISSOS ────────────────────────────── */}
-      <div className="dash-grid dc" style={{ marginBottom: 20 }}>
-
-        {/* FOCO DO DIA */}
-        <div style={{
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 14, padding: "20px",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 16 }}>
-            🎯 Foco do Dia
-          </div>
-          {focoDoDia ? (
-            <div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#4a9bb0", lineHeight: 1, marginBottom: 10 }}>
-                {focoDoDia.hora}
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
-                {focoDoDia.paciente_nome}
-              </div>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-                {focoDoDia.tipo_consulta || "Compromisso"}
-              </div>
-              <span style={{
-                display: "inline-flex",
-                fontSize: 11, padding: "3px 10px", borderRadius: 10,
-                background: stStatus[focoDoDia.status]?.bg || "#1a1a2e",
-                color:      stStatus[focoDoDia.status]?.color || "#64748b",
-                fontWeight: 600,
-              }}>
-                {stStatus[focoDoDia.status]?.label || focoDoDia.status}
-              </span>
-            </div>
-          ) : (
-            <div style={{ color: "#475569", fontSize: 13 }}>
-              <div style={{ fontSize: 28, marginBottom: 10 }}>📅</div>
-              Sua agenda está livre hoje.{" "}
-              <span
-                style={{ color: "#4a9bb0", cursor: "pointer", fontWeight: 600 }}
-                onClick={() => onNavigate("/agendamentos")}
-              >
-                Agendar um compromisso →
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* PRÓXIMOS 7 DIAS */}
-        <div style={{
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 14, padding: "20px",
-          maxHeight: 340, overflowY: "auto",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase" }}>
-              📆 Próximos 7 Dias
-            </div>
-            <button
-              onClick={() => onNavigate("/agendamentos")}
-              style={{ fontSize: 11, color: "#4a9bb0", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
-            >
-              Ver agenda →
-            </button>
-          </div>
-
-          {diasOrdenados.length === 0 ? (
-            <div style={{ color: "#475569", fontSize: 13, textAlign: "center", paddingTop: 16 }}>
-              Nenhum compromisso agendado para os próximos 7 dias.<br />
-              Bom momento para planejar a semana.
-            </div>
-          ) : diasOrdenados.map((d, di) => (
-            <div key={d}>
-              <div style={{
-                fontSize: 10, fontWeight: 700,
-                color: d === hojeStr ? "#4a9bb0" : "#64748b",
-                textTransform: "uppercase", letterSpacing: "0.06em",
-                marginTop: di > 0 ? 14 : 0, marginBottom: 6,
-                paddingBottom: 4,
-                borderBottom: "1px solid rgba(255,255,255,0.05)",
-              }}>
-                {labelDia(d, hojeStr, amanhaStr)}
-              </div>
-              {gruposDias[d].map((a, ai) => (
-                <div key={a.id} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  paddingTop: ai === 0 ? 2 : 6,
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4a9bb0", minWidth: 44 }}>{a.hora}</span>
-                  <span style={{ fontSize: 13, color: "#cbd5e1", flex: 1 }}>{a.paciente_nome}</span>
-                  <span style={{
-                    fontSize: 10, padding: "2px 8px", borderRadius: 8,
-                    background: stStatus[a.status]?.bg || "#1a1a2e",
-                    color:      stStatus[a.status]?.color || "#64748b",
-                    fontWeight: 600, whiteSpace: "nowrap",
-                  }}>
-                    {stStatus[a.status]?.label || a.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-
-      </div>
-
-      {lembretes.length > 0 && (
-        <div className="dc" style={{
-          background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.18)",
-          borderRadius: 14, padding: "20px", marginBottom: 20,
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>
-            ⚠️ Lembretes
-          </div>
-          {lembretes.map((a, i) => (
-            <div key={`${a.id}-${i}`} style={{
-              display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-              borderBottom: i < lembretes.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-            }}>
-              <span style={{
-                fontSize: 10, padding: "2px 8px", borderRadius: 6, fontWeight: 700, whiteSpace: "nowrap",
-                background: a.data < hojeStr ? "rgba(248,113,113,0.15)" : "rgba(245,158,11,0.15)",
-                color:      a.data < hojeStr ? "#f87171" : "#fbbf24",
-              }}>
-                {a.data < hojeStr ? "ATRASADO" : "PENDENTE"}
-              </span>
-              <span style={{ fontSize: 12, color: "#64748b", minWidth: 60 }}>
-                {a.data < hojeStr ? formatarDataBR(a.data) : a.hora}
-              </span>
-              <span style={{ fontSize: 13, color: "#f1f5f9", flex: 1, fontWeight: 500 }}>{a.paciente_nome}</span>
-              <span style={{ fontSize: 11, color: "#64748b" }}>{a.tipo_consulta || ""}</span>
-            </div>
-          ))}
-          <div style={{ marginTop: 14 }}>
-            <button
-              onClick={() => onNavigate("/agendamentos")}
-              style={{
-                padding: "8px 16px", borderRadius: 8,
-                border: "1px solid rgba(245,158,11,0.3)",
-                background: "rgba(245,158,11,0.08)",
-                color: "#f59e0b", fontSize: 12, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              Gerenciar na agenda →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── OBJETIVOS DO DIA ──────────────────────────────────────────────── */}
-      {temDados && (
-        <div className="dc" style={{
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 14, padding: "20px", marginBottom: 20,
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#4a9bb0", letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>
-            ✅ Objetivos do Dia
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {objetivosDoDia.map(o => (
-              <div key={o.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 15, color: o.feito ? "#4ade80" : "#475569" }}>{o.feito ? "✔" : "○"}</span>
-                <span style={{ fontSize: 13.5, color: o.feito ? "#94a3b8" : "#f1f5f9", textDecoration: o.feito ? "line-through" : "none" }}>
-                  {o.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Foco do Dia/Próximos 7 Dias/Lembretes/Resumo da IA/Objetivos do
+          Dia removidos desta versão da Home (Correção Visual Final V1) —
+          eram informação de agenda de profundidade, já coberta em detalhe
+          por /agendamentos (Bloco H/Operação na lateral); nenhum dado ou
+          motor foi apagado, só a apresentação duplicada no centro. ────── */}
 
       {/* ── ONBOARDING / RECURSOS / CONSULTORIA — rodapé (já há inteligência) ─── */}
       {temDados && blocoOnboardingRecursosConsultoria}

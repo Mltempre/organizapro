@@ -13,9 +13,14 @@ type Props = {
   narrativa?: string;
   sinais: SinalCanonico[];
   onNavigate: (destino: string) => void;
+  /** Correção Visual Final V1: a Home passa "Prioridade do Dia" + 1 único
+   * sinal (`sinais` já vem cortado pelo caller) — texto padrão continua
+   * servindo qualquer reaproveitamento futuro com a lista completa. */
+  titulo?: string;
+  subtitulo?: string;
 };
 
-export default function MissaoDoDiaCard({ narrativa, sinais, onNavigate }: Props) {
+export default function MissaoDoDiaCard({ narrativa, sinais, onNavigate, titulo, subtitulo }: Props) {
   return (
     <div className="dc" style={{
       background: "#12151f", border: "1px solid rgba(56,189,248,0.22)",
@@ -31,10 +36,10 @@ export default function MissaoDoDiaCard({ narrativa, sinais, onNavigate }: Props
         </div>
         <div>
           <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-            Diretor Digital
+            {titulo ?? "Diretor Digital"}
           </div>
           <div style={{ fontSize: 11, color: "#64748b" }}>
-            3 prioridades para hoje, com base no seu histórico real
+            {subtitulo ?? "3 prioridades para hoje, com base no seu histórico real"}
           </div>
         </div>
       </div>

@@ -1,11 +1,17 @@
 "use client";
-// ── Radar de Oportunidades ────────────────────────────────────────────────
+// ── Radar de Oportunidades — Bloco D da Casa ──────────────────────────────
 // Extraído de app/dashboard/page.tsx (Fase 2 do roadmap de Modo Demonstração
 // — docs/modo-demonstracao-v1-arquitetura.md, seção 9). Puramente
 // apresentação: recebe a lista já calculada de OportunidadeCliente
 // (lib/oportunidades-clientes.ts) e um callback de navegação — nunca
 // consulta o Supabase nem recalcula prioridade/desempate. V1 se chamava
 // "Agenda Autônoma de Receita" — mesma base, nenhum envio automático.
+//
+// `limite` (Correção Visual Final V1): a Home mostra só um RESUMO — "Radar
+// resumido, não motor inteiro" — os primeiros N (por prioridade/desempate,
+// mesma ordem já calculada) e um link "Ver todas" para /oportunidades
+// quando há mais. Sem `limite`, mostra a lista inteira (comportamento
+// original, preservado para qualquer reaproveitamento futuro).
 import type { OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import { stTom, stTierOportunidade } from "./estilos-prioridade";
 
@@ -13,9 +19,14 @@ type Props = {
   oportunidades: OportunidadeCliente[];
   resumo: string;
   onNavigate: (destino: string) => void;
+  limite?: number;
+  verTodasDestino?: string;
 };
 
-export default function RadarDeOportunidades({ oportunidades, resumo, onNavigate }: Props) {
+export default function RadarDeOportunidades({ oportunidades, resumo, onNavigate, limite, verTodasDestino }: Props) {
+  const exibidas = limite ? oportunidades.slice(0, limite) : oportunidades;
+  const restantes = oportunidades.length - exibidas.length;
+
   return (
     <div className="dc" style={{
       background: "#12151f", border: "1px solid rgba(124,58,237,0.22)",
@@ -41,9 +52,9 @@ export default function RadarDeOportunidades({ oportunidades, resumo, onNavigate
         </div>
       </div>
 
-      {oportunidades.length > 0 && (
+      {exibidas.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, marginTop: 16 }}>
-          {oportunidades.map(op => {
+          {exibidas.map(op => {
             const meta = stTierOportunidade[op.prioridade];
             const cor = stTom[meta.tom];
             const numeroWpp = op.telefone ? (op.telefone.length > 11 ? op.telefone : `55${op.telefone}`) : null;
@@ -121,6 +132,19 @@ export default function RadarDeOportunidades({ oportunidades, resumo, onNavigate
             );
           })}
         </div>
+      )}
+
+      {restantes > 0 && verTodasDestino && (
+        <button
+          onClick={() => onNavigate(verTodasDestino)}
+          style={{
+            marginTop: 14, padding: "8px 16px", borderRadius: 8,
+            border: "1px solid rgba(124,58,237,0.3)", background: "rgba(124,58,237,0.08)",
+            color: "#a78bfa", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+          }}
+        >
+          Ver todas as {oportunidades.length} oportunidades →
+        </button>
       )}
     </div>
   );
