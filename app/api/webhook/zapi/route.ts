@@ -1,10 +1,63 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  detectarPedidoOptOut, entidadeIdDeTelefone, entidadeIdDeterministico,
+  chaveIdempotenciaWebhookRecebido, chaveIdempotenciaConsentimento,
+} from "../../../../lib/whatsapp-governado";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// ── WhatsApp Governado V1 — opt-out automático + dedup de replay ────────
+// Duas peças novas, ambas best-effort e aditivas: nunca mudam o
+// comportamento já homologado quando a condição que as ativa não ocorre.
+//
+// 1) Opt-out: se a mensagem recebida é uma palavra-chave EXATA de opt-out
+//    (ver detectarPedidoOptOut — mesmo padrão de casamento exato já usado
+//    em CONFIRMAR_EXATO/REAGENDAR_EXATO acima), grava o bloqueio em
+//    eventos_dominio (mesmo mecanismo de app/api/whatsapp/consentimento)
+//    e encerra sem chamar o chatbot nem nenhuma automação comercial.
+//
+// 2) Replay: a Z-API pode reentregar o mesmo evento (timeout, retry de
+//    infraestrutura) — sem nenhuma proteção, isso chamava o chatbot (e a
+//    resposta automática) duas vezes para a mesma mensagem. Só ativa
+//    quando o payload traz um identificador real de mensagem
+//    (messageId/zaapId) — sem esse campo, nunca bloqueia nada (fail-open
+//    para o comportamento já existente; PENDENTE DE HOMOLOGAÇÃO: qual
+//    campo exato a Z-API envia em produção precisa ser confirmado com
+//    tráfego real antes deste bloco ter efeito prático).
+
+async function jaProcessadoOuMarcar(clinicaId: string, instanceId: string, messageId: string): Promise<boolean> {
+  const chave = chaveIdempotenciaWebhookRecebido(instanceId || "sem_instance", messageId);
+  const entidadeId = entidadeIdDeterministico(instanceId || "sem_instance", messageId);
+  const { data: existente } = await supabase
+    .from("eventos_dominio")
+    .select("id")
+    .eq("clinica_id", clinicaId)
+    .eq("chave_idempotencia", chave)
+    .maybeSingle();
+  if (existente) return true;
+  await supabase.from("eventos_dominio").insert({
+    clinica_id: clinicaId, tipo: "whatsapp.webhook_recebido", entidade_tipo: "mensagem_whatsapp", entidade_id: entidadeId,
+    chave_idempotencia: chave, payload: { messageId }, criado_em: new Date().toISOString(),
+  });
+  return false;
+}
+
+async function registrarOptOutSePedido(clinicaId: string, telefone: string, mensagem: string): Promise<boolean> {
+  if (!detectarPedidoOptOut(mensagem)) return false;
+  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const entidadeId = entidadeIdDeTelefone(clinicaId, telefone);
+  await supabase.from("eventos_dominio").insert({
+    clinica_id: clinicaId, tipo: "whatsapp.consentimento", entidade_tipo: "contato_whatsapp", entidade_id: entidadeId,
+    chave_idempotencia: chaveIdempotenciaConsentimento(entidadeId, `webhook_optout:${hoje}`),
+    payload: { telefone, estado: "bloqueado", origem: "webhook_optout_automatico" }, criado_em: new Date().toISOString(),
+  });
+  console.warn("[WEBHOOK] opt-out detectado — contato bloqueado para automação comercial:", { clinica_id: clinicaId });
+  return true;
+}
 
 // ─── Normalização de telefone ────────────────────────────────────────────────
 
@@ -285,6 +338,19 @@ export async function POST(req: NextRequest) {
       }
 
       if (chatbotClinicaId) {
+        const messageId: string = body.messageId ?? body.zaapId ?? "";
+        if (messageId && await jaProcessadoOuMarcar(chatbotClinicaId, instanceId, messageId)) {
+          console.warn("[WEBHOOK] mensagem já processada (replay do provider) — chatbot não chamado novamente:", { clinica_id: chatbotClinicaId, messageId });
+          return NextResponse.json({ sucesso: true, recebido: true, ignorado: "replay" });
+        }
+        if (await registrarOptOutSePedido(chatbotClinicaId, telefone, mensagem)) {
+          await supabase.from("whatsapp_logs").insert({
+            clinica_id: chatbotClinicaId,
+            telefone, mensagem, status: "recebido",
+            resposta: { acao, processado: false, motivo: "optout_automatico" },
+          });
+          return NextResponse.json({ sucesso: true, recebido: true, ignorado: "optout" });
+        }
         console.log("[WEBHOOK] ▶ Encaminhando para Chatbot IA:", {
           clinica_id: chatbotClinicaId,
           telefone,

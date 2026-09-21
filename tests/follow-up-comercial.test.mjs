@@ -305,7 +305,11 @@ test("POST /api/follow-up/tentativa: autoriza antes de qualquer leitura/escrita"
 
 test("POST /api/follow-up/tentativa: entidade é sempre relida do banco escopada por clinica_id, nunca confia no client — fail-closed", () => {
   assert.match(rota, /\.eq\("clinica_id", clinica_id\)/);
-  assert.match(rota, /gerarFollowUpsComerciais\(/);
+  // reavaliarCasoFollowUp (lib/follow-up-persistencia.ts, extraído da rota
+  // para ser reaproveitado também por .../aprovar-envio — WhatsApp
+  // Governado V1) é quem chama gerarFollowUpsComerciais internamente;
+  // continua sendo a MESMA função pura, nenhuma segunda implementação.
+  assert.match(rota, /reavaliarCasoFollowUp\(/);
   assert.match(rota, /if \(!caso\)/);
 });
 

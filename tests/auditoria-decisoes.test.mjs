@@ -178,7 +178,7 @@ test("idempotência/determinismo: mesma entrada duas vezes produz exatamente o m
 const rota = fs.readFileSync(new URL("../app/api/follow-up/tentativa/route.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("follow-up/tentativa: registra auditoria SOMENTE depois que o caso é reavaliado como elegível — nunca antes", () => {
-  const idxReavaliar = rota.indexOf("const caso = await reavaliarCaso(");
+  const idxReavaliar = rota.indexOf("const caso = await reavaliarCasoFollowUp(");
   const idxAuditoria = rota.indexOf("prepararRegistroAuditoria(");
   assert.ok(idxReavaliar > -1 && idxAuditoria > -1);
   assert.ok(idxReavaliar < idxAuditoria, "auditoria deveria acontecer depois da reavaliação de elegibilidade");

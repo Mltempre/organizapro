@@ -84,6 +84,40 @@ export default function CobrancasPage() {
   const [preparando, setPreparando]           = useState<string | null>(null);
   const [mensagemPreparada, setMensagemPreparada] = useState<{ cobrancaId: string; texto: string } | null>(null);
 
+  // WhatsApp Governado V1 — bloco APROVAR: só depois de "Preparar
+  // cobrança" o botão abaixo chama POST /api/cobrancas/[id]/aprovar-envio,
+  // que revalida tudo de novo e só então chama o adaptador real (Z-API).
+  const [enviando, setEnviando]           = useState<string | null>(null);
+  const [enviadosAgora, setEnviadosAgora] = useState<Set<string>>(new Set());
+  const idempotencyEnvioRef = React.useRef<Record<string, string>>({});
+
+  function idempotencyKeyEnvioPara(cobrancaId: string): string {
+    if (!idempotencyEnvioRef.current[cobrancaId]) idempotencyEnvioRef.current[cobrancaId] = crypto.randomUUID();
+    return idempotencyEnvioRef.current[cobrancaId];
+  }
+
+  async function aprovarEnvio(c: Cobranca) {
+    setEnviando(c.id);
+    try {
+      const res = await fetch(`/api/cobrancas/${c.id}/aprovar-envio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ clinica_id: clinicaId, idempotency_key: idempotencyKeyEnvioPara(c.id) }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
+      setEnviadosAgora(prev => new Set(prev).add(c.id));
+      setMensagemPreparada(null);
+      setSucesso('Mensagem enviada pelo WhatsApp.');
+      setTimeout(() => setSucesso(''), 3500);
+    } catch (e) {
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setEnviando(null);
+    }
+  }
+
   const carregar = useCallback(async () => {
     try {
       setCarregando(true); setErro('');
@@ -308,9 +342,17 @@ export default function CobrancasPage() {
                 </div>
                 {mensagemPreparada?.cobrancaId === c.id && (
                   <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
-                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4a9bb0', marginBottom: 4 }}>Mensagem preparada (nenhum envio real) — copie e envie manualmente:</div>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4a9bb0', marginBottom: 4 }}>Mensagem preparada — copie e envie manualmente, ou aprove o envio automático pelo WhatsApp:</div>
                     {mensagemPreparada.texto}
+                    <div style={{ marginTop: 8 }}>
+                      <button className="cob-btn" disabled={enviando === c.id} onClick={() => aprovarEnvio(c)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        {enviando === c.id ? 'Enviando...' : 'Aprovar e enviar pelo WhatsApp'}
+                      </button>
+                    </div>
                   </div>
+                )}
+                {enviadosAgora.has(c.id) && mensagemPreparada?.cobrancaId !== c.id && (
+                  <div style={{ fontSize: 11, color: '#16a34a' }}>✓ Mensagem enviada pelo WhatsApp hoje.</div>
                 )}
               </div>
             ))}

@@ -27,12 +27,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../../lib/auth-clinica";
 import { logOperacao } from "../../../../lib/log-estruturado";
-import {
-  gerarFollowUpsComerciais, prepararMensagemFollowUp,
-  type TipoFollowUpProprio, type CasoFollowUp,
-} from "../../../../lib/follow-up-comercial";
-import { agregarClientesElegiveisRecompra } from "../../../../lib/motor-pedidos";
+import { prepararMensagemFollowUp, type TipoFollowUpProprio } from "../../../../lib/follow-up-comercial";
+import { reavaliarCasoFollowUp } from "../../../../lib/follow-up-persistencia";
 import { prepararRegistroAuditoria } from "../../../../lib/auditoria-decisoes";
+import { entidadeIdDeTelefone } from "../../../../lib/whatsapp-governado";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,81 +39,22 @@ const admin = createClient(
 
 const TIPOS_VALIDOS: TipoFollowUpProprio[] = ["oportunidade_parada", "orcamento_parado", "tratamento_sem_retorno", "pedido_nao_concluido", "recompra_possivel"];
 
-function hojeStr(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+// oportunidade_parada e recompra_possivel usam telefone normalizado como
+// "id de caso" (ver lib/follow-up-comercial.ts, comentário do tipo
+// CasoFollowUp.entidadeId) — mas eventos_dominio.entidade_id é uuid NOT
+// NULL, nunca aceitaria o texto bruto do telefone. Descoberto durante a
+// missão WhatsApp Governado V1 (que lê estes mesmos eventos para decidir
+// se pode aprovar um envio): entidadeIdParaEvento deriva um uuid estável a
+// partir do telefone real, sem fabricar nenhum dado novo — o texto do
+// telefone continua real no payload, só a COLUNA passa a ser válida.
+function entidadeIdParaEvento(tipo: TipoFollowUpProprio, entidadeId: string, clinica_id: string): string {
+  return tipo === "oportunidade_parada" || tipo === "recompra_possivel"
+    ? entidadeIdDeTelefone(clinica_id, entidadeId)
+    : entidadeId;
 }
 
-async function reavaliarCaso(
-  tipo: TipoFollowUpProprio,
-  entidadeId: string,
-  clinica_id: string,
-  hoje: string,
-  agora: string
-): Promise<CasoFollowUp | null> {
-  const entradaBase = {
-    hoje, agora, entidadesComTentativaHoje: new Set<string>(),
-    oportunidadesParadas: [], orcamentosParados: [], tratamentosSemRetorno: [], pedidosNaoConcluidos: [], recomprasPossiveis: [],
-  };
-
-  if (tipo === "oportunidade_parada") {
-    // entidadeId aqui é o telefone normalizado (oportunidade não tem um
-    // "id de caso" único e estável fora da própria oportunidade — várias
-    // sinalizações do mesmo telefone contam como o mesmo caso de
-    // follow-up, mesma decisão já usada em recompra_possivel).
-    const { data } = await admin.from("oportunidades_demanda")
-      .select("id, telefone, nome_informado, status, orcamento_vinculado_id, ultima_interacao_em")
-      .eq("clinica_id", clinica_id).eq("telefone_normalizado", entidadeId)
-      .order("ultima_interacao_em", { ascending: false }).limit(1).maybeSingle();
-    if (!data) return null;
-    const resultado = gerarFollowUpsComerciais({ ...entradaBase, oportunidadesParadas: [{ id: data.id, telefone: data.telefone, pacienteNome: data.nome_informado || data.telefone, status: data.status, orcamentoVinculadoId: data.orcamento_vinculado_id, ultimaInteracaoEm: data.ultima_interacao_em }] });
-    return resultado[0] ?? null;
-  }
-
-  if (tipo === "orcamento_parado") {
-    const { data } = await admin.from("orcamentos")
-      .select("id, paciente_nome, telefone, procedimento, valor, apresentado_em")
-      .eq("id", entidadeId).eq("clinica_id", clinica_id).eq("status", "apresentado").maybeSingle();
-    if (!data) return null;
-    const resultado = gerarFollowUpsComerciais({ ...entradaBase, orcamentosParados: [{ id: data.id, pacienteNome: data.paciente_nome, telefone: data.telefone, procedimento: data.procedimento, valor: data.valor, apresentadoEm: data.apresentado_em }] });
-    return resultado[0] ?? null;
-  }
-
-  if (tipo === "tratamento_sem_retorno") {
-    const { data } = await admin.from("tratamentos")
-      .select("id, paciente_nome, paciente_telefone, tipo_tratamento, status, proxima_data_prevista, updated_at, interrompido_em")
-      .eq("id", entidadeId).eq("clinica_id", clinica_id).in("status", ["em_andamento", "interrompido"]).maybeSingle();
-    if (!data) return null;
-    const resultado = gerarFollowUpsComerciais({ ...entradaBase, tratamentosSemRetorno: [{ id: data.id, pacienteNome: data.paciente_nome, telefone: data.paciente_telefone, tipoTratamento: data.tipo_tratamento, status: data.status, proximaDataPrevista: data.proxima_data_prevista, updatedAt: data.updated_at, interrompidoEm: data.interrompido_em }] });
-    return resultado[0] ?? null;
-  }
-
-  if (tipo === "pedido_nao_concluido") {
-    const { data } = await admin.from("pedidos")
-      .select("id, nome_cliente, telefone, valor_centavos, criado_em, pedido_itens(descricao)")
-      .eq("id", entidadeId).eq("clinica_id", clinica_id).in("status", ["criado", "confirmado"]).maybeSingle();
-    if (!data) return null;
-    const itens = data.pedido_itens as { descricao: string }[] | null;
-    const descricao = itens?.length ? `${itens.length} ${itens.length === 1 ? "item" : "itens"}` : "pedido";
-    const resultado = gerarFollowUpsComerciais({ ...entradaBase, pedidosNaoConcluidos: [{ id: data.id, pacienteNome: data.nome_cliente, telefone: data.telefone, descricao, valor: data.valor_centavos / 100, criadoEm: data.criado_em }] });
-    return resultado[0] ?? null;
-  }
-
-  // recompra_possivel: entidadeId é o telefone normalizado do cliente —
-  // relê TODOS os pedidos desse telefone na clínica e reaplica a mesma
-  // agregação real já usada pelo Dashboard/Previsor.
-  const { data: pedidosDoCliente } = await admin.from("pedidos")
-    .select("id, paciente_id, nome_cliente, telefone, status, criado_em, pagamento_confirmado_em")
-    .eq("clinica_id", clinica_id);
-  const doTelefone = (pedidosDoCliente ?? []).filter((p) => (p.telefone || "").replace(/\D/g, "") === entidadeId);
-  if (doTelefone.length === 0) return null;
-  const recomprasPossiveis = agregarClientesElegiveisRecompra(
-    doTelefone.map((p) => ({
-      pacienteId: p.paciente_id, telefone: p.telefone, nomeCliente: p.nome_cliente,
-      status: p.status, criadoEm: p.criado_em, pagamentoConfirmadoEm: p.pagamento_confirmado_em,
-    }))
-  );
-  const resultado = gerarFollowUpsComerciais({ ...entradaBase, recomprasPossiveis });
-  return resultado[0] ?? null;
+function hojeStr(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
 export async function POST(req: NextRequest) {
@@ -154,7 +93,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: "Já existe uma tentativa registrada hoje para este caso — evita duplicidade." }, { status: 409 });
   }
 
-  const caso = await reavaliarCaso(tipo as TipoFollowUpProprio, entidade_id, clinica_id, hoje, agora);
+  const caso = await reavaliarCasoFollowUp(admin, tipo as TipoFollowUpProprio, entidade_id, clinica_id, hoje, agora);
   if (!caso) {
     logOperacao({ operacao: "followup.tentativa", clinica_id, entidade_id, resultado: "rejeitado", motivo: "caso não é mais elegível (dado real mudou)" });
     return NextResponse.json({ sucesso: false, error: "Este caso não está mais elegível — o dado real já mudou (resolvido, avançou ou não encontrado)." }, { status: 409 });
@@ -175,7 +114,7 @@ export async function POST(req: NextRequest) {
     versaoRegra: "follow-up-comercial-v1",
     tipoDecisao: caso.tipo,
     entidadeTipo: caso.entidadeTipo,
-    entidadeId: caso.entidadeId,
+    entidadeId: entidadeIdParaEvento(tipo as TipoFollowUpProprio, caso.entidadeId, clinica_id),
     clienteId: caso.telefone ? caso.telefone.replace(/\D/g, "") : null,
     sinaisUtilizados: [
       { campo: "tipo_caso", valor: caso.tipo },
@@ -204,7 +143,7 @@ export async function POST(req: NextRequest) {
     clinica_id,
     tipo: "followup.tentativa",
     entidade_tipo: caso.entidadeTipo,
-    entidade_id,
+    entidade_id: entidadeIdParaEvento(tipo as TipoFollowUpProprio, entidade_id, clinica_id),
     chave_idempotencia: chaveIdempotencia,
     payload: {
       tipo_followup: tipo,

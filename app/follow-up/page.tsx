@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
@@ -53,6 +53,14 @@ export default function FollowUpPage() {
   const [registrando, setRegistrando] = useState<string | null>(null);
   const [registradosAgora, setRegistradosAgora] = useState<Set<string>>(new Set());
   const [mensagemPreparada, setMensagemPreparada] = useState<{ entidadeId: string; texto: string } | null>(null);
+
+  // WhatsApp Governado V1 — bloco APROVAR: só depois de "Registrar
+  // contato" (que prepara via POST /api/follow-up/tentativa) o botão
+  // abaixo chama POST /api/follow-up/aprovar-envio, que relê e revalida
+  // o caso de novo e só então chama o adaptador real (Z-API).
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const [enviadosAgora, setEnviadosAgora] = useState<Set<string>>(new Set());
+  const idempotencyEnvioRef = useRef<Record<string, string>>({});
 
   const carregar = useCallback(async () => {
     try {
@@ -142,6 +150,33 @@ export default function FollowUpPage() {
     }
   }
 
+  function idempotencyKeyEnvioPara(entidadeId: string): string {
+    if (!idempotencyEnvioRef.current[entidadeId]) idempotencyEnvioRef.current[entidadeId] = crypto.randomUUID();
+    return idempotencyEnvioRef.current[entidadeId];
+  }
+
+  async function aprovarEnvio(caso: CasoFollowUp) {
+    setEnviando(caso.entidadeId);
+    try {
+      const res = await fetch('/api/follow-up/aprovar-envio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ clinica_id: clinicaId, tipo: caso.tipo as TipoFollowUpProprio, entidade_id: caso.entidadeId, idempotency_key: idempotencyKeyEnvioPara(caso.entidadeId) }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
+      setEnviadosAgora(prev => new Set(prev).add(caso.entidadeId));
+      setMensagemPreparada(null);
+      setSucesso('Mensagem enviada pelo WhatsApp.');
+      setTimeout(() => setSucesso(''), 3500);
+    } catch (e) {
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setEnviando(null);
+    }
+  }
+
   const casosProprios = casos.filter(c => c.donoDoFluxo === 'follow-up');
   const casosDelegados = casos.filter(c => c.donoDoFluxo !== 'follow-up');
 
@@ -180,9 +215,17 @@ export default function FollowUpPage() {
                 </div>
                 {mensagemPreparada?.entidadeId === caso.entidadeId && (
                   <div style={{ background: '#0f1117', border: '1px solid #2d3148', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#cbd5e1' }}>
-                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4a9bb0', marginBottom: 4 }}>Mensagem preparada (nenhum envio real) — copie e envie manualmente:</div>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4a9bb0', marginBottom: 4 }}>Mensagem preparada — copie e envie manualmente, ou aprove o envio automático pelo WhatsApp:</div>
                     {mensagemPreparada.texto}
+                    <div style={{ marginTop: 8 }}>
+                      <button disabled={enviando === caso.entidadeId} onClick={() => aprovarEnvio(caso)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        {enviando === caso.entidadeId ? 'Enviando...' : 'Aprovar e enviar pelo WhatsApp'}
+                      </button>
+                    </div>
                   </div>
+                )}
+                {enviadosAgora.has(caso.entidadeId) && mensagemPreparada?.entidadeId !== caso.entidadeId && (
+                  <div style={{ fontSize: 11, color: '#16a34a' }}>✓ Mensagem enviada pelo WhatsApp hoje.</div>
                 )}
               </div>
             );
