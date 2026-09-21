@@ -13,6 +13,7 @@
 
 import type { OportunidadeCliente } from "./oportunidades-clientes";
 import type { Recomendacao } from "./recomendacoes";
+import { oportunidadeElegivelParaOrcamento, type OportunidadeStatus } from "./oportunidades-demanda";
 
 export type EspecialistaOrigem = "comercial";
 
@@ -96,6 +97,47 @@ export function adaptarRecomendacoes(recomendacoes: Recomendacao[]): SinalCanoni
     destino:      r.destino,
     destinoLabel: r.destinoLabel,
   }));
+}
+
+// ── Adaptador do primeiro elo do Smart Commerce (P1: Reintegração) ──────
+// "Interesse sem compra" (public.oportunidades_demanda) — capturado via
+// WhatsApp/manual/site, hoje isolado na tela /oportunidades e nunca
+// enxergado pela Missão do Dia/Próxima Melhor Ação. Reaproveita 100% o
+// predicado real que já trava a geração de orçamento (nunca uma regra de
+// elegibilidade nova) e a própria classificação de confiança já registrada
+// na oportunidade (nunca uma prioridade inventada aqui).
+export type OportunidadeDemandaSinal = {
+  id: string;
+  canal: "whatsapp" | "manual" | "site";
+  telefone: string;
+  nome_informado: string | null;
+  status: OportunidadeStatus;
+  confianca_classificacao: "alta" | "media" | "baixa";
+  orcamento_vinculado_id: string | null;
+};
+
+const CANAL_LABEL_DEMANDA: Record<OportunidadeDemandaSinal["canal"], string> = {
+  whatsapp: "WhatsApp", manual: "contato manual", site: "site",
+};
+
+export function adaptarOportunidadesDemanda(oportunidades: OportunidadeDemandaSinal[]): SinalCanonico[] {
+  return oportunidades
+    .filter(oportunidadeElegivelParaOrcamento)
+    .map(op => ({
+      id:           `demanda-${op.id}`,
+      especialista: "comercial",
+      tipo:         op.status,
+      prioridade:   op.confianca_classificacao,
+      titulo:       `${op.nome_informado || "Contato"} — interesse ainda sem orçamento`,
+      motivo:       `Sinalizou interesse via ${CANAL_LABEL_DEMANDA[op.canal]} e ainda não recebeu um orçamento.`,
+      evidencia:    "Identificado na oportunidade real registrada (interesse sem compra).",
+      acaoSugerida: "Entrar em contato e apresentar um orçamento",
+      contexto:     { tipo: "cliente" as const, nome: op.nome_informado || "Contato", telefone: op.telefone },
+      chaveDedup:   `demanda:${op.id}`,
+      criadoEm:     null,
+      destino:      "/oportunidades",
+      destinoLabel: "Ver oportunidade",
+    }));
 }
 
 // ── Desempate determinístico ─────────────────────────────────────────────

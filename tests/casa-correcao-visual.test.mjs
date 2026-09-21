@@ -1,9 +1,11 @@
 // Casa Premium — Correção Visual Final V1. Verificação estática: prova
 // que a lateral foi reorganizada em grupos com rotas reais (nenhuma
-// inventada), que a Home ficou objetivamente mais enxuta (Prioridade do
-// Dia = 1 item, Radar resumido = 3 + link, blocos redundantes removidos),
-// que o mobile continua com UMA única barra lateral (drawer), e que
-// nenhum score/índice foi fabricado.
+// inventada), que a Home ficou objetivamente mais enxuta (Radar resumido
+// = 3 + link, blocos redundantes removidos), que o mobile continua com
+// UMA única barra lateral (drawer), e que nenhum score/índice foi
+// fabricado. A seção "Prioridade do Dia = 1 item" desta missão foi
+// deliberadamente revertida pela P1 IMEDIATO (Reintegrar a Inteligência)
+// — ver comentário mais abaixo.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -59,16 +61,26 @@ test("AdminShell: continua UMA única barra lateral (aside), com drawer/hamburge
 });
 
 // ── Home muito mais enxuta ────────────────────────────────────────────────
+//
+// P1 IMEDIATO — Reintegrar a Inteligência (superscede as duas asserções
+// originais desta seção): a decisão de produto da Correção Visual Final
+// V1 de reduzir este bloco a 1 sinal ("Prioridade do Dia") foi revertida
+// deliberadamente — a auditoria confirmou que isso escondia a Missão do
+// Dia/Próxima Melhor Ação, que a P1 exige reintegrar. O bloco volta a se
+// chamar "Diretor Digital" (título padrão de MissaoDoDiaCard) e a
+// receber a lista completa de sinais (top-3, já limitado dentro de
+// gerarMissaoDoDia — nunca um novo slice aqui), agora com o pulso da
+// Central de Oportunidades (contagemPorTier) reconectado.
 
-test("Prioridade do Dia: Home passa só o TOP-1 sinal (slice(0, 1)), não 3 nem 5", () => {
-  assert.match(dashboardView, /sinais=\{missaoDoDia\.slice\(0, 1\)\}/);
+test("Diretor Digital: Home passa a lista completa de missaoDoDia (já limitada a 3 por gerarMissaoDoDia), nunca um slice(0,1) novo", () => {
+  assert.match(dashboardView, /sinais=\{missaoDoDia\}/);
+  assert.doesNotMatch(dashboardView, /sinais=\{missaoDoDia\.slice/);
 });
 
-test("Prioridade do Dia: título/subtítulo reforçam 'uma ação', nunca '3 prioridades' na Home", () => {
+test("Diretor Digital: recebe o pulso da Central de Oportunidades (contagemPorTier) — reconecta a Central sem duplicar a grade completa", () => {
   const idx = dashboardView.indexOf("<MissaoDoDiaCard");
   const trecho = dashboardView.slice(idx, idx + 300);
-  assert.match(trecho, /titulo="Prioridade do Dia"/);
-  assert.doesNotMatch(trecho, /3 prioridades/);
+  assert.match(trecho, /contagemPorTier=\{contagemPorTier\}/);
 });
 
 test("Radar de Oportunidades: Home passa limite={3} e verTodasDestino real — resumo, não o motor inteiro", () => {

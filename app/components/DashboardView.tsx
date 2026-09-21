@@ -18,7 +18,7 @@
 import AdminShell from "./AdminShell";
 import WelcomeModal from "./onboarding/WelcomeModal";
 import OnboardingCard from "./onboarding/OnboardingCard";
-import MissaoDoDiaCard from "./MissaoDoDiaCard";
+import MissaoDoDiaCard, { type ContagemPorTier } from "./MissaoDoDiaCard";
 import { type AcaoPrioritaria } from "./ProximaMelhorAcao";
 import RadarDeOportunidades from "./RadarDeOportunidades";
 import type { OportunidadeCliente } from "../../lib/oportunidades-clientes";
@@ -264,6 +264,9 @@ export type DashboardViewProps = {
   onboarding: { temEmpresa: boolean; temWhatsapp: boolean; temCliente: boolean; temCompromisso: boolean };
   ideia: IdeiaDodia;
   missaoDoDia: SinalCanonico[];
+  /** Pulso da Central de Oportunidades (contagem por tier) — omitido
+   * quando não há dados suficientes, nunca fabricado como 0/0/0. */
+  contagemPorTier?: ContagemPorTier;
   indicadores: { compromissosHoje: number; horariosVagosHoje: number; pendentes: number; atrasados: number; avaliacoesPendentes: number };
   narrativaDiretor: string;
   oportunidadesClientes: OportunidadeCliente[];
@@ -287,7 +290,7 @@ export type DashboardViewProps = {
 export default function DashboardView(props: DashboardViewProps) {
   const {
     clinicaId, dataStr, saudacaoCard, temDados, situacaoEmoji, situacaoTom, ocupacaoPct,
-    botoesRapidos, onboarding, ideia, missaoDoDia, indicadores,
+    botoesRapidos, onboarding, ideia, missaoDoDia, contagemPorTier, indicadores,
     narrativaDiretor,
     oportunidadesClientes, resumoRadar,
     orcamentosParadosCount, cobrancasAbertasCount, indicadoresCobranca, itensAtividade, atividadeIndisponivel,
@@ -476,19 +479,18 @@ export default function DashboardView(props: DashboardViewProps) {
           há inteligência para mostrar) ───────────────────────────────────── */}
       {!temDados && blocoOnboardingRecursosConsultoria}
 
-      {/* ── BLOCO B · PRIORIDADE DO DIA — a ação mais importante agora, uma
-          só (não 3 nem 5). Núcleo Inteligente, mesma priorização/desempate
-          do Radar — sem card próprio para "Diretor Digital" nem "Agora": a
-          Home mostra o essencial, a profundidade (Diretor Digital completo,
-          Próxima Melhor Ação) ainda não tem página dedicada — registrado
-          como gap no relatório desta missão, não construído aqui. ─────── */}
-      {temDados && missaoDoDia.length > 0 && (
+      {/* ── BLOCO B · DIRETOR DIGITAL — peça central da inteligência do
+          OrganizaPro (P1: Reintegração da Inteligência). Um único bloco
+          coeso reintegra: narrativa do IA Comercial, Missão do Dia/Próxima
+          Melhor Ação (top-3 Sinais Canônicos, com CTA de WhatsApp) e o
+          pulso da Central de Oportunidades (contagem por tier, nunca a
+          grade completa — ver MissaoDoDiaCard.tsx). ─────────────────────── */}
+      {temDados && (
         <MissaoDoDiaCard
           narrativa={narrativaDiretor}
-          sinais={missaoDoDia.slice(0, 1)}
+          sinais={missaoDoDia}
           onNavigate={onNavigate}
-          titulo="Prioridade do Dia"
-          subtitulo="A ação mais importante agora, com base no seu histórico real"
+          contagemPorTier={contagemPorTier}
         />
       )}
 

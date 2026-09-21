@@ -17,7 +17,7 @@ type PedidoRow = {
   pedido_itens?: { descricao: string }[];
 };
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
-import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
+import { adaptarOportunidadesClientes, adaptarRecomendacoes, adaptarOportunidadesDemanda, gerarMissaoDoDia, type SinalCanonico, type OportunidadeDemandaSinal } from "../../lib/nucleo-inteligente";
 import DashboardView, {
   gerarIdeia, gerarInsights, gerarSaudacaoCard,
   type AgItem,
@@ -67,6 +67,7 @@ type DashData = {
   tratamentosAtivosRows: Tratamento[];
   cobrancasAbertasRows: Cobranca[];
   todasCobrancasRows: Cobranca[];
+  oportunidadesDemandaRows: OportunidadeDemandaSinal[];
   itensAtividade: ItemAtividade[];
   atividadeIndisponivel: boolean;
 };
@@ -88,6 +89,7 @@ export default function Dashboard() {
     tratamentosAtivosRows: [],
     cobrancasAbertasRows: [],
     todasCobrancasRows: [],
+    oportunidadesDemandaRows: [],
     itensAtividade: [],
     atividadeIndisponivel: false,
   });
@@ -165,6 +167,17 @@ export default function Dashboard() {
       // Bloco G "OrganizaPro trabalhando" — atividade real dos últimos dias,
       // via /api/atividade-recente (eventos_dominio, service role). Falha
       // nunca fabrica atividade, só resulta em lista vazia + indisponivel.
+      // Smart Commerce Canônico · primeiro elo ("interesse sem compra") —
+      // P1: Reintegração da Inteligência. public.oportunidades_demanda só é
+      // acessível via service role, leitura via /api/oportunidades (mesma
+      // rota que /oportunidades já usa). Falha nunca fabrica oportunidade,
+      // só resulta em lista vazia (nenhum sinal novo).
+      const oportunidadesDemandaPromise = fetch(`/api/oportunidades`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(async (r) => (r.ok ? ((await r.json()).data as OportunidadeDemandaSinal[]) ?? [] : []))
+        .catch(() => [] as OportunidadeDemandaSinal[]);
+
       const atividadeRecentePromise = fetch(`/api/atividade-recente?clinica_id=${cid}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
@@ -244,6 +257,7 @@ export default function Dashboard() {
       const tratamentosAtivosRows = await tratamentosAtivosPromise;
       const todasCobrancasRows = await todasCobrancasPromise;
       const cobrancasAbertasRows = todasCobrancasRows.filter((c) => c.status === "pendente" || c.status === "em_cobranca");
+      const oportunidadesDemandaRows = await oportunidadesDemandaPromise;
       const { eventos: eventosAtividade, indisponivel: atividadeIndisponivel } = await atividadeRecentePromise;
       const itensAtividade = calcularAtividadeRecente(eventosAtividade);
 
@@ -306,6 +320,7 @@ export default function Dashboard() {
         tratamentosAtivosRows,
         cobrancasAbertasRows,
         todasCobrancasRows,
+        oportunidadesDemandaRows,
         itensAtividade,
         atividadeIndisponivel,
       });
@@ -481,8 +496,15 @@ export default function Dashboard() {
   // Mesmos sinais canônicos que alimentam a Próxima Melhor Ação — nenhuma
   // regra de priorização própria, nenhuma consulta nova. Ver
   // docs/nucleo-inteligente-v1-arquitetura.md, seção 4.5.
+  // Smart Commerce Canônico · primeiro elo ("interesse sem compra") entra
+  // aqui também — mesma lista de sinais, mesma ordenação/desempate, nenhuma
+  // regra nova (docs P1: Reintegração da Inteligência).
   const sinaisCanonicos = insights.temDados
-    ? [...adaptarOportunidadesClientes(oportunidadesClientes), ...adaptarRecomendacoes(todasRecomendacoesAcionaveis)]
+    ? [
+        ...adaptarOportunidadesClientes(oportunidadesClientes),
+        ...adaptarRecomendacoes(todasRecomendacoesAcionaveis),
+        ...adaptarOportunidadesDemanda(dash.oportunidadesDemandaRows),
+      ]
     : [];
   const missaoDoDia: SinalCanonico[] = gerarMissaoDoDia(sinaisCanonicos);
 
@@ -532,6 +554,7 @@ export default function Dashboard() {
       }}
       ideia={ideia}
       missaoDoDia={missaoDoDia}
+      contagemPorTier={{ alta: centralOportunidades.alta.length, media: centralOportunidades.media.length, baixa: centralOportunidades.baixa.length }}
       indicadores={{
         compromissosHoje: dash.compromissosHoje,
         horariosVagosHoje: dash.horariosVagosHoje,

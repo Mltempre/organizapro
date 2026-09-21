@@ -92,10 +92,16 @@ test("receita-perdida/previsor-faturamento/linha-economica: mesmo contrato de te
 
 // ── Mapa mestre — funcionalidades órfãs/fundação confirmadas por código ──
 
-test("lib/memoria-proveniencia.ts: órfã-desconectada — nenhum arquivo real importa suas funções (só citada em comentários de outros motores)", () => {
+// P1 IMEDIATO — Reintegrar a Inteligência: lib/memoria-proveniencia.ts
+// deixou de ser órfã nesta missão — app/api/memoria/route.ts agora a
+// consome (POST grava prepararRegistroMemoria em eventos_dominio, GET
+// devolve os fatos para app/clientes/[id]/page.tsx). Esta asserção
+// substitui a original (que confirmava a ausência de qualquer import
+// real) pelo estado atual: exatamente UM consumidor real, a rota nova.
+test("lib/memoria-proveniencia.ts: reconectada — app/api/memoria/route.ts é o único consumidor real (P1: Reintegração da Inteligência)", () => {
   const arquivos = arquivosComTrecho(["app", "lib"], /from ["'].*memoria-proveniencia["']/)
     .filter((f) => !f.endsWith("memoria-proveniencia.ts"));
-  assert.deepEqual(arquivos, [], "nenhum import real deveria existir — confirma órfã-desconectada");
+  assert.deepEqual(arquivos.map((f) => path.relative(root, f).replace(/\\/g, "/")), ["app/api/memoria/route.ts"]);
 });
 
 test("lib/atribuicao-origem.ts: calcularCAC/calcularROAS existem (preparação-fundação) mas não são chamados por nenhuma página/rota", () => {
