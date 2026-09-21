@@ -71,3 +71,86 @@ test("calcularIndicadoresCobranca: valorRecebido nunca se confunde com valorRecu
   assert.equal(indicadores.valorRecebidoTotal, 200);
   assert.equal(indicadores.valorRecuperadoTotal, 100);
 });
+
+// ── Cobrador Digital — elegivelParaTentativaCobranca ────────────────────
+
+test("elegivelParaTentativaCobranca: cobrança pendente, vencida, com telefone e sem tentativa hoje é elegível", () => {
+  const r = motor.elegivelParaTentativaCobranca(
+    { status: "pendente", vencimento: "2026-09-01", paciente_telefone: "11911112222" },
+    "2026-09-20", false
+  );
+  assert.deepEqual(r, { elegivel: true });
+});
+
+test("elegivelParaTentativaCobranca: em_cobranca vencida também é elegível (mesma regra de status aberto)", () => {
+  const r = motor.elegivelParaTentativaCobranca(
+    { status: "em_cobranca", vencimento: "2026-09-01", paciente_telefone: "11911112222" },
+    "2026-09-20", false
+  );
+  assert.deepEqual(r, { elegivel: true });
+});
+
+test("elegivelParaTentativaCobranca: paga NUNCA é elegível, mesmo vencida e com telefone", () => {
+  const r = motor.elegivelParaTentativaCobranca(
+    { status: "pago", vencimento: "2026-09-01", paciente_telefone: "11911112222" },
+    "2026-09-20", false
+  );
+  assert.deepEqual(r, { elegivel: false, motivo: "ja_paga" });
+});
+
+test("elegivelParaTentativaCobranca: cancelada NUNCA é elegível", () => {
+  const r = motor.elegivelParaTentativaCobranca(
+    { status: "cancelada", vencimento: "2026-09-01", paciente_telefone: "11911112222" },
+    "2026-09-20", false
+  );
+  assert.deepEqual(r, { elegivel: false, motivo: "cancelada" });
+});
+
+test("elegivelParaTentativaCobranca: cobrança ainda não vencida não é elegível", () => {
+  const r = motor.elegivelParaTentativaCobranca(
+    { status: "pendente", vencimento: "2026-09-25", paciente_telefone: "11911112222" },
+    "2026-09-20", false
+  );
+  assert.deepEqual(r, { elegivel: false, motivo: "nao_vencida" });
+});
+
+test("elegivelParaTentativaCobranca: sem telefone nunca vira falsa elegibilidade", () => {
+  const r = motor.elegivelParaTentativaCobranca(
+    { status: "pendente", vencimento: "2026-09-01", paciente_telefone: null },
+    "2026-09-20", false
+  );
+  assert.deepEqual(r, { elegivel: false, motivo: "sem_telefone" });
+});
+
+test("elegivelParaTentativaCobranca: tentativa duplicada no mesmo dia é bloqueada", () => {
+  const r = motor.elegivelParaTentativaCobranca(
+    { status: "pendente", vencimento: "2026-09-01", paciente_telefone: "11911112222" },
+    "2026-09-20", true
+  );
+  assert.deepEqual(r, { elegivel: false, motivo: "tentativa_ja_registrada_hoje" });
+});
+
+// ── Cobrador Digital — prepararMensagemCobranca ─────────────────────────
+
+test("prepararMensagemCobranca: usa só dados reais da cobrança, nunca inventa valor/vencimento/dívida/acordo/desconto", () => {
+  const m = motor.prepararMensagemCobranca(
+    { paciente_nome: "Ana Costa", descricao: "Consulta de retorno", valor: 250, vencimento: "2026-09-01" },
+    19
+  );
+  assert.equal(m.canal, "whatsapp");
+  assert.match(m.texto, /Ana Costa/);
+  assert.match(m.texto, /Consulta de retorno/);
+  assert.match(m.texto, /R\$\s?250,00/);
+  assert.match(m.texto, /01\/09\/2026/);
+  assert.match(m.texto, /19 dias/);
+  assert.doesNotMatch(m.texto.toLowerCase(), /desconto|acordo|parcelamento|juros/);
+});
+
+test("prepararMensagemCobranca: singular correto para 1 dia de atraso", () => {
+  const m = motor.prepararMensagemCobranca(
+    { paciente_nome: "Bruno", descricao: "Serviço", valor: 100, vencimento: "2026-09-19" },
+    1
+  );
+  assert.match(m.texto, /1 dia\b/);
+  assert.doesNotMatch(m.texto, /1 dias/);
+});

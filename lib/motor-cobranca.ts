@@ -204,3 +204,64 @@ export function calcularIndicadoresCobranca(cobrancas: Cobranca[], agora: string
     quantidadeAtrasadaLonga,
   };
 }
+
+// ─── Cobrador Digital — tentativa de cobrança ──────────────────────────
+// Elo que faltava na cadeia cobrança -> vencimento -> atraso (acima) ->
+// tentativa de cobrança -> registro -> pagamento/encerramento (acima).
+// Domínio puro: decide SE uma tentativa pode acontecer agora e PREPARA o
+// texto — nunca envia nada, nunca decide sozinho. A rota que usa isto
+// ainda passa por autorização humana explícita e nunca chama o adaptador
+// de envio real (POST /api/whatsapp) nesta versão.
+
+export type MotivoInelegibilidadeCobranca =
+  | "ja_paga" | "cancelada" | "nao_vencida" | "sem_telefone" | "tentativa_ja_registrada_hoje";
+
+export type ElegibilidadeTentativa =
+  | { elegivel: false; motivo: MotivoInelegibilidadeCobranca }
+  | { elegivel: true };
+
+/**
+ * Fail-closed: só elegível quando TUDO é real e permitido. Paga/cancelada
+ * nunca são elegíveis mesmo que outros campos pareçam ok — o status é
+ * sempre relido no momento da chamada, então um pagamento confirmado
+ * antes desta checagem automaticamente interrompe qualquer tentativa
+ * nova (nenhum mecanismo separado de "cancelar cobrança pendente" é
+ * necessário: a elegibilidade nunca finge que o status é outro).
+ */
+export function elegivelParaTentativaCobranca(
+  cobranca: Pick<Cobranca, "status" | "vencimento" | "paciente_telefone">,
+  hoje: string,
+  jaTentouHoje: boolean
+): ElegibilidadeTentativa {
+  if (cobranca.status === "pago") return { elegivel: false, motivo: "ja_paga" };
+  if (cobranca.status === "cancelada") return { elegivel: false, motivo: "cancelada" };
+  if (!estaAtrasada(cobranca.vencimento, hoje)) return { elegivel: false, motivo: "nao_vencida" };
+  if (!cobranca.paciente_telefone) return { elegivel: false, motivo: "sem_telefone" };
+  if (jaTentouHoje) return { elegivel: false, motivo: "tentativa_ja_registrada_hoje" };
+  return { elegivel: true };
+}
+
+export interface MensagemCobranca {
+  canal: "whatsapp";
+  texto: string;
+}
+
+/**
+ * Mensagem profissional e parametrizável — nunca agressiva, nunca gerada
+ * por IA. Todo dado (nome, valor, vencimento, dias de atraso) vem
+ * exclusivamente da cobrança real; nenhum valor, dívida, acordo ou
+ * desconto é inventado ou sugerido aqui.
+ */
+export function prepararMensagemCobranca(
+  cobranca: Pick<Cobranca, "paciente_nome" | "descricao" | "valor" | "vencimento">,
+  diasDeAtraso: number
+): MensagemCobranca {
+  const valorFormatado = cobranca.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const [ano, mes, dia] = cobranca.vencimento.split("-");
+  const vencimentoFormatado = `${dia}/${mes}/${ano}`;
+  const texto =
+    `Olá, ${cobranca.paciente_nome}! Passando para lembrar sobre "${cobranca.descricao}", ` +
+    `no valor de ${valorFormatado}, com vencimento em ${vencimentoFormatado} ` +
+    `(${diasDeAtraso} dia${diasDeAtraso === 1 ? "" : "s"} em atraso). Qualquer dúvida, estamos à disposição.`;
+  return { canal: "whatsapp", texto };
+}

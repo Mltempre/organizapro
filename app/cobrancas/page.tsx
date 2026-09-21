@@ -78,6 +78,12 @@ export default function CobrancasPage() {
   const [modalCancelar, setModalCancelar]   = useState<Cobranca | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState<MotivoCancelamento | ''>('');
 
+  // Cobrador Digital V1 — modo estritamente preparatório: só prepara e
+  // registra a tentativa (POST /api/cobrancas/[id]/tentativa), nunca
+  // envia WhatsApp. mensagemPreparada guarda o texto pronto pra copiar.
+  const [preparando, setPreparando]           = useState<string | null>(null);
+  const [mensagemPreparada, setMensagemPreparada] = useState<{ cobrancaId: string; texto: string } | null>(null);
+
   const carregar = useCallback(async () => {
     try {
       setCarregando(true); setErro('');
@@ -197,6 +203,26 @@ export default function CobrancasPage() {
     }
   }
 
+  async function prepararTentativa(c: Cobranca) {
+    setPreparando(c.id);
+    setMensagemPreparada(null);
+    try {
+      const res = await fetch(`/api/cobrancas/${c.id}/tentativa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ clinica_id: clinicaId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
+      setMensagemPreparada({ cobrancaId: c.id, texto: json.mensagem });
+    } catch (e) {
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setPreparando(null);
+    }
+  }
+
   const hoje = hojeStr();
   const agora = new Date().toISOString();
   const filtradas = cobrancas.filter(c => filtro === 'todos' || c.status === filtro);
@@ -266,13 +292,26 @@ export default function CobrancasPage() {
           <div style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>⏱ Precisa de atenção agora</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {atencaoUrgente.map(({ cobranca: c, dias }) => (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 10, padding: '10px 14px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: '#f1f5f9' }}>
-                  <strong>{c.paciente_nome}</strong> tem {formatarValor(c.valor)} ({c.descricao}) atrasado há {dias} dia{dias === 1 ? '' : 's'}.
+              <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: '#f1f5f9' }}>
+                    <strong>{c.paciente_nome}</strong> tem {formatarValor(c.valor)} ({c.descricao}) atrasado há {dias} dia{dias === 1 ? '' : 's'}.
+                  </div>
+                  <button className="cob-btn" disabled={transicionando === c.id} onClick={() => transicionar(c, 'em_cobranca')} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#fbbf24,#d97706)', color: '#1e2130', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    {c.status === 'em_cobranca' ? 'Já em cobrança' : 'Cobrar agora'}
+                  </button>
+                  {/* Cobrador Digital V1 — só prepara e registra a tentativa (idempotente por
+                      dia); nunca envia WhatsApp real nesta versão (sem gate de autonomia). */}
+                  <button className="cob-btn" disabled={!c.paciente_telefone || preparando === c.id} onClick={() => prepararTentativa(c)} title={!c.paciente_telefone ? 'Cliente sem telefone cadastrado' : undefined} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, fontWeight: 700, cursor: c.paciente_telefone ? 'pointer' : 'not-allowed', opacity: c.paciente_telefone ? 1 : 0.5 }}>
+                    {preparando === c.id ? 'Preparando...' : 'Preparar cobrança'}
+                  </button>
                 </div>
-                <button className="cob-btn" disabled={transicionando === c.id} onClick={() => transicionar(c, 'em_cobranca')} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#fbbf24,#d97706)', color: '#1e2130', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                  {c.status === 'em_cobranca' ? 'Já em cobrança' : 'Cobrar agora'}
-                </button>
+                {mensagemPreparada?.cobrancaId === c.id && (
+                  <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4a9bb0', marginBottom: 4 }}>Mensagem preparada (nenhum envio real) — copie e envie manualmente:</div>
+                    {mensagemPreparada.texto}
+                  </div>
+                )}
               </div>
             ))}
           </div>
