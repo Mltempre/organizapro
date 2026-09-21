@@ -1,12 +1,13 @@
 "use client";
-// ── Próxima Melhor Ação ───────────────────────────────────────────────────
-// Extraído de app/dashboard/page.tsx (Fase 2 do roadmap de Modo Demonstração
-// — docs/modo-demonstracao-v1-arquitetura.md, seção 9). Puramente
-// apresentação: recebe a lista já ordenada de AcaoPrioritaria (gerada por
-// gerarProximasAcoes, que continua em app/dashboard/page.tsx) e um callback
-// de navegação — nunca consulta o Supabase nem recalcula prioridade/
-// desempate. O primeiro item da lista já ordenada vira o card em destaque;
-// o resto (no máximo 4) fica abaixo como "Outras oportunidades".
+// ── Agora — Bloco E da Casa (Dashboard/Casa Premium V1) ──────────────────
+// Interface pública (nome do arquivo/tipo) mantida como "ProximaMelhorAcao"
+// para não quebrar import — rótulo visível renomeado para "Agora / O que
+// precisa de você" (Convergência Final V1). Puramente apresentação: recebe
+// a lista já ordenada de AcaoPrioritaria (gerada por gerarProximasAcoes,
+// que continua em app/dashboard/page.tsx) e um callback de navegação —
+// nunca consulta o Supabase nem recalcula prioridade/desempate. O primeiro
+// item da lista já ordenada vira o card em destaque; o resto (no máximo 4)
+// fica abaixo como "Outras oportunidades".
 import { stTom, stTierOportunidade } from "./estilos-prioridade";
 
 export type AcaoPrioritaria = {
@@ -40,8 +41,13 @@ export default function ProximaMelhorAcao({ acoes, onNavigate }: Props) {
         }}>
           🚀
         </div>
-        <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-          Próxima Melhor Ação
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
+            Agora
+          </div>
+          <div style={{ fontSize: 11, color: "#64748b" }}>
+            O que precisa de você
+          </div>
         </div>
       </div>
 
@@ -132,7 +138,7 @@ export default function ProximaMelhorAcao({ acoes, onNavigate }: Props) {
                         borderRadius: 12, padding: "12px 16px",
                       }}>
                         <span style={{ fontSize: 15 }}>{m.emoji}</span>
-                        <span style={{ fontSize: 13.5, color: "#f1f5f9", fontWeight: 600, flex: 1, minWidth: 160 }}>
+                        <span style={{ fontSize: 13.5, color: "#f1f5f9", fontWeight: 600, flex: 1, minWidth: 0 }}>
                           {acao.titulo}
                         </span>
                         {acao.destino && (

@@ -21,13 +21,15 @@ import OnboardingCard from "./onboarding/OnboardingCard";
 import MissaoDoDiaCard from "./MissaoDoDiaCard";
 import ProximaMelhorAcao, { type AcaoPrioritaria } from "./ProximaMelhorAcao";
 import IndicadoresExecutivos from "./IndicadoresExecutivos";
-import DiretorDigitalCard from "./DiretorDigitalCard";
 import RadarDeOportunidades from "./RadarDeOportunidades";
-import CentralDeOportunidadesCard from "./CentralDeOportunidades";
 import type { OportunidadeCliente } from "../../lib/oportunidades-clientes";
-import type { CentralOportunidades, Recomendacao } from "../../lib/recomendacoes";
+import type { Recomendacao } from "../../lib/recomendacoes";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, organizarSinaisCanonicos, type SinalCanonico } from "../../lib/nucleo-inteligente";
-import type { RecomendacaoConsultiva } from "../../lib/ia-comercial";
+import type { IndicadoresCobranca } from "../../lib/motor-cobranca";
+import type { ItemAtividade } from "../../lib/organizapro-trabalhando";
+import FaixaExecutiva from "./FaixaExecutiva";
+import DinheiroCard from "./DinheiroCard";
+import OrganizaProTrabalhandoCard from "./OrganizaProTrabalhandoCard";
 
 // ── Tipos compartilhados (contrato entre fonte de dado e apresentação) ────
 
@@ -290,18 +292,20 @@ export type DashboardViewProps = {
   indicadores: { compromissosHoje: number; horariosVagosHoje: number; pendentes: number; atrasados: number; avaliacoesPendentes: number };
   resumoIA: string;
   narrativaDiretor: string;
-  recomendacoesConsultivas: RecomendacaoConsultiva[];
   focoDoDia: AgItem | null;
   hojeStr: string;
   amanhaStr: string;
   diasOrdenados: string[];
   gruposDias: Record<string, AgItem[]>;
   lembretes: AgItem[];
-  oportunidadesResumo: string[];
   objetivosDoDia: { label: string; feito: boolean }[];
   oportunidadesClientes: OportunidadeCliente[];
   resumoRadar: string;
-  centralOportunidades: CentralOportunidades;
+  orcamentosParadosCount: number;
+  cobrancasAbertasCount: number | null;
+  indicadoresCobranca: IndicadoresCobranca | null;
+  itensAtividade: ItemAtividade[];
+  atividadeIndisponivel: boolean;
   onNavigate: (destino: string) => void;
   /** Padrão true (comportamento atual do Dashboard real). /dashboard-demo passa false: o
    * onboarding de "primeiro acesso" não é coerente numa página de vendas mostrando um
@@ -317,9 +321,11 @@ export default function DashboardView(props: DashboardViewProps) {
   const {
     clinicaId, dataStr, saudacaoCard, temDados, situacaoEmoji, situacaoTom, ocupacaoPct,
     botoesRapidos, onboarding, ideia, missaoDoDia, proximasAcoes, indicadores,
-    resumoIA, narrativaDiretor, recomendacoesConsultivas, focoDoDia, hojeStr, amanhaStr,
-    diasOrdenados, gruposDias, lembretes, oportunidadesResumo, objetivosDoDia,
-    oportunidadesClientes, resumoRadar, centralOportunidades, onNavigate,
+    resumoIA, narrativaDiretor, focoDoDia, hojeStr, amanhaStr,
+    diasOrdenados, gruposDias, lembretes, objetivosDoDia,
+    oportunidadesClientes, resumoRadar,
+    orcamentosParadosCount, cobrancasAbertasCount, indicadoresCobranca, itensAtividade, atividadeIndisponivel,
+    onNavigate,
     exibirWelcomeModal = true, textoBemVindo,
   } = props;
 
@@ -442,6 +448,8 @@ export default function DashboardView(props: DashboardViewProps) {
         @media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
         .indicadores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
         @media (max-width: 860px) { .indicadores-grid { grid-template-columns: repeat(2, 1fr); } }
+        .faixa-executiva-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        @media (max-width: 860px) { .faixa-executiva-grid { grid-template-columns: repeat(2, 1fr); } }
         .btn-rapido:hover { background: rgba(31,78,95,0.25) !important; border-color: rgba(31,78,95,0.55) !important; }
         .indicador-tile:hover { border-color: rgba(74,155,176,0.4) !important; }
       `}</style>
@@ -505,43 +513,29 @@ export default function DashboardView(props: DashboardViewProps) {
           há inteligência para mostrar) ───────────────────────────────────── */}
       {!temDados && blocoOnboardingRecursosConsultoria}
 
-      {/* ── 2a. CABEÇALHO DO BLOCO DE INTELIGÊNCIA — nomeia o conjunto abaixo
-          como uma coisa só (Missão → PMA → Diretor Digital → Radar → Central),
-          nunca 5 widgets soltos. Puramente apresentacional, nenhuma regra nova. */}
+      {/* ── BLOCO B · DIRETOR DIGITAL — narrativa curta + 3 prioridades reais
+          (Núcleo Inteligente, mesma priorização/desempate do Radar). Um único
+          bloco executivo, nunca meia tela: substitui o que antes eram três
+          cartões empilhados mostrando o mesmo conjunto de sinais (Missão do
+          Dia + Próxima Melhor Ação + Diretor Digital). ─────────────────── */}
       {temDados && (
-        <div className="dc" style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 14px" }}>
-          <span style={{ fontSize: 20 }}>🧭</span>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2 }}>
-              Seu Diretor Digital hoje
-            </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-              A mesma inteligência olhando seu negócio de ângulos diferentes — prioridades, oportunidades e recomendações.
-            </div>
-          </div>
-        </div>
+        <MissaoDoDiaCard narrativa={narrativaDiretor} sinais={missaoDoDia} onNavigate={onNavigate} />
       )}
 
-      {/* ── 2b. MISSÃO DO DIA ────────────────────────────────────────────── */}
+      {/* ── BLOCO C · FAIXA EXECUTIVA — 4 números que respondem "onde existe
+          dinheiro/oportunidade", cada um leva à tela real. ──────────────── */}
       {temDados && (
-        <MissaoDoDiaCard sinais={missaoDoDia} onNavigate={onNavigate} />
-      )}
-
-      {/* ── 3. PRÓXIMA MELHOR AÇÃO ───────────────────────────────────────── */}
-      {temDados && (
-        <ProximaMelhorAcao acoes={proximasAcoes} onNavigate={onNavigate} />
-      )}
-
-      {/* ── 4. IA COMERCIAL · DIRETOR DIGITAL ─────────────────────────────── */}
-      {temDados && (
-        <DiretorDigitalCard
-          narrativa={narrativaDiretor}
-          recomendacoes={recomendacoesConsultivas}
+        <FaixaExecutiva
+          oportunidades={oportunidadesClientes.length}
+          orcamentosParados={orcamentosParadosCount}
+          cobrancasAbertas={cobrancasAbertasCount}
+          compromissosHoje={indicadores.compromissosHoje}
           onNavigate={onNavigate}
         />
       )}
 
-      {/* ── 5. RADAR DE OPORTUNIDADES ─────────────────────────────────────── */}
+      {/* ── BLOCO D · RADAR DE OPORTUNIDADES — um cartão por cliente, com
+          motivo, tempo decorrido e ação real. ───────────────────────────── */}
       {temDados && (
         <RadarDeOportunidades
           oportunidades={oportunidadesClientes}
@@ -550,17 +544,17 @@ export default function DashboardView(props: DashboardViewProps) {
         />
       )}
 
-      {/* ── 6. CENTRAL DE OPORTUNIDADES — sempre renderiza quando há dados;
-          estado vazio explicativo (nunca inventa oportunidade) fica a cargo
-          do próprio componente quando os 3 tiers estão vazios. */}
+      {/* ── BLOCO E · AGORA — o que precisa de você, com CTA (inclui WhatsApp
+          quando há telefone). ───────────────────────────────────────────── */}
       {temDados && (
-        <CentralDeOportunidadesCard
-          central={centralOportunidades}
-          onNavigate={onNavigate}
-        />
+        <ProximaMelhorAcao acoes={proximasAcoes} onNavigate={onNavigate} />
       )}
 
-      {/* ── 7. INDICADORES EXECUTIVOS ────────────────────────────────────── */}
+      {/* ── BLOCO F · DINHEIRO — só o que public.cobrancas comprova; nunca um
+          sistema financeiro novo, nunca oportunidade tratada como venda. ── */}
+      <DinheiroCard indicadores={indicadoresCobranca} onNavigate={onNavigate} />
+
+      {/* ── INDICADORES DE AGENDA (operacional, já existia) ──────────────── */}
       <IndicadoresExecutivos
         compromissosHoje={indicadores.compromissosHoje}
         horariosVagosHoje={indicadores.horariosVagosHoje}
@@ -569,6 +563,10 @@ export default function DashboardView(props: DashboardViewProps) {
         avaliacoesPendentes={indicadores.avaliacoesPendentes}
         onNavigate={onNavigate}
       />
+
+      {/* ── BLOCO G · ORGANIZAPRO TRABALHANDO — atividade real dos últimos
+          dias (eventos_dominio), nunca ROI/receita atribuída. ───────────── */}
+      <OrganizaProTrabalhandoCard itens={itensAtividade} indisponivel={atividadeIndisponivel} dias={7} />
 
       {/* ── 8. RESUMO DA IA ───────────────────────────────────────────────── */}
       <div className="dc" style={{
@@ -730,33 +728,7 @@ export default function DashboardView(props: DashboardViewProps) {
         </div>
       )}
 
-      {/* ── 10. OPORTUNIDADES ENCONTRADAS ────────────────────────────────── */}
-      {temDados && (
-        <div className="dc" style={{
-          background: "#12151f", border: "1px solid rgba(124,58,237,0.22)",
-          borderRadius: 16, padding: "20px 24px", marginBottom: 20,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: "rgba(124,58,237,0.16)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
-            }}>
-              💡
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>
-              Oportunidades encontradas
-            </div>
-          </div>
-          <p style={{ fontSize: 13, color: "#94a3b8", margin: "10px 0 0", lineHeight: 1.6 }}>
-            {oportunidadesResumo.length > 0
-              ? oportunidadesResumo.join(" · ")
-              : "Oportunidades serão exibidas conforme o uso do sistema."}
-          </p>
-        </div>
-      )}
-
-      {/* ── 11. OBJETIVOS DO DIA ─────────────────────────────────────────── */}
+      {/* ── OBJETIVOS DO DIA ──────────────────────────────────────────────── */}
       {temDados && (
         <div className="dc" style={{
           background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",

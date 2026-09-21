@@ -7,8 +7,9 @@ import { obterHorariosVagos } from "../../lib/horarios";
 import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import type { Orcamento } from "../../lib/motor-orcamentos";
 import type { Tratamento } from "../../lib/motor-tratamento";
-import type { Cobranca } from "../../lib/motor-cobranca";
+import { calcularIndicadoresCobranca, type Cobranca, type IndicadoresCobranca } from "../../lib/motor-cobranca";
 import { agregarClientesElegiveisRecompra, type PedidoStatus } from "../../lib/motor-pedidos";
+import { calcularAtividadeRecente, type ItemAtividade } from "../../lib/organizapro-trabalhando";
 
 type PedidoRow = {
   id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string;
@@ -65,6 +66,9 @@ type DashData = {
   todosPedidosRows: PedidoRow[];
   tratamentosAtivosRows: Tratamento[];
   cobrancasAbertasRows: Cobranca[];
+  todasCobrancasRows: Cobranca[];
+  itensAtividade: ItemAtividade[];
+  atividadeIndisponivel: boolean;
 };
 
 export default function Dashboard() {
@@ -83,6 +87,9 @@ export default function Dashboard() {
     todosPedidosRows: [],
     tratamentosAtivosRows: [],
     cobrancasAbertasRows: [],
+    todasCobrancasRows: [],
+    itensAtividade: [],
+    atividadeIndisponivel: false,
   });
 
   const carregarDados = useCallback(async () => {
@@ -145,15 +152,28 @@ export default function Dashboard() {
         })
         .catch(() => [] as Tratamento[]);
 
-      const cobrancasAbertasPromise = fetch(`/api/cobrancas?clinica_id=${cid}`, {
+      // Dinheiro (Bloco F) precisa de TODAS as cobranças (inclusive pagas/
+      // canceladas) para calcularIndicadoresCobranca (recebido/recuperado no
+      // mês); "abertas" (pendente/em_cobranca) continua um recorte client-side
+      // da MESMA lista, nunca uma segunda consulta.
+      const todasCobrancasPromise = fetch(`/api/cobrancas?clinica_id=${cid}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(async (r) => (r.ok ? ((await r.json()).cobrancas as Cobranca[]) ?? [] : []))
+        .catch(() => [] as Cobranca[]);
+
+      // Bloco G "OrganizaPro trabalhando" — atividade real dos últimos dias,
+      // via /api/atividade-recente (eventos_dominio, service role). Falha
+      // nunca fabrica atividade, só resulta em lista vazia + indisponivel.
+      const atividadeRecentePromise = fetch(`/api/atividade-recente?clinica_id=${cid}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
         .then(async (r) => {
-          if (!r.ok) return [] as Cobranca[];
-          const todas = ((await r.json()).cobrancas as Cobranca[]) ?? [];
-          return todas.filter((c) => c.status === "pendente" || c.status === "em_cobranca");
+          if (!r.ok) return { eventos: [] as { tipo: string; resultado: string | null }[], indisponivel: true };
+          const json = await r.json();
+          return { eventos: (json.eventos ?? []) as { tipo: string; resultado: string | null }[], indisponivel: !!json.indisponivel };
         })
-        .catch(() => [] as Cobranca[]);
+        .catch(() => ({ eventos: [] as { tipo: string; resultado: string | null }[], indisponivel: true }));
 
       const [
         { data: agHoje },
@@ -222,7 +242,10 @@ export default function Dashboard() {
       const todosPedidosRows = await todosPedidosPromise;
       const pedidosNaoConcluidosRows = todosPedidosRows.filter((p) => p.status === "criado" || p.status === "confirmado");
       const tratamentosAtivosRows = await tratamentosAtivosPromise;
-      const cobrancasAbertasRows = await cobrancasAbertasPromise;
+      const todasCobrancasRows = await todasCobrancasPromise;
+      const cobrancasAbertasRows = todasCobrancasRows.filter((c) => c.status === "pendente" || c.status === "em_cobranca");
+      const { eventos: eventosAtividade, indisponivel: atividadeIndisponivel } = await atividadeRecentePromise;
+      const itensAtividade = calcularAtividadeRecente(eventosAtividade);
 
       // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
       // mesmo telefone não tiver nenhum compromisso futuro já remarcado.
@@ -282,6 +305,9 @@ export default function Dashboard() {
         todosPedidosRows,
         tratamentosAtivosRows,
         cobrancasAbertasRows,
+        todasCobrancasRows,
+        itensAtividade,
+        atividadeIndisponivel,
       });
     } catch (err) {
       console.error(err);
@@ -327,13 +353,17 @@ export default function Dashboard() {
     ...dash.agendaHoje.filter(a => a.status === "agendado"),
   ];
 
-  // Botões Rápidos (v2, 2026-07-27): WhatsApp e Relatórios ainda não têm uma
-  // página própria com esse nome — direcionam para /chatbot e /metricas, as
-  // páginas reais mais próximas hoje. Quando módulos dedicados existirem,
-  // só o destino muda, sem alterar a interface.
+  // Botões Rápidos — Bloco H da Casa (Convergência Final V1: Orçamentos e
+  // Reputação adicionados, ambos já reais e agora diretamente referenciados
+  // pela Faixa Executiva/Radar/Dinheiro acima — nunca um menu duplicado,
+  // só os atalhos que a própria Casa já cita). WhatsApp e Relatórios ainda
+  // não têm uma página própria com esse nome — direcionam para /chatbot e
+  // /metricas, as páginas reais mais próximas hoje.
   const botoesRapidos = [
     { icon: "➕", label: "Novo Cliente",     destino: "/clientes"     },
     { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos" },
+    { icon: "💰", label: "Orçamentos",       destino: "/orcamentos"   },
+    { icon: "⭐", label: "Reputação",        destino: "/reputacao"    },
     { icon: "💬", label: "WhatsApp",         destino: "/chatbot"      },
     { icon: "📊", label: "Relatórios",       destino: "/metricas"     },
   ];
@@ -446,6 +476,13 @@ export default function Dashboard() {
   // Radar de Oportunidades — frase de abertura na voz do Diretor Digital.
   const resumoRadar = gerarResumoRadar(oportunidadesClientes.length);
 
+  // Bloco F "Dinheiro" — mesmo motor real já usado em app/cobrancas/page.tsx
+  // (calcularIndicadoresCobranca), nenhum cálculo novo. null (nunca 0)
+  // quando a clínica ainda não tem nenhuma cobrança registrada — a tela não
+  // pode fingir ter medido algo que não existe.
+  const indicadoresCobranca: IndicadoresCobranca | null =
+    dash.todasCobrancasRows.length > 0 ? calcularIndicadoresCobranca(dash.todasCobrancasRows, agoraIso) : null;
+
   // V2: ambienteProducao virá de um sinal real de conta/ambiente. Mantido
   // desligado em V1 para nunca personalizar em contas de demonstração.
   const saudacaoCard = gerarSaudacaoCard({
@@ -499,14 +536,6 @@ export default function Dashboard() {
     ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
     : gerarMensagemDadosInsuficientes();
 
-  // Oportunidades encontradas — contagem por categoria, sem valor em R$
-  // (ver docs/dashboard-executivo-ia-v1-diagnostico-proposta.md, seção 2).
-  const oportunidadesResumo = [
-    dash.clientesParaReativar > 0 ? `${dash.clientesParaReativar} cliente${dash.clientesParaReativar > 1 ? "s" : ""} sem retorno` : null,
-    dash.horariosVagosHoje    > 0 ? `${dash.horariosVagosHoje} horário${dash.horariosVagosHoje > 1 ? "s" : ""} livre${dash.horariosVagosHoje > 1 ? "s" : ""}` : null,
-    dash.avaliacoesPendentes > 0 ? `${dash.avaliacoesPendentes} avaliaç${dash.avaliacoesPendentes > 1 ? "ões" : "ão"} pendente${dash.avaliacoesPendentes > 1 ? "s" : ""}` : null,
-  ].filter((s): s is string => s !== null);
-
   // Objetivos do Dia — checklist real, derivado de dados já calculados.
   const objetivosDoDia = [
     { label: "Confirmar todos os atendimentos", feito: dash.pendentes === 0 && dash.atrasados === 0 },
@@ -557,18 +586,20 @@ export default function Dashboard() {
       }}
       resumoIA={resumoIA}
       narrativaDiretor={narrativaDiretor}
-      recomendacoesConsultivas={recomendacoesConsultivas}
       focoDoDia={focoDoDia}
       hojeStr={hojeStr}
       amanhaStr={amanhaStr}
       diasOrdenados={diasOrdenados}
       gruposDias={gruposDias}
       lembretes={lembretes}
-      oportunidadesResumo={oportunidadesResumo}
       objetivosDoDia={objetivosDoDia}
       oportunidadesClientes={oportunidadesClientes}
       resumoRadar={resumoRadar}
-      centralOportunidades={centralOportunidades}
+      orcamentosParadosCount={dash.orcamentosParadosRows.length}
+      cobrancasAbertasCount={dash.todasCobrancasRows.length > 0 ? dash.cobrancasAbertasRows.length : null}
+      indicadoresCobranca={indicadoresCobranca}
+      itensAtividade={dash.itensAtividade}
+      atividadeIndisponivel={dash.atividadeIndisponivel}
       onNavigate={(destino) => router.push(destino)}
     />
   );

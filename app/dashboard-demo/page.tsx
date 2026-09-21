@@ -140,12 +140,6 @@ export default function DashboardDemo() {
     ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
     : gerarMensagemDadosInsuficientes();
 
-  const oportunidadesResumo = [
-    ctxNegocio.clientesParaReativar > 0 ? `${ctxNegocio.clientesParaReativar} cliente${ctxNegocio.clientesParaReativar > 1 ? "s" : ""} sem retorno` : null,
-    ctxNegocio.horariosVagosHoje    > 0 ? `${ctxNegocio.horariosVagosHoje} horário${ctxNegocio.horariosVagosHoje > 1 ? "s" : ""} livre${ctxNegocio.horariosVagosHoje > 1 ? "s" : ""}` : null,
-    ctxNegocio.avaliacoesPendentes  > 0 ? `${ctxNegocio.avaliacoesPendentes} avaliaç${ctxNegocio.avaliacoesPendentes > 1 ? "ões" : "ão"} pendente${ctxNegocio.avaliacoesPendentes > 1 ? "s" : ""}` : null,
-  ].filter((s): s is string => s !== null);
-
   const objetivosDoDia = [
     { label: "Confirmar todos os atendimentos", feito: ctxNegocio.pendentesHoje === 0 && ctxNegocio.atrasados === 0 },
     { label: "Preencher horários livres",       feito: ctxNegocio.horariosVagosHoje === 0 },
@@ -168,6 +162,8 @@ export default function DashboardDemo() {
       botoesRapidos={[
         { icon: "➕", label: "Novo Cliente",     destino: "/clientes"     },
         { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos" },
+        { icon: "💰", label: "Orçamentos",       destino: "/orcamentos"   },
+        { icon: "⭐", label: "Reputação",        destino: "/reputacao"    },
         { icon: "💬", label: "WhatsApp",         destino: "/chatbot"      },
         { icon: "📊", label: "Relatórios",       destino: "/metricas"     },
       ]}
@@ -190,18 +186,20 @@ export default function DashboardDemo() {
       }}
       resumoIA={resumoIA}
       narrativaDiretor={narrativaDiretor}
-      recomendacoesConsultivas={recomendacoesConsultivas}
       focoDoDia={focoDoDia}
       hojeStr={hojeStr}
       amanhaStr={amanhaStr}
       diasOrdenados={diasOrdenados}
       gruposDias={gruposDias}
       lembretes={lembretes}
-      oportunidadesResumo={oportunidadesResumo}
       objetivosDoDia={objetivosDoDia}
       oportunidadesClientes={oportunidadesClientes}
       resumoRadar={resumoRadar}
-      centralOportunidades={centralOportunidades}
+      orcamentosParadosCount={0}
+      cobrancasAbertasCount={null}
+      indicadoresCobranca={null}
+      itensAtividade={[]}
+      atividadeIndisponivel={false}
       onNavigate={(destino) => router.push(destino)}
       exibirWelcomeModal={false}
       textoBemVindo={{
