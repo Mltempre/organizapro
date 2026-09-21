@@ -8,8 +8,13 @@ import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente 
 import type { Orcamento } from "../../lib/motor-orcamentos";
 import type { Tratamento } from "../../lib/motor-tratamento";
 import type { Cobranca } from "../../lib/motor-cobranca";
+import { agregarClientesElegiveisRecompra, type PedidoStatus } from "../../lib/motor-pedidos";
 
-type PedidoRow = { id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string; pedido_itens?: { descricao: string }[] };
+type PedidoRow = {
+  id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string;
+  paciente_id?: string | null; pagamento_confirmado_em?: string | null;
+  pedido_itens?: { descricao: string }[];
+};
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, gerarMissaoDoDia, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import DashboardView, {
@@ -57,6 +62,7 @@ type DashData = {
   cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[];
   orcamentosParadosRows: Orcamento[];
   pedidosNaoConcluidosRows: PedidoRow[];
+  todosPedidosRows: PedidoRow[];
   tratamentosAtivosRows: Tratamento[];
   cobrancasAbertasRows: Cobranca[];
 };
@@ -74,6 +80,7 @@ export default function Dashboard() {
     clientesSemProximoRows: [], cancelamentosSemReagendamentoRows: [],
     orcamentosParadosRows: [],
     pedidosNaoConcluidosRows: [],
+    todosPedidosRows: [],
     tratamentosAtivosRows: [],
     cobrancasAbertasRows: [],
   });
@@ -111,17 +118,15 @@ export default function Dashboard() {
         .catch(() => [] as Orcamento[]);
 
       // E-commerce IA V1 — mesmo raciocínio: public.pedidos só é acessível
-      // via service role, leitura via /api/pedidos. Filtra client-side por
-      // "criado"/"confirmado" (a API não filtra por múltiplos status numa
-      // única chamada) — falha nunca fabrica pedido, só lista vazia.
-      const pedidosNaoConcluidosPromise = fetch(`/api/pedidos?clinica_id=${cid}`, {
+      // via service role, leitura via /api/pedidos. Busca TODOS os pedidos
+      // de uma vez (a API não filtra por múltiplos status numa única
+      // chamada); "não concluídos" e "recompra possível" são dois recortes
+      // client-side da MESMA lista, nunca uma segunda consulta — falha
+      // nunca fabrica pedido, só lista vazia.
+      const todosPedidosPromise = fetch(`/api/pedidos?clinica_id=${cid}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then(async (r) => {
-          if (!r.ok) return [] as PedidoRow[];
-          const todos = ((await r.json()).pedidos as PedidoRow[]) ?? [];
-          return todos.filter((p) => p.status === "criado" || p.status === "confirmado");
-        })
+        .then(async (r) => (r.ok ? ((await r.json()).pedidos as PedidoRow[]) ?? [] : []))
         .catch(() => [] as PedidoRow[]);
 
       // Smart Commerce Canônico — mesmo raciocínio: public.tratamentos e
@@ -214,7 +219,8 @@ export default function Dashboard() {
       ]);
 
       const orcamentosParadosRows = await orcamentosParadosPromise;
-      const pedidosNaoConcluidosRows = await pedidosNaoConcluidosPromise;
+      const todosPedidosRows = await todosPedidosPromise;
+      const pedidosNaoConcluidosRows = todosPedidosRows.filter((p) => p.status === "criado" || p.status === "confirmado");
       const tratamentosAtivosRows = await tratamentosAtivosPromise;
       const cobrancasAbertasRows = await cobrancasAbertasPromise;
 
@@ -273,6 +279,7 @@ export default function Dashboard() {
         cancelamentosSemReagendamentoRows,
         orcamentosParadosRows,
         pedidosNaoConcluidosRows,
+        todosPedidosRows,
         tratamentosAtivosRows,
         cobrancasAbertasRows,
       });
@@ -399,22 +406,30 @@ export default function Dashboard() {
           valor: o.valor, apresentadoEm: o.apresentado_em,
         })),
         // E-commerce IA V1 — dados já buscados acima via /api/pedidos
-        // (service role, escopado por clinica_id). "recompra_possivel" não
-        // está ligado aqui ainda — precisa de uma agregação por cliente
-        // (último pedido pago × nenhum pedido novo depois) que este
-        // dashboard não calcula hoje; motor e sinal já prontos e testados
-        // para quando essa consulta for construída (ver relatório).
+        // (service role, escopado por clinica_id).
         pedidosNaoConcluidos: dash.pedidosNaoConcluidosRows.map(p => ({
           id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone,
           descricao: p.pedido_itens?.length ? `${p.pedido_itens.length} ${p.pedido_itens.length === 1 ? "item" : "itens"}` : "pedido",
           valor: p.valor_centavos / 100, criadoEm: p.criado_em,
         })),
+        // Recompra possível — mesma lista de /api/pedidos usada acima,
+        // agregada por cliente (último pedido × ele está pago) pelo motor
+        // real (agregarClientesElegiveisRecompra, lib/motor-pedidos.ts).
+        // O limiar de 60 dias e o cálculo de "dias" continuam dentro de
+        // gerarOportunidadesClientes — este bloco só resolve "qual é o
+        // último pedido de cada cliente e ele está pago", nunca infere
+        // além disso. Zero consulta nova.
+        recomprasPossiveis: agregarClientesElegiveisRecompra(dash.todosPedidosRows.map(p => ({
+          pacienteId:            p.paciente_id ?? null,
+          telefone:              p.telefone,
+          nomeCliente:           p.nome_cliente,
+          status:                p.status as PedidoStatus,
+          criadoEm:              p.criado_em,
+          pagamentoConfirmadoEm: p.pagamento_confirmado_em ?? null,
+        }))),
         // Smart Commerce Canônico — Convergência de Tratamentos/Cobranças:
         // dados já buscados acima via /api/tratamentos e /api/cobrancas
-        // (service role, escopado por clinica_id). "recompra_possivel"
-        // continua sem ligação aqui — precisa de uma agregação por cliente
-        // (último pedido pago × nenhum pedido novo depois) que este
-        // dashboard não calcula hoje; motor e sinal já prontos e testados.
+        // (service role, escopado por clinica_id).
         tratamentosSemRetorno: dash.tratamentosAtivosRows.map(t => ({
           id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone,
           tipoTratamento: t.tipo_tratamento, status: t.status,

@@ -17,6 +17,7 @@ const normalizar = (s) => s.replace(/\r\n/g, "\n");
 const rotaListaCria = normalizar(readFileSync(path.join(root, "app/api/pedidos/route.ts"), "utf8"));
 const rotaTransicao = normalizar(readFileSync(path.join(root, "app/api/pedidos/[id]/transicao/route.ts"), "utf8"));
 const migration = normalizar(readFileSync(path.join(root, "supabase/migrations/20260920000001_pedidos_ecommerce_ia_v1.sql"), "utf8"));
+const dashboard = normalizar(readFileSync(path.join(root, "app/dashboard/page.tsx"), "utf8"));
 
 test("GET /api/pedidos: autoriza antes de qualquer leitura, e a leitura é filtrada por clinica_id", () => {
   const idxGet = rotaListaCria.indexOf("export async function GET");
@@ -84,4 +85,17 @@ test("migration: pedidos/pedido_itens ficam RLS-enabled sem nenhuma policy (serv
   const semPolicyPedidos = !/CREATE POLICY[\s\S]*ON public\.pedidos\b/.test(migration.replace(/pedido_itens/g, ""));
   assert.equal(semPolicyPedidos, true, "pedidos não deveria ter nenhuma CREATE POLICY");
   assert.doesNotMatch(migration, /CREATE POLICY[\s\S]*ON public\.pedido_itens/);
+});
+
+test("dashboard: recompra_possivel é agregada a partir da MESMA lista de /api/pedidos?clinica_id, nunca uma consulta nova", () => {
+  // Uma única fetch tenant-escopada alimenta os dois recortes.
+  assert.match(dashboard, /todosPedidosPromise = fetch\(`\/api\/pedidos\?clinica_id=\$\{cid\}`/);
+  assert.match(dashboard, /const todosPedidosRows = await todosPedidosPromise;/);
+  assert.match(dashboard, /const pedidosNaoConcluidosRows = todosPedidosRows\.filter/);
+  // agregarClientesElegiveisRecompra só é chamada com dados de dash.todosPedidosRows
+  // (o mesmo estado tenant-escopado), nunca com uma fonte paralela.
+  const idxChamada = dashboard.indexOf("agregarClientesElegiveisRecompra(");
+  assert.ok(idxChamada > -1, "chamada de agregarClientesElegiveisRecompra não encontrada");
+  const trecho = dashboard.slice(idxChamada, idxChamada + 120);
+  assert.match(trecho, /dash\.todosPedidosRows\.map/);
 });

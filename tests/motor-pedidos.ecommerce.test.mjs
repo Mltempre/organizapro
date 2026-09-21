@@ -113,3 +113,72 @@ test("pertenceAoMesmoTenant: só true quando as duas clinica_id batem exatamente
   assert.equal(motor.pertenceAoMesmoTenant("c1", "c1"), true);
   assert.equal(motor.pertenceAoMesmoTenant("c1", "c2"), false);
 });
+
+// ── agregarClientesElegiveisRecompra ────────────────────────────────────
+
+test("agregarClientesElegiveisRecompra: cliente cujo pedido mais recente está pago vira candidato, com a data real de pagamento", () => {
+  const resultado = motor.agregarClientesElegiveisRecompra([
+    { pacienteId: "p1", telefone: "11911112222", nomeCliente: "Carla Dias", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: "2026-06-01T12:00:00Z" },
+  ]);
+  assert.equal(resultado.length, 1);
+  assert.deepEqual(resultado[0], { pacienteNome: "Carla Dias", telefone: "11911112222", ultimoPedidoPagoEm: "2026-06-01T12:00:00Z" });
+});
+
+test("agregarClientesElegiveisRecompra: cliente com pedido novo posterior (mesmo não pago) ao último pago NÃO vira candidato — o pedido mais recente manda", () => {
+  const resultado = motor.agregarClientesElegiveisRecompra([
+    { pacienteId: "p1", telefone: "11911112222", nomeCliente: "Carla Dias", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: "2026-06-01T12:00:00Z" },
+    { pacienteId: "p1", telefone: "11911112222", nomeCliente: "Carla Dias", status: "criado", criadoEm: "2026-08-01T10:00:00Z", pagamentoConfirmadoEm: null },
+  ]);
+  assert.equal(resultado.length, 0);
+});
+
+test("agregarClientesElegiveisRecompra: pedido pago sem pagamentoConfirmadoEm (dado incompleto) nunca fabrica uma data", () => {
+  const resultado = motor.agregarClientesElegiveisRecompra([
+    { pacienteId: "p1", telefone: "11911112222", nomeCliente: "Carla Dias", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: null },
+  ]);
+  assert.equal(resultado.length, 0);
+});
+
+test("agregarClientesElegiveisRecompra: pedido sem paciente_id nem telefone é descartado, nunca vira meio-cliente", () => {
+  const resultado = motor.agregarClientesElegiveisRecompra([
+    { pacienteId: null, telefone: null, nomeCliente: "Anônimo", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: "2026-06-01T12:00:00Z" },
+  ]);
+  assert.equal(resultado.length, 0);
+});
+
+test("agregarClientesElegiveisRecompra: agrupa por paciente_id mesmo quando o telefone informado muda entre os pedidos", () => {
+  const resultado = motor.agregarClientesElegiveisRecompra([
+    { pacienteId: "p1", telefone: "11911112222", nomeCliente: "Carla Dias", status: "cancelado", criadoEm: "2026-05-01T10:00:00Z", pagamentoConfirmadoEm: null },
+    { pacienteId: "p1", telefone: "11999998888", nomeCliente: "Carla Dias", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: "2026-06-01T12:00:00Z" },
+  ]);
+  assert.equal(resultado.length, 1);
+  assert.equal(resultado[0].telefone, "11999998888");
+});
+
+test("agregarClientesElegiveisRecompra: sem paciente_id, agrupa por telefone normalizado", () => {
+  const resultado = motor.agregarClientesElegiveisRecompra([
+    { pacienteId: null, telefone: "(11) 91111-2222", nomeCliente: "Site Público", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: "2026-06-01T12:00:00Z" },
+    { pacienteId: null, telefone: "11911112222", nomeCliente: "Site Público", status: "criado", criadoEm: "2026-08-01T10:00:00Z", pagamentoConfirmadoEm: null },
+  ]);
+  assert.equal(resultado.length, 0, "mesmo telefone em formatos diferentes deve ser o mesmo cliente, e o pedido de agosto é o mais recente");
+});
+
+test("agregarClientesElegiveisRecompra: dois clientes distintos nunca se misturam (isolamento por chave)", () => {
+  const resultado = motor.agregarClientesElegiveisRecompra([
+    { pacienteId: "p1", telefone: "11911112222", nomeCliente: "Cliente A", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: "2026-06-01T12:00:00Z" },
+    { pacienteId: "p2", telefone: "11933334444", nomeCliente: "Cliente B", status: "criado", criadoEm: "2026-08-01T10:00:00Z", pagamentoConfirmadoEm: null },
+  ]);
+  assert.equal(resultado.length, 1);
+  assert.equal(resultado[0].pacienteNome, "Cliente A");
+});
+
+test("agregarClientesElegiveisRecompra: idempotente — mesma entrada duas vezes produz exatamente o mesmo resultado, nunca duplicado", () => {
+  const entrada = [
+    { pacienteId: "p1", telefone: "11911112222", nomeCliente: "Carla Dias", status: "pago", criadoEm: "2026-06-01T10:00:00Z", pagamentoConfirmadoEm: "2026-06-01T12:00:00Z" },
+  ];
+  assert.deepEqual(motor.agregarClientesElegiveisRecompra(entrada), motor.agregarClientesElegiveisRecompra(entrada));
+});
+
+test("agregarClientesElegiveisRecompra: entrada vazia real nunca fabrica candidato", () => {
+  assert.deepEqual(motor.agregarClientesElegiveisRecompra([]), []);
+});

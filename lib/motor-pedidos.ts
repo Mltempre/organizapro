@@ -163,3 +163,63 @@ export function valorFoiManipulado(valorRecebidoCentavos: number, item: ItemCata
 export function pertenceAoMesmoTenant(clinicaIdDoPedido: string, clinicaIdDoItem: string): boolean {
   return clinicaIdDoPedido === clinicaIdDoItem;
 }
+
+// ── Recompra possível — agregação por cliente ────────────────────────────
+//
+// Resolve exatamente o que RecompraPossivelInput (lib/oportunidades-
+// clientes.ts) exige de quem chama: "qual foi o último pedido deste
+// cliente, e não há nenhum pedido mais novo depois dele". Domínio puro —
+// recebe linhas já buscadas por quem chama (mesmo padrão de estaParado/
+// diasParado em motor-orcamentos.ts), nunca consulta o banco. Não calcula
+// "dias" nem aplica o limiar de 60 dias — isso continua sendo
+// responsabilidade exclusiva de gerarOportunidadesClientes.
+
+export type PedidoParaRecompra = {
+  pacienteId:            string | null;
+  telefone:              string | null;
+  nomeCliente:           string;
+  status:                PedidoStatus;
+  criadoEm:              string; // timestamptz ISO
+  pagamentoConfirmadoEm: string | null;
+};
+
+export type ClienteElegivelRecompra = {
+  pacienteNome:       string;
+  telefone:           string | null;
+  ultimoPedidoPagoEm: string; // timestamptz ISO
+};
+
+/**
+ * Agrupa por paciente_id (quando existe) ou telefone normalizado — nunca
+ * por nome, que não é identificador confiável. Pedido sem os dois não
+ * pode ser agrupado nem contatado depois, então é descartado (nunca vira
+ * meio-cliente fabricado). Dentro de cada grupo, só o pedido MAIS RECENTE
+ * (maior criadoEm) decide: se ele está pago, o cliente é candidato — se
+ * está em qualquer outro status (em aberto, cancelado), o cliente já tem
+ * outra pendência real (coberta por pedido_nao_concluido) ou simplesmente
+ * não é candidato a reativação. Nunca inferido, nunca duplicado: no
+ * máximo um resultado por cliente.
+ */
+export function agregarClientesElegiveisRecompra(pedidos: PedidoParaRecompra[]): ClienteElegivelRecompra[] {
+  const maisRecentePorCliente = new Map<string, PedidoParaRecompra>();
+  for (const p of pedidos) {
+    const telefoneNormalizado = (p.telefone || "").replace(/\D/g, "");
+    const chave = p.pacienteId || telefoneNormalizado;
+    if (!chave) continue;
+    const atual = maisRecentePorCliente.get(chave);
+    if (!atual || new Date(p.criadoEm).getTime() > new Date(atual.criadoEm).getTime()) {
+      maisRecentePorCliente.set(chave, p);
+    }
+  }
+
+  const resultado: ClienteElegivelRecompra[] = [];
+  for (const maisRecente of maisRecentePorCliente.values()) {
+    if (maisRecente.status !== "pago" || !maisRecente.pagamentoConfirmadoEm) continue;
+    resultado.push({
+      pacienteNome:       maisRecente.nomeCliente,
+      telefone:           maisRecente.telefone,
+      ultimoPedidoPagoEm: maisRecente.pagamentoConfirmadoEm,
+    });
+  }
+  return resultado;
+}
