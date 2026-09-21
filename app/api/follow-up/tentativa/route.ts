@@ -32,6 +32,7 @@ import {
   type TipoFollowUpProprio, type CasoFollowUp,
 } from "../../../../lib/follow-up-comercial";
 import { agregarClientesElegiveisRecompra } from "../../../../lib/motor-pedidos";
+import { prepararRegistroAuditoria } from "../../../../lib/auditoria-decisoes";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -160,6 +161,44 @@ export async function POST(req: NextRequest) {
   }
 
   const mensagem = prepararMensagemFollowUp(tipo as TipoFollowUpProprio, caso.pacienteNome, caso.motivo);
+
+  // Auditoria das Decisões da IA V1 — evidência estruturada de POR QUE
+  // este caso foi considerado elegível, nunca a narrativa/mensagem (que
+  // é apresentação, não fonte). sinaisUtilizados vem só de campos que o
+  // motor puro já calculou (tipo, status, dono do fluxo) — nenhum texto
+  // livre, nenhum raciocínio de modelo. Falha ao registrar auditoria
+  // nunca bloqueia a tentativa em si (evidência é best-effort, a ação
+  // real do usuário não pode depender dela).
+  const registroAuditoria = prepararRegistroAuditoria({
+    clinicaId: clinica_id,
+    motor: "follow-up-comercial",
+    versaoRegra: "follow-up-comercial-v1",
+    tipoDecisao: caso.tipo,
+    entidadeTipo: caso.entidadeTipo,
+    entidadeId: caso.entidadeId,
+    clienteId: caso.telefone ? caso.telefone.replace(/\D/g, "") : null,
+    sinaisUtilizados: [
+      { campo: "tipo_caso", valor: caso.tipo },
+      { campo: "status_elegibilidade", valor: caso.status },
+      { campo: "dono_do_fluxo", valor: caso.donoDoFluxo },
+    ],
+    decisao: "registrar_contato",
+    observadoEm: agora,
+  });
+  if (registroAuditoria) {
+    const { error: erroAuditoria } = await admin.from("eventos_dominio").insert({
+      clinica_id,
+      tipo: registroAuditoria.tipoEvento,
+      entidade_tipo: registroAuditoria.entidadeTipo,
+      entidade_id: registroAuditoria.entidadeId,
+      chave_idempotencia: registroAuditoria.chaveIdempotencia,
+      payload: registroAuditoria.payload,
+      criado_em: agora,
+    });
+    if (erroAuditoria && !/duplicate|unique/i.test(erroAuditoria.message ?? "")) {
+      logOperacao({ operacao: "auditoria.decisao", clinica_id, entidade_id, resultado: "erro", motivo: `evidencia nao gravada: ${erroAuditoria.message}` });
+    }
+  }
 
   const { error: erroEvento } = await admin.from("eventos_dominio").insert({
     clinica_id,
