@@ -29,6 +29,14 @@ import { estaAtrasada, diasAtraso } from "./motor-cobranca";
 
 export type PrioridadeOportunidade = "alta" | "media" | "baixa";
 
+export type EntidadeTipoOportunidade =
+  | "cliente"
+  | "agendamento"
+  | "orcamento"
+  | "tratamento"
+  | "cobranca"
+  | "pedido";
+
 export type TipoSinal =
   | "cancelamento_sem_reagendamento"
   | "orcamento_parado"
@@ -44,6 +52,10 @@ export type SinalOportunidade = {
   motivo:           string;
   prioridade:       PrioridadeOportunidade;
   acaoSugerida:     string;
+  entidadeTipo:     EntidadeTipoOportunidade;
+  entidadeId?:      string;
+  destino:          string;
+  destinoAcao?:     string;
   diasDesdeEvento:  number | null; // dias corridos desde a data real do evento (cancelamento, atendimento previsto, ou 0 quando é hoje) — null quando não há data confiável
   tempoDecorrido:   string | null; // mesmo dado, já formatado ("hoje", "há 1 dia", "há 5 dias") — null quando diasDesdeEvento é null
 };
@@ -248,6 +260,9 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
       motivo:          `${c.nome} está sem um próximo atendimento programado.`,
       prioridade:      "media",
       acaoSugerida:    "Oferecer um novo horário",
+      entidadeTipo:    "cliente",
+      entidadeId:      c.id,
+      destino:         "/clientes",
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });
@@ -260,6 +275,9 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
       motivo:          `${a.nome} teve um compromisso cancelado e pode precisar de um novo agendamento.`,
       prioridade:      "alta",
       acaoSugerida:    "Reagendar ou confirmar interesse",
+      entidadeTipo:    "agendamento",
+      entidadeId:      a.id,
+      destino:         "/agendamentos",
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });
@@ -272,6 +290,9 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
       motivo:          `${a.nome} possui um compromisso aguardando confirmação.`,
       prioridade:      "alta",
       acaoSugerida:    "Confirmar presença agora",
+      entidadeTipo:    "agendamento",
+      entidadeId:      a.id,
+      destino:         "/agendamentos",
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });
@@ -288,6 +309,10 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
         motivo:          `${o.pacienteNome} tem um orçamento de ${o.procedimento} (${valorFormatado}) parado há ${dias} dia${dias === 1 ? "" : "s"} sem decisão.`,
         prioridade:      "alta",
         acaoSugerida:    "Fazer follow-up do orçamento",
+        entidadeTipo:    "orcamento",
+        entidadeId:      o.id,
+        destino:         "/orcamentos",
+        destinoAcao:     "/follow-up",
         diasDesdeEvento: dias,
         tempoDecorrido:  formatarTempoDecorrido(dias),
       });
@@ -307,6 +332,9 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
         motivo:          `${c.pacienteNome} tem uma cobrança de ${c.descricao} (${valorFormatado}) atrasada há ${dias} dia${dias === 1 ? "" : "s"}.`,
         prioridade:      "alta",
         acaoSugerida:    "Cobrar o pagamento pendente",
+        entidadeTipo:    "cobranca",
+        entidadeId:      c.id,
+        destino:         "/cobrancas",
         diasDesdeEvento: dias,
         tempoDecorrido:  formatarTempoDecorrido(dias),
       });
@@ -324,6 +352,10 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
           motivo:          `${t.pacienteNome} está com ${t.tipoTratamento} sem próximo retorno definido.`,
           prioridade:      "media",
           acaoSugerida:    "Agendar o próximo retorno",
+          entidadeTipo:    "tratamento",
+          entidadeId:      t.id,
+          destino:         "/tratamentos",
+          destinoAcao:     "/follow-up",
           diasDesdeEvento: dias,
           tempoDecorrido:  formatarTempoDecorrido(dias),
         });
@@ -334,6 +366,10 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
           motivo:          `${t.pacienteNome} está com ${t.tipoTratamento} interrompido há ${dias} dia${dias === 1 ? "" : "s"}.`,
           prioridade:      "media",
           acaoSugerida:    "Retomar contato antes do abandono",
+          entidadeTipo:    "tratamento",
+          entidadeId:      t.id,
+          destino:         "/tratamentos",
+          destinoAcao:     "/follow-up",
           diasDesdeEvento: dias,
           tempoDecorrido:  formatarTempoDecorrido(dias),
         });
@@ -357,6 +393,10 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
         motivo:          `${p.pacienteNome} tem um pedido de ${p.descricao} (${valorFormatado}) parado há ${dias} dia${dias === 1 ? "" : "s"} sem confirmação/pagamento.`,
         prioridade:      "alta",
         acaoSugerida:    "Confirmar o pedido com o cliente",
+        entidadeTipo:    "pedido",
+        entidadeId:      p.id,
+        destino:         "/pedidos",
+        destinoAcao:     "/follow-up",
         diasDesdeEvento: dias,
         tempoDecorrido:  formatarTempoDecorrido(dias),
       });
@@ -377,6 +417,9 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
         motivo:          `${r.pacienteNome} não faz um pedido novo há ${dias} dias — pode ser hora de reativar.`,
         prioridade:      "media",
         acaoSugerida:    "Oferecer um novo pedido",
+        entidadeTipo:    "cliente",
+        destino:         "/pedidos",
+        destinoAcao:     "/follow-up",
         diasDesdeEvento: dias,
         tempoDecorrido:  formatarTempoDecorrido(dias),
       });

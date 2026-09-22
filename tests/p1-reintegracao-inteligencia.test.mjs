@@ -1,9 +1,9 @@
 // P1 IMEDIATO — Reintegrar a Inteligência do OrganizaPro. Prova o único
 // código novo desta missão: o adaptador do primeiro elo do Smart Commerce
 // ("interesse sem compra", public.oportunidades_demanda) para o Sinal
-// Canônico — sem regra de elegibilidade/priorização nova (reaproveita
-// oportunidadeElegivelParaOrcamento e confianca_classificacao tal como
-// já existem em lib/oportunidades-demanda.ts).
+// Canônico — elegibilidade reaproveita oportunidadeElegivelParaOrcamento;
+// prioridade comercial e confiança do classificador permanecem conceitos
+// separados.
 //
 // CONVERGENCIA_BUILD_DIR=<tmp> node --test tests/p1-reintegracao-inteligencia.test.mjs
 // (build precisa incluir nucleo-inteligente.js e oportunidades-demanda.js)
@@ -24,9 +24,13 @@ test("oportunidade aberta e sem orçamento vinculado vira Sinal Canônico", () =
   assert.equal(r.length, 1);
   assert.equal(r[0].id, "demanda-op1");
   assert.equal(r[0].especialista, "comercial");
-  assert.equal(r[0].tipo, "sinalizada"); // vocabulário real do status, nunca inventado
-  assert.equal(r[0].prioridade, "alta"); // reaproveita confianca_classificacao tal como está
+  assert.equal(r[0].tipo, "interesse_sem_orcamento");
+  assert.equal(r[0].prioridade, "media");
+  assert.equal(r[0].confianca, "alta");
+  assert.equal(r[0].dados.status, "sinalizada"); // preserva o estado operacional real
   assert.equal(r[0].contexto.telefone, "11911112222");
+  assert.equal(r[0].entidadeTipo, "oportunidade");
+  assert.equal(r[0].entidadeId, "op1");
   assert.equal(r[0].destino, "/oportunidades");
   assert.equal(r[0].chaveDedup, "demanda:op1");
 });
@@ -56,9 +60,11 @@ test("chaveDedup do primeiro elo (demanda:*) nunca colide com as chaves de clien
   assert.equal(organizados.length, 2, "nenhum dos dois sinais deveria ser removido por deduplicação");
 });
 
-test("sinal do primeiro elo participa da mesma ordenação por prioridade que os demais especialistas (nenhuma regra de priorização própria)", () => {
-  const alta = adaptarOportunidadesDemanda([{ ...BASE, status: "sinalizada", confianca_classificacao: "alta" }])[0];
+test("confiança alta não promove interesse sem orçamento para prioridade comercial alta", () => {
+  const interesse = adaptarOportunidadesDemanda([{ ...BASE, status: "sinalizada", confianca_classificacao: "alta" }])[0];
+  const prioridadeAlta = { id: "cliente-x", especialista: "comercial", tipo: "orcamento_parado", prioridade: "alta", titulo: "t", motivo: "m", evidencia: "e", acaoSugerida: "a", chaveDedup: "cliente-x", criadoEm: null };
   const baixaOutra = { id: "cliente-y", especialista: "comercial", tipo: "sem_proximo_compromisso", prioridade: "baixa", titulo: "t", motivo: "m", evidencia: "e", acaoSugerida: "a", chaveDedup: "cliente-y", criadoEm: null };
-  const organizados = organizarSinaisCanonicos([baixaOutra, alta]);
-  assert.equal(organizados[0].id, alta.id, "sinal de prioridade alta deveria vir primeiro, independente da ordem de entrada");
+  const organizados = organizarSinaisCanonicos([baixaOutra, interesse, prioridadeAlta]);
+  assert.equal(organizados[0].id, prioridadeAlta.id);
+  assert.equal(organizados[1].id, interesse.id);
 });

@@ -12,10 +12,21 @@
 // por parâmetro, já carregado por quem chama.
 
 import type { OportunidadeCliente } from "./oportunidades-clientes";
-import type { Recomendacao } from "./recomendacoes";
+import type { CategoriaRecomendacao, CentralOportunidades, Recomendacao } from "./recomendacoes";
 import { oportunidadeElegivelParaOrcamento, type OportunidadeStatus } from "./oportunidades-demanda";
 
 export type EspecialistaOrigem = "comercial";
+export type PrioridadeComercial = "alta" | "media" | "baixa";
+export type ConfiancaClassificacao = "alta" | "media" | "baixa";
+export type EntidadeTipoComercial =
+  | "negocio"
+  | "cliente"
+  | "agendamento"
+  | "oportunidade"
+  | "orcamento"
+  | "tratamento"
+  | "cobranca"
+  | "pedido";
 
 // Estrutura mínima definida em docs/nucleo-inteligente-v1-arquitetura.md,
 // seção 4.1 — identificado/motivo/ação/evidência (já provado em produção
@@ -25,7 +36,8 @@ export type SinalCanonico = {
   id:            string;   // estável entre recarregamentos — mesmo id já usado hoje pela Próxima Melhor Ação
   especialista:  EspecialistaOrigem;
   tipo:          string;   // vocabulário do próprio especialista (nunca inventado aqui)
-  prioridade:    "alta" | "media" | "baixa";
+  prioridade:    PrioridadeComercial; // prioridade comercial; nunca confiança do classificador
+  confianca?:    ConfiancaClassificacao | null;
   titulo:        string;
   motivo:        string;
   evidencia:     string;
@@ -33,8 +45,20 @@ export type SinalCanonico = {
   contexto?:     { tipo: "cliente"; nome: string; telefone: string | null }; // ausente = sinal agregado
   chaveDedup:    string;
   criadoEm:      string | null; // null quando não há uma data real associada ao sinal
+  entidadeTipo?: EntidadeTipoComercial; // opcional para compatibilidade com sinais V1 já persistidos/testados
+  entidadeId?:   string;
   destino?:      string;
   destinoLabel?: string;
+  destinoAcao?:  string; // fluxo governado quando a ação recomendada difere da consulta do domínio
+  urgencia?:     number | null; // dias reais de espera; usado só como desempate, nunca como score
+  dados?:        Record<string, string | number | boolean | null>;
+  apresentacao?: {
+    categoria: CategoriaRecomendacao;
+    explicacao: string;
+    impacto: string;
+    tempoEstimado: string;
+    quantidade: number;
+  };
 };
 
 // ── Adaptador do Especialista Comercial ──────────────────────────────────
@@ -63,11 +87,12 @@ const ORIGEM_PADRAO = { evidencia: "no histórico real de agendamentos", destino
 
 export function adaptarOportunidadesClientes(oportunidades: OportunidadeCliente[]): SinalCanonico[] {
   return oportunidades.map(op => {
-    const origem = ORIGEM_POR_TIPO[op.sinais[0].tipo] ?? ORIGEM_PADRAO;
+    const principal = op.sinais[0];
+    const origem = ORIGEM_POR_TIPO[principal.tipo] ?? ORIGEM_PADRAO;
     return {
       id:           `cliente-${op.chave}`,
       especialista: "comercial",
-      tipo:         op.sinais[0].tipo,
+      tipo:         principal.tipo,
       prioridade:   op.prioridade,
       titulo:       `${op.nome} — ${op.acaoSugerida}`,
       motivo:       op.motivoPrincipal,
@@ -78,8 +103,19 @@ export function adaptarOportunidadesClientes(oportunidades: OportunidadeCliente[
       contexto:     { tipo: "cliente" as const, nome: op.nome, telefone: op.telefone },
       chaveDedup:   op.chave,
       criadoEm:     null,
-      destino:      origem.destino,
+      entidadeTipo: principal.entidadeTipo,
+      entidadeId:   principal.entidadeId,
+      destino:      principal.destino || origem.destino,
       destinoLabel: origem.destinoLabel,
+      destinoAcao:  principal.destinoAcao,
+      urgencia:     principal.diasDesdeEvento,
+      apresentacao: {
+        categoria: "oportunidade" as const,
+        explicacao: principal.motivo,
+        impacto: principal.acaoSugerida,
+        tempoEstimado: principal.tempoDecorrido ?? "Agora",
+        quantidade: 1,
+      },
     };
   });
 }
@@ -101,8 +137,16 @@ export function adaptarRecomendacoes(recomendacoes: Recomendacao[]): SinalCanoni
     acaoSugerida: r.acao,
     chaveDedup:   `rec:${r.id}`,
     criadoEm:     null,
+    entidadeTipo: "negocio",
     destino:      r.destino,
     destinoLabel: r.destinoLabel,
+    apresentacao: {
+      categoria: r.categoria,
+      explicacao: r.explicacao,
+      impacto: r.impacto,
+      tempoEstimado: r.tempoEstimado,
+      quantidade: r.quantidade,
+    },
   }));
 }
 
@@ -123,6 +167,31 @@ export type OportunidadeDemandaSinal = {
   orcamento_vinculado_id: string | null;
 };
 
+// Interesse real ainda sem orçamento é uma oportunidade comercial de
+// prioridade média. A confiança descreve a certeza da classificação da
+// origem, não a urgência de agir — por isso os dois conceitos permanecem
+// separados. Oportunidade parada (>= limiar do Follow-up) continua alta no
+// motor operacional próprio, sem ser inferida neste adaptador sem data.
+const PRIORIDADE_COMERCIAL_POR_TIPO: Record<string, PrioridadeComercial> = {
+  cancelamento_sem_reagendamento: "alta",
+  orcamento_parado: "alta",
+  cobranca_atrasada: "alta",
+  pedido_nao_concluido: "alta",
+  confirmacao_pendente: "alta",
+  oportunidade_parada: "alta",
+  interesse_sem_orcamento: "media",
+  tratamento_sem_retorno: "media",
+  recompra_possivel: "media",
+  sem_proximo_compromisso: "media",
+};
+
+export function prioridadeComercialParaTipo(
+  tipo: string,
+  prioridadeLegada: PrioridadeComercial = "media"
+): PrioridadeComercial {
+  return PRIORIDADE_COMERCIAL_POR_TIPO[tipo] ?? prioridadeLegada;
+}
+
 const CANAL_LABEL_DEMANDA: Record<OportunidadeDemandaSinal["canal"], string> = {
   whatsapp: "WhatsApp", manual: "contato manual", site: "site",
 };
@@ -133,8 +202,9 @@ export function adaptarOportunidadesDemanda(oportunidades: OportunidadeDemandaSi
     .map(op => ({
       id:           `demanda-${op.id}`,
       especialista: "comercial",
-      tipo:         op.status,
-      prioridade:   op.confianca_classificacao,
+      tipo:         "interesse_sem_orcamento",
+      prioridade:   prioridadeComercialParaTipo("interesse_sem_orcamento"),
+      confianca:    op.confianca_classificacao,
       titulo:       `${op.nome_informado || "Contato"} — interesse ainda sem orçamento`,
       motivo:       `Sinalizou interesse via ${CANAL_LABEL_DEMANDA[op.canal]} e ainda não recebeu um orçamento.`,
       evidencia:    "Identificado na oportunidade real registrada (interesse sem compra).",
@@ -142,8 +212,18 @@ export function adaptarOportunidadesDemanda(oportunidades: OportunidadeDemandaSi
       contexto:     { tipo: "cliente" as const, nome: op.nome_informado || "Contato", telefone: op.telefone },
       chaveDedup:   `demanda:${op.id}`,
       criadoEm:     null,
+      entidadeTipo: "oportunidade" as const,
+      entidadeId:   op.id,
       destino:      "/oportunidades",
       destinoLabel: "Ver oportunidade",
+      dados:        { status: op.status, canal: op.canal },
+      apresentacao: {
+        categoria: "oportunidade" as const,
+        explicacao: `Interesse real recebido via ${CANAL_LABEL_DEMANDA[op.canal]}, ainda sem orçamento vinculado.`,
+        impacto: "Apresentar um orçamento com base no interesse registrado",
+        tempoEstimado: "Agora",
+        quantidade: 1,
+      },
     }));
 }
 
@@ -154,19 +234,31 @@ export function adaptarOportunidadesDemanda(oportunidades: OportunidadeDemandaSi
 // para que Próxima Melhor Ação e Missão do Dia nunca precisem recalcular a
 // prioridade cada uma à sua moda.
 const TIER: Record<string, number> = {
-  cancelamento_sem_reagendamento: 1,
-  confirmacao_pendente:           2,
-  "compromissos-atrasados":       3,
-  "horario-vago-hoje":            4,
-  sem_proximo_compromisso:        5,
+  cancelamento_sem_reagendamento: 0,
+  orcamento_parado:               1,
+  cobranca_atrasada:              2,
+  pedido_nao_concluido:           3,
+  confirmacao_pendente:           4,
+  oportunidade_parada:            5,
+  interesse_sem_orcamento:        6,
+  // aliases V1: sinais antigos continuam ordenáveis sem regravação
+  sinalizada:                     6,
+  em_contato:                     6,
+  agendada:                       6,
+  atendida:                       6,
+  tratamento_sem_retorno:         7,
+  recompra_possivel:              8,
+  sem_proximo_compromisso:        9,
+  "compromissos-atrasados":      10,
+  "horario-vago-hoje":           11,
 };
-const TIER_PADRAO = 6;
+const TIER_PADRAO = 99;
 
 function tierDoSinal(sinal: SinalCanonico): number {
   return TIER[sinal.tipo] ?? TIER_PADRAO;
 }
 
-const PESO_PRIORIDADE: Record<"alta" | "media" | "baixa", number> = { alta: 0, media: 1, baixa: 2 };
+const PESO_PRIORIDADE: Record<PrioridadeComercial, number> = { alta: 0, media: 1, baixa: 2 };
 
 // Princípio da Transparência (docs/nucleo-inteligente-v1-arquitetura.md,
 // seção 2, item 6): todo sinal precisa de motivo, evidência e ação — um
@@ -189,7 +281,10 @@ export function organizarSinaisCanonicos(sinais: SinalCanonico[]): SinalCanonico
   const ordenados = [...sinais]
     .filter(sinalValido)
     .sort((a, b) =>
-      PESO_PRIORIDADE[a.prioridade] - PESO_PRIORIDADE[b.prioridade] || tierDoSinal(a) - tierDoSinal(b)
+      PESO_PRIORIDADE[a.prioridade] - PESO_PRIORIDADE[b.prioridade]
+      || tierDoSinal(a) - tierDoSinal(b)
+      || (b.urgencia ?? -1) - (a.urgencia ?? -1)
+      || a.chaveDedup.localeCompare(b.chaveDedup)
     );
   const vistos = new Set<string>();
   const resultado: SinalCanonico[] = [];
@@ -208,4 +303,91 @@ export function organizarSinaisCanonicos(sinais: SinalCanonico[]): SinalCanonico
 // o teto fixo de 3, nunca uma lista maior.
 export function gerarMissaoDoDia(sinais: SinalCanonico[], limite = 3): SinalCanonico[] {
   return organizarSinaisCanonicos(sinais).slice(0, limite);
+}
+
+export type EstadoComercialCanonico = {
+  sinais: SinalCanonico[];
+  missaoDoDia: SinalCanonico[];
+  central: Record<PrioridadeComercial, SinalCanonico[]>;
+  radar: SinalCanonico[];
+  diretor: SinalCanonico[];
+};
+
+/** Uma única coleção organizada, projetada para cada superfície sem
+ * recalcular prioridade. Radar mantém somente sinais com contexto de cliente;
+ * Central recebe o quadro completo; Diretor e Missão recebem o mesmo top-N. */
+export function gerarEstadoComercialCanonico(
+  sinais: SinalCanonico[],
+  limiteMissao = 3
+): EstadoComercialCanonico {
+  const organizados = organizarSinaisCanonicos(sinais);
+  const missaoDoDia = organizados.slice(0, limiteMissao);
+  return {
+    sinais: organizados,
+    missaoDoDia,
+    central: {
+      alta: organizados.filter(s => s.prioridade === "alta"),
+      media: organizados.filter(s => s.prioridade === "media"),
+      baixa: organizados.filter(s => s.prioridade === "baixa"),
+    },
+    radar: organizados.filter(s => !!s.contexto),
+    diretor: missaoDoDia,
+  };
+}
+
+function sinalParaRecomendacao(sinal: SinalCanonico): Recomendacao {
+  const apresentacao = sinal.apresentacao;
+  return {
+    id: sinal.id,
+    categoria: apresentacao?.categoria ?? "oportunidade",
+    titulo: sinal.titulo,
+    explicacao: apresentacao?.explicacao ?? sinal.motivo,
+    motivo: sinal.evidencia,
+    acao: sinal.acaoSugerida,
+    destino: sinal.destino,
+    destinoLabel: sinal.destinoLabel,
+    prioridade: sinal.prioridade,
+    impacto: apresentacao?.impacto ?? sinal.acaoSugerida,
+    tempoEstimado: apresentacao?.tempoEstimado ?? "Agora",
+    quantidade: apresentacao?.quantidade ?? 1,
+  };
+}
+
+/** Adaptador temporário para o componente legado da Central. O conteúdo vem
+ * integralmente do estado canônico; nenhuma regra ou prioridade é recalculada. */
+export function adaptarCentralCanonicaParaLegado(
+  central: EstadoComercialCanonico["central"]
+): CentralOportunidades {
+  return {
+    alta: central.alta.map(sinalParaRecomendacao),
+    media: central.media.map(sinalParaRecomendacao),
+    baixa: central.baixa.map(sinalParaRecomendacao),
+  };
+}
+
+/** Mantém o contrato atual do Radar enquanto o componente está na pista do
+ * Capitão, mas aplica exatamente a ordem decidida pelo estado canônico. */
+export function ordenarOportunidadesPorEstadoCanonico(
+  oportunidades: OportunidadeCliente[],
+  estado: EstadoComercialCanonico
+): OportunidadeCliente[] {
+  const porId = new Map(oportunidades.map(op => [`cliente-${op.chave}`, op]));
+  return estado.radar.map(s => porId.get(s.id)).filter((op): op is OportunidadeCliente => !!op);
+}
+
+export type FontesComerciaisReais = {
+  totalPacientes: number;
+  totalAgendamentos: number;
+  oportunidades: number;
+  orcamentos: number;
+  tratamentos: number;
+  cobrancas: number;
+  pedidos: number;
+};
+
+/** Dados comerciais podem existir antes do cadastro de um paciente. Esta
+ * função só responde se existe alguma fonte real; não confunde disponibilidade
+ * com conteúdo e não faz I/O. */
+export function existemDadosComerciaisReais(fontes: FontesComerciaisReais): boolean {
+  return Object.values(fontes).some(quantidade => quantidade > 0);
 }

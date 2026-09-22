@@ -17,6 +17,8 @@ const stCategoria: Record<RecomendacaoConsultiva["categoria"], { emoji: string; 
   tratamento_sem_retorno:   { emoji: "🔁", label: "Continuidade sem retorno" },
   pedido_nao_concluido:     { emoji: "🛒", label: "Pedido não concluído" },
   recompra_possivel:        { emoji: "🔂", label: "Recompra possível" },
+  interesse_sem_orcamento:  { emoji: "💬", label: "Interesse sem orçamento" },
+  sinal_comercial:          { emoji: "📌", label: "Sinal comercial" },
 };
 
 const stPrioridade: Record<"alta" | "media" | "baixa", { bg: string; border: string; color: string; label: string }> = {

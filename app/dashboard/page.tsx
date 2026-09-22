@@ -17,7 +17,17 @@ type PedidoRow = {
   pedido_itens?: { descricao: string }[];
 };
 import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
-import { adaptarOportunidadesClientes, adaptarRecomendacoes, adaptarOportunidadesDemanda, gerarMissaoDoDia, type SinalCanonico, type OportunidadeDemandaSinal } from "../../lib/nucleo-inteligente";
+import {
+  adaptarOportunidadesClientes,
+  adaptarRecomendacoes,
+  adaptarOportunidadesDemanda,
+  adaptarCentralCanonicaParaLegado,
+  existemDadosComerciaisReais,
+  gerarEstadoComercialCanonico,
+  ordenarOportunidadesPorEstadoCanonico,
+  type SinalCanonico,
+  type OportunidadeDemandaSinal,
+} from "../../lib/nucleo-inteligente";
 import DashboardView, {
   gerarIdeia, gerarInsights, gerarSaudacaoCard,
   type AgItem,
@@ -374,6 +384,20 @@ export default function Dashboard() {
     atrasados:            dash.atrasados,
   });
 
+  // A existência de inteligência comercial não depende da existência de
+  // paciente cadastrado. Lead público, oportunidade, pedido ou cobrança são
+  // fatos reais por si só. Disponibilidade/erro de cada fonte continua fora
+  // deste hunk porque está sendo tratada na pista do Capitão.
+  const temDadosComerciais = existemDadosComerciaisReais({
+    totalPacientes: dash.totalPacientes,
+    totalAgendamentos: dash.totalAgendamentos,
+    oportunidades: dash.oportunidadesDemandaRows.length,
+    orcamentos: dash.orcamentosParadosRows.length,
+    tratamentos: dash.tratamentosAtivosRows.length,
+    cobrancas: dash.todasCobrancasRows.length,
+    pedidos: dash.todosPedidosRows.length,
+  });
+
   // Intelligence 2.0 — o Diretor Digital não só percebe, decide: escolhe UMA
   // prioridade principal para o dia (docs/organizapro-intelligence-engine-
   // v1.html). Regras determinísticas, sem IA generativa; usa só dados já
@@ -396,14 +420,14 @@ export default function Dashboard() {
     temWhatsapp:          dash.temWhatsapp,
   };
 
-  const centralOportunidades = insights.temDados
+  const centralOportunidadesBase = temDadosComerciais
     ? gerarCentralOportunidades(ctxNegocio)
     : { alta: [], media: [], baixa: [] };
 
   // Agenda Autônoma de Receita — diferente da Central de Oportunidades (que
   // conta), aqui cada card é UM cliente nomeado, com o motivo real que o
   // trouxe até aqui. Mesmos dados já carregados acima; zero consulta nova.
-  const oportunidadesClientes: OportunidadeCliente[] = insights.temDados
+  const oportunidadesClientes: OportunidadeCliente[] = temDadosComerciais
     ? gerarOportunidadesClientes({
         hoje: hojeStr,
         agora: agoraIso,
@@ -461,9 +485,6 @@ export default function Dashboard() {
       })
     : [];
 
-  // Radar de Oportunidades — frase de abertura na voz do Diretor Digital.
-  const resumoRadar = gerarResumoRadar(oportunidadesClientes.length);
-
   // Bloco F "Dinheiro" — mesmo motor real já usado em app/cobrancas/page.tsx
   // (calcularIndicadoresCobranca), nenhum cálculo novo. null (nunca 0)
   // quando a clínica ainda não tem nenhuma cobrança registrada — a tela não
@@ -489,7 +510,7 @@ export default function Dashboard() {
   // Central de Oportunidades continua alimentando Missão do Dia/Diretor
   // Digital abaixo — nenhuma regra de negócio nova.
   const todasRecomendacoesAcionaveis = [
-    ...centralOportunidades.alta, ...centralOportunidades.media, ...centralOportunidades.baixa,
+    ...centralOportunidadesBase.alta, ...centralOportunidadesBase.media, ...centralOportunidadesBase.baixa,
   ];
 
   // ── 🎯 Missão do Dia (Núcleo Inteligente V1.1, Fase 1) ───────────────────
@@ -499,26 +520,31 @@ export default function Dashboard() {
   // Smart Commerce Canônico · primeiro elo ("interesse sem compra") entra
   // aqui também — mesma lista de sinais, mesma ordenação/desempate, nenhuma
   // regra nova (docs P1: Reintegração da Inteligência).
-  const sinaisCanonicos = insights.temDados
+  const sinaisCanonicos = temDadosComerciais
     ? [
         ...adaptarOportunidadesClientes(oportunidadesClientes),
         ...adaptarRecomendacoes(todasRecomendacoesAcionaveis),
         ...adaptarOportunidadesDemanda(dash.oportunidadesDemandaRows),
       ]
     : [];
-  const missaoDoDia: SinalCanonico[] = gerarMissaoDoDia(sinaisCanonicos);
+  const estadoComercial = gerarEstadoComercialCanonico(sinaisCanonicos);
+  const missaoDoDia: SinalCanonico[] = estadoComercial.missaoDoDia;
+  const centralOportunidades = adaptarCentralCanonicaParaLegado(estadoComercial.central);
+  const oportunidadesClientesRadar = ordenarOportunidadesPorEstadoCanonico(oportunidadesClientes, estadoComercial);
+  const resumoRadar = gerarResumoRadar(oportunidadesClientesRadar.length);
 
   // ── IA Comercial V1 · Diretor Digital (docs/ia-comercial-v1-arquitetura.md) ──
   // Reaproveita 100% os mesmos dados já calculados acima para o Radar e para
   // a Central de Oportunidades — nenhuma consulta nova, nenhuma regra de
   // priorização nova, nenhum dos dois arquivos originais foi alterado.
   const recomendacoesConsultivas = gerarRecomendacoesConsultivas({
-    temDadosSuficientes: insights.temDados,
+    temDadosSuficientes: temDadosComerciais,
     oportunidadesClientes,
     recomendacoes: todasRecomendacoesAcionaveis,
     ocupacaoPct,
+    sinaisCanonicos: estadoComercial.diretor,
   });
-  const narrativaDiretor = insights.temDados
+  const narrativaDiretor = temDadosComerciais
     ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
     : gerarMensagemDadosInsuficientes();
 
@@ -540,7 +566,7 @@ export default function Dashboard() {
       clinicaId={clinicaId}
       dataStr={dataStr}
       saudacaoCard={saudacaoCard}
-      temDados={insights.temDados}
+      temDados={temDadosComerciais}
       situacaoEmoji={insights.situacao.emoji}
       situacaoTom={insights.situacao.tom}
       ocupacaoPct={ocupacaoPct}
@@ -564,7 +590,7 @@ export default function Dashboard() {
         avaliacoesPendentes: dash.avaliacoesPendentes,
       }}
       narrativaDiretor={narrativaDiretor}
-      oportunidadesClientes={oportunidadesClientes}
+      oportunidadesClientes={oportunidadesClientesRadar}
       resumoRadar={resumoRadar}
       orcamentosParadosCount={dash.orcamentosParadosRows.length}
       cobrancasAbertasCount={dash.todasCobrancasRows.length > 0 ? dash.cobrancasAbertasRows.length : null}

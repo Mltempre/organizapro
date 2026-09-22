@@ -18,6 +18,7 @@
 
 import type { OportunidadeCliente } from "./oportunidades-clientes";
 import type { Recomendacao } from "./recomendacoes";
+import type { SinalCanonico } from "./nucleo-inteligente";
 
 export type CategoriaConsultiva =
   | "retorno_cliente"
@@ -28,7 +29,9 @@ export type CategoriaConsultiva =
   | "cobranca_atrasada"
   | "tratamento_sem_retorno"
   | "pedido_nao_concluido"
-  | "recompra_possivel";
+  | "recompra_possivel"
+  | "interesse_sem_orcamento"
+  | "sinal_comercial";
 
 // Estrutura obrigatória de toda recomendação consultiva (missão desta versão):
 // o que foi identificado, por que importa, o que fazer agora, e a evidência
@@ -50,9 +53,29 @@ export type EntradaConsultor = {
   oportunidadesClientes: OportunidadeCliente[]; // já calculado pelo Radar — não recalculado aqui
   recomendacoes:         Recomendacao[];        // já calculado pela Central de Oportunidades — não recalculado aqui
   ocupacaoPct:           number | null;          // já calculado no Dashboard
+  sinaisCanonicos?:      readonly SinalCanonico[]; // quando presente, é a única realidade narrada pelo Diretor
 };
 
 const PESO_PRIORIDADE: Record<"alta" | "media" | "baixa", number> = { alta: 0, media: 1, baixa: 2 };
+
+function categoriaDoSinal(sinal: SinalCanonico): CategoriaConsultiva {
+  const porTipo: Partial<Record<string, CategoriaConsultiva>> = {
+    cancelamento_sem_reagendamento: "cancelamento_confirmacao",
+    confirmacao_pendente: "cancelamento_confirmacao",
+    sem_proximo_compromisso: "retorno_cliente",
+    orcamento_parado: "orcamento_parado",
+    cobranca_atrasada: "cobranca_atrasada",
+    tratamento_sem_retorno: "tratamento_sem_retorno",
+    pedido_nao_concluido: "pedido_nao_concluido",
+    recompra_possivel: "recompra_possivel",
+    interesse_sem_orcamento: "interesse_sem_orcamento",
+    "horario-vago-hoje": "agenda_ociosa",
+    "agenda-proximos-dias-vazia": "agenda_ociosa",
+    "agenda-semana-com-poucos-compromissos": "agenda_ociosa",
+    "avaliacao-pendente": "reputacao",
+  };
+  return porTipo[sinal.tipo] ?? "sinal_comercial";
+}
 
 /**
  * Reformula sinais já existentes (Radar + Central de Oportunidades) na
@@ -63,6 +86,24 @@ const PESO_PRIORIDADE: Record<"alta" | "media" | "baixa", number> = { alta: 0, m
  */
 export function gerarRecomendacoesConsultivas(input: EntradaConsultor): RecomendacaoConsultiva[] {
   if (!input.temDadosSuficientes) return [];
+
+  // Convergência do Cérebro Comercial V1: quando o chamador já possui um
+  // estado canônico, o Diretor apenas o narra. Não recompõe Radar + Central,
+  // não reordena e não pode omitir oportunidades_demanda que já estejam na
+  // Missão do Dia.
+  if (input.sinaisCanonicos) {
+    return input.sinaisCanonicos.slice(0, 3).map(sinal => ({
+      id: `consultivo-canonico-${sinal.id}`,
+      categoria: categoriaDoSinal(sinal),
+      identificado: sinal.titulo,
+      motivo: sinal.motivo,
+      acao: sinal.acaoSugerida,
+      evidencia: sinal.evidencia,
+      prioridade: sinal.prioridade,
+      destino: sinal.destino,
+      destinoLabel: sinal.destinoLabel,
+    }));
+  }
 
   const lista: RecomendacaoConsultiva[] = [];
 
