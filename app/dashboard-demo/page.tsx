@@ -125,8 +125,8 @@ export default function DashboardDemo() {
       situacaoTom={insights.situacao.tom}
       ocupacaoPct={ocupacaoPct}
       botoesRapidos={[
-        { icon: "➕", label: "Novo Cliente",     destino: "/clientes"     },
-        { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos" },
+        { icon: "➕", label: "Novo Cliente",     destino: "/clientes?novo=1"     },
+        { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos?novo=1" },
         { icon: "💰", label: "Orçamentos",       destino: "/orcamentos"   },
         { icon: "⭐", label: "Reputação",        destino: "/reputacao"    },
         { icon: "💬", label: "WhatsApp",         destino: "/chatbot"      },

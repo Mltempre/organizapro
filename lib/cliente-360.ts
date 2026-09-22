@@ -150,7 +150,14 @@ export function gerarCliente360(input: EntradaCliente360): ResumoCliente360 {
   // ── Timeline — só fatos reais, nunca um evento fabricado ────────────
   const timeline: EventoTimeline[] = [];
   for (const a of agendamentos) {
-    timeline.push({ tipo: "agendamento", data: `${a.data}T${a.hora}`, descricao: `Compromisso: ${a.tipoConsulta} (${a.status})`, valor: null, destino: "/agendamentos" });
+    const dataHora = `${a.data}T${a.hora}`;
+    // A aba padrão de /agendamentos ("Próximos") exclui compromissos
+    // passados/concluídos/cancelados — sem isto, clicar num evento
+    // passado da timeline abria uma tela onde o próprio item não
+    // aparecia. Passado real (comparado a `agora`, nunca ao relógio do
+    // navegador) manda para a aba Histórico; futuro continua na padrão.
+    const destinoAgendamento = dataHora < input.agora ? "/agendamentos?filtro=historico" : "/agendamentos";
+    timeline.push({ tipo: "agendamento", data: dataHora, descricao: `Compromisso: ${a.tipoConsulta} (${a.status})`, valor: null, destino: destinoAgendamento });
   }
   for (const o of oportunidades) {
     timeline.push({ tipo: "oportunidade", data: o.criadoEm, descricao: `Oportunidade sinalizada via ${o.canal}`, valor: null, destino: "/oportunidades" });

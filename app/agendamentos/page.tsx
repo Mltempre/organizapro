@@ -235,7 +235,12 @@ export default function AgendamentosPage() {
   const [sucesso, setSucesso]           = useState('');
   const [clinicaId, setClinicaId]       = useState('');
   const [enviando, setEnviando]         = useState<string | null>(null);
-  const [filtroData, setFiltroData]     = useState<'proximos' | 'confirmados' | 'historico'>('proximos');
+  // Destino real vindo de outra tela (ex.: Cliente 360, timeline de um
+  // compromisso passado) — mesmo padrão já usado em app/google-presenca/
+  // page.tsx para ler query string sem exigir Suspense boundary novo.
+  // Só decide a aba inicial; nunca cria uma aba nova.
+  const filtroInicial = (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('filtro') : null) as 'proximos' | 'confirmados' | 'historico' | null;
+  const [filtroData, setFiltroData]     = useState<'proximos' | 'confirmados' | 'historico'>(filtroInicial === 'historico' || filtroInicial === 'confirmados' ? filtroInicial : 'proximos');
   const [gerandoPdf, setGerandoPdf]     = useState(false);
 
   const carregar = useCallback(async () => {
@@ -274,6 +279,13 @@ export default function AgendamentosPage() {
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Botão Rápido "Novo Agendamento" do Dashboard (?novo=1) — abre o mesmo
+  // modal real de criação que o botão "+" desta tela já usa. Nenhum
+  // formulário novo, só liga o atalho à ação que já existe.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('novo') === '1') abrirNovo();
+  }, []);
 
   function abrirNovo() { setEditando(null); setForm(formInicial); setErro(''); setModal(true); }
 
@@ -482,7 +494,11 @@ export default function AgendamentosPage() {
     });
 
   const compromissosHoje = agendamentos.filter(a => a.data === hoje && !['cancelado','faltou'].includes(a.status)).length;
-  const confirmados      = agendamentos.filter(a => a.status === 'confirmado' && a.data >= hoje).length;
+  // Mesma condição exata da aba "Confirmados" (linha ~488) — antes o card
+  // só contava confirmados futuros/hoje, enquanto a aba (sem restrição de
+  // data) podia mostrar mais itens ao ser aberta, dando a impressão de
+  // números incoerentes na mesma tela.
+  const confirmados      = agendamentos.filter(a => a.confirmado === true || a.status === 'confirmado').length;
   const ausencias        = agendamentos.filter(a => a.status === 'faltou').length;
   const concluidos       = agendamentos.filter(a => a.status === 'concluido').length;
 

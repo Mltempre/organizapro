@@ -358,8 +358,11 @@ export default function Dashboard() {
   // não têm uma página própria com esse nome — direcionam para /chatbot e
   // /metricas, as páginas reais mais próximas hoje.
   const botoesRapidos = [
-    { icon: "➕", label: "Novo Cliente",     destino: "/clientes"     },
-    { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos" },
+    // ?novo=1: as próprias telas de destino já leem esse parâmetro e
+    // abrem o modal real de criação (abrirNovo, mesmo botão "+" que já
+    // existia) — nenhum formulário novo, só liga o atalho à ação real.
+    { icon: "➕", label: "Novo Cliente",     destino: "/clientes?novo=1"     },
+    { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos?novo=1" },
     { icon: "💰", label: "Orçamentos",       destino: "/orcamentos"   },
     { icon: "⭐", label: "Reputação",        destino: "/reputacao"    },
     { icon: "💬", label: "WhatsApp",         destino: "/chatbot"      },

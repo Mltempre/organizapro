@@ -152,6 +152,13 @@ export default function ClientesPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Botão Rápido "Novo Cliente" do Dashboard (?novo=1) — abre o mesmo
+  // modal real de criação que o botão "+" desta tela já usa. Nenhum
+  // formulário novo, só liga o atalho à ação que já existe.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('novo') === '1') abrirNovo();
+  }, []);
+
   // ── Histórico ──
 
   async function carregarHistorico(p: Paciente, cid: string) {

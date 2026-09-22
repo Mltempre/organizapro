@@ -234,7 +234,13 @@ export default function TratamentosPage() {
   return (
     <AdminShell
       title="Tratamentos"
-      subtitle={`${filtradas.length} tratamento${filtradas.length !== 1 ? 's' : ''}${indicadores.semAcompanhamento > 0 ? ` · ${indicadores.semAcompanhamento} sem acompanhamento` : ''}`}
+      // "sem acompanhamento" é indicador SEMPRE global (indicadores vem de
+      // calcularIndicadoresTratamento(tratamentos), nunca de `filtradas`)
+      // — só aparece junto da contagem filtrada quando o filtro ativo é
+      // 'todos', para nunca parecer que pertence ao recorte atual (ex.:
+      // filtro "Concluídos" mostrando "2 tratamentos · 5 sem
+      // acompanhamento" como se os 5 estivessem entre os 2 exibidos).
+      subtitle={`${filtradas.length} tratamento${filtradas.length !== 1 ? 's' : ''}${filtro === 'todos' && indicadores.semAcompanhamento > 0 ? ` · ${indicadores.semAcompanhamento} sem acompanhamento no total` : ''}`}
       actionLabel="+ Novo tratamento"
       actionOnClick={abrirNovo}
     >

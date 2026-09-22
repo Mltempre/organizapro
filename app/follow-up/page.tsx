@@ -52,7 +52,10 @@ export default function FollowUpPage() {
   const [erro, setErro] = useState('');
   const [falhaParcial, setFalhaParcial] = useState(false);
   const [sucesso, setSucesso] = useState('');
-  const [registrando, setRegistrando] = useState<string | null>(null);
+  // Set, não string única: mesma correção de app/orcamentos e
+  // app/oportunidades — evita que registrar contato de um caso reabilite
+  // por engano o botão de outro caso ainda em voo.
+  const [registrando, setRegistrando] = useState<Set<string>>(new Set());
   const [registradosAgora, setRegistradosAgora] = useState<Set<string>>(new Set());
   const [mensagemPreparada, setMensagemPreparada] = useState<{ entidadeId: string; texto: string } | null>(null);
 
@@ -60,7 +63,7 @@ export default function FollowUpPage() {
   // contato" (que prepara via POST /api/follow-up/tentativa) o botão
   // abaixo chama POST /api/follow-up/aprovar-envio, que relê e revalida
   // o caso de novo e só então chama o adaptador real (Z-API).
-  const [enviando, setEnviando] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState<Set<string>>(new Set());
   const [enviadosAgora, setEnviadosAgora] = useState<Set<string>>(new Set());
   const idempotencyEnvioRef = useRef<Record<string, string>>({});
 
@@ -132,7 +135,7 @@ export default function FollowUpPage() {
 
   async function registrarContato(caso: CasoFollowUp) {
     if (caso.donoDoFluxo !== 'follow-up') return;
-    setRegistrando(caso.entidadeId);
+    setRegistrando(prev => new Set(prev).add(caso.entidadeId));
     setMensagemPreparada(null);
     try {
       const res = await fetch('/api/follow-up/tentativa', {
@@ -150,7 +153,7 @@ export default function FollowUpPage() {
       console.error(e);
       setErro(MSG_ERRO_PADRAO);
     } finally {
-      setRegistrando(null);
+      setRegistrando(prev => { const next = new Set(prev); next.delete(caso.entidadeId); return next; });
     }
   }
 
@@ -170,7 +173,7 @@ export default function FollowUpPage() {
   }
 
   async function aprovarEnvio(caso: CasoFollowUp) {
-    setEnviando(caso.entidadeId);
+    setEnviando(prev => new Set(prev).add(caso.entidadeId));
     try {
       const res = await fetch('/api/follow-up/aprovar-envio', {
         method: 'POST',
@@ -189,7 +192,7 @@ export default function FollowUpPage() {
       console.error(e);
       setErro(MSG_ERRO_PADRAO);
     } finally {
-      setEnviando(null);
+      setEnviando(prev => { const next = new Set(prev); next.delete(caso.entidadeId); return next; });
     }
   }
 
@@ -224,12 +227,12 @@ export default function FollowUpPage() {
                   </div>
                   <button onClick={() => router.push(caso.destino)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>Ver →</button>
                   <button
-                    disabled={jaRegistrado || registrando === caso.entidadeId || !caso.telefone}
+                    disabled={jaRegistrado || registrando.has(caso.entidadeId) || !caso.telefone}
                     onClick={() => registrarContato(caso)}
                     title={!caso.telefone ? 'Cliente sem telefone cadastrado' : undefined}
                     style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: jaRegistrado ? 'rgba(148,163,184,0.2)' : 'linear-gradient(135deg,#16a34a,#15803d)', color: jaRegistrado ? '#94a3b8' : '#fff', fontSize: 11, fontWeight: 600, cursor: jaRegistrado || !caso.telefone ? 'not-allowed' : 'pointer' }}
                   >
-                    {registrando === caso.entidadeId ? 'Registrando...' : jaRegistrado ? 'Aguardando retorno' : 'Registrar contato'}
+                    {registrando.has(caso.entidadeId) ? 'Registrando...' : jaRegistrado ? 'Aguardando retorno' : 'Registrar contato'}
                   </button>
                 </div>
                 {mensagemPreparada?.entidadeId === caso.entidadeId && (
@@ -237,8 +240,8 @@ export default function FollowUpPage() {
                     <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4a9bb0', marginBottom: 4 }}>Mensagem preparada — copie e envie manualmente, ou aprove o envio automático pelo WhatsApp:</div>
                     {mensagemPreparada.texto}
                     <div style={{ marginTop: 8 }}>
-                      <button disabled={enviando === caso.entidadeId} onClick={() => aprovarEnvio(caso)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                        {enviando === caso.entidadeId ? 'Enviando...' : 'Aprovar e enviar pelo WhatsApp'}
+                      <button disabled={enviando.has(caso.entidadeId)} onClick={() => aprovarEnvio(caso)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        {enviando.has(caso.entidadeId) ? 'Enviando...' : 'Aprovar e enviar pelo WhatsApp'}
                       </button>
                     </div>
                   </div>

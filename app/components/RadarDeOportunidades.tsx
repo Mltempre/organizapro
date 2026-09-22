@@ -60,6 +60,18 @@ export default function RadarDeOportunidades({ oportunidades, resumo, onNavigate
             const meta = stTierOportunidade[op.prioridade];
             const cor = stTom[meta.tom];
             const numeroWpp = op.telefone ? (op.telefone.length > 11 ? op.telefone : `55${op.telefone}`) : null;
+            // "Abrir cliente" só vai para /clientes/[id] quando o sinal
+            // principal REALMENTE identifica um paciente cadastrado
+            // (entidadeTipo "cliente" + entidadeId real — hoje só o sinal
+            // "sem_proximo_compromisso" carrega isso). Os demais tipos
+            // (orçamento/cobrança/tratamento/pedido/agendamento) apontam
+            // para uma entidade diferente do paciente — nunca fabricamos
+            // um cliente_id que o motor não forneceu; fica na lista geral,
+            // comportamento seguro documentado.
+            const principal = op.sinais[0];
+            const destinoCliente = principal?.entidadeTipo === "cliente" && principal.entidadeId
+              ? `/clientes/${principal.entidadeId}`
+              : "/clientes";
             return (
               <div key={op.chave} style={{
                 background: "rgba(255,255,255,0.03)", border: `1px solid ${cor.border}`,
@@ -111,7 +123,7 @@ export default function RadarDeOportunidades({ oportunidades, resumo, onNavigate
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                   <button
-                    onClick={() => onNavigate("/clientes")}
+                    onClick={() => onNavigate(destinoCliente)}
                     style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(74,155,176,0.35)", background: "rgba(74,155,176,0.1)", color: "#4a9bb0", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
                   >
                     Abrir cliente

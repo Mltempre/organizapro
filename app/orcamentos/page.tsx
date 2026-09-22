@@ -92,7 +92,11 @@ export default function OrcamentosPage() {
   const salvandoRef = useRef(false);
   const idempotencyKeyRef = useRef<string>('');
 
-  const [transicionando, setTransicionando] = useState<string | null>(null);
+  // Set, não string única: clicar em cards DIFERENTES quase ao mesmo tempo
+  // não pode reabilitar o botão de um card ainda em voo (o valor único
+  // anterior era sobrescrito pelo id mais recente, liberando o card
+  // anterior antes da resposta dele chegar).
+  const [transicionando, setTransicionando] = useState<Set<string>>(new Set());
   const [modalRecusar, setModalRecusar]     = useState<Orcamento | null>(null);
   const [motivoRecusa, setMotivoRecusa]     = useState<MotivoDecisao | ''>('');
 
@@ -204,7 +208,7 @@ export default function OrcamentosPage() {
   // ── Transições — só os 3 estados finais que o motor real aceita ─────────
 
   async function transicionar(o: Orcamento, novoStatus: StatusOrcamento, motivo?: MotivoDecisao) {
-    setTransicionando(o.id);
+    setTransicionando(prev => new Set(prev).add(o.id));
     try {
       const res = await fetch(`/api/orcamentos/${o.id}/transicao`, {
         method: 'POST',
@@ -224,7 +228,7 @@ export default function OrcamentosPage() {
       console.error(e);
       setErro(MSG_ERRO_PADRAO);
     } finally {
-      setTransicionando(null);
+      setTransicionando(prev => { const next = new Set(prev); next.delete(o.id); return next; });
     }
   }
 
@@ -386,9 +390,25 @@ export default function OrcamentosPage() {
                       </div>
                     )}
                     {proximaAcao && (
-                      <div style={{ fontSize: 12, marginTop: 6, color: '#4a9bb0' }}>
-                        ➜ Próxima ação: {proximaAcao}
-                      </div>
+                      parado ? (
+                        // Parado tem ação real a tomar — leva para /follow-up,
+                        // a mesma superfície onde orçamento_parado já vira caso
+                        // de "Registrar contato"/"Aprovar envio" (lib/follow-up-
+                        // comercial.ts). Nenhuma rota nova, nenhuma automação
+                        // nova — só liga o texto (antes decorativo) à ação real
+                        // que já existe.
+                        <button
+                          type="button"
+                          onClick={() => router.push('/follow-up')}
+                          style={{ display: 'block', marginTop: 6, padding: 0, border: 'none', background: 'transparent', color: '#4a9bb0', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left', textDecoration: 'underline' }}
+                        >
+                          ➜ {proximaAcao} →
+                        </button>
+                      ) : (
+                        <div style={{ fontSize: 12, marginTop: 6, color: '#4a9bb0' }}>
+                          ➜ Próxima ação: {proximaAcao}
+                        </div>
+                      )
                     )}
                   </div>
 
@@ -406,15 +426,15 @@ export default function OrcamentosPage() {
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <button
                           className="orc-btn-aprovar"
-                          disabled={transicionando === o.id}
+                          disabled={transicionando.has(o.id)}
                           onClick={() => transicionar(o, 'aprovado')}
                           style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                         >
-                          {transicionando === o.id ? '...' : 'Aprovado'}
+                          {transicionando.has(o.id) ? '...' : 'Aprovado'}
                         </button>
                         <button
                           className="orc-btn-recusar"
-                          disabled={transicionando === o.id}
+                          disabled={transicionando.has(o.id)}
                           onClick={() => { setModalRecusar(o); setMotivoRecusa(''); }}
                           style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #450a0a', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer' }}
                         >
@@ -422,7 +442,7 @@ export default function OrcamentosPage() {
                         </button>
                         <button
                           className="orc-btn-expirar"
-                          disabled={transicionando === o.id}
+                          disabled={transicionando.has(o.id)}
                           onClick={() => transicionar(o, 'expirado')}
                           style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 11, cursor: 'pointer' }}
                         >
@@ -559,11 +579,11 @@ export default function OrcamentosPage() {
                 Cancelar
               </button>
               <button
-                disabled={transicionando === modalRecusar.id}
+                disabled={transicionando.has(modalRecusar.id)}
                 onClick={() => transicionar(modalRecusar, 'recusado', motivoRecusa || undefined)}
                 style={{ flex: 2, padding: '10px', borderRadius: 8, border: '1px solid #450a0a', background: 'rgba(248,113,113,0.1)', color: '#f87171', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
               >
-                {transicionando === modalRecusar.id ? 'Confirmando...' : 'Confirmar recusa'}
+                {transicionando.has(modalRecusar.id) ? 'Confirmando...' : 'Confirmar recusa'}
               </button>
             </div>
           </div>

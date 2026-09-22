@@ -67,7 +67,10 @@ export default function OportunidadesPage() {
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [filtro, setFiltro] = useState<'todas' | OportunidadeStatus>('todas');
-  const [transicionando, setTransicionando] = useState<string | null>(null);
+  // Set, não string única: mesma correção de app/orcamentos/page.tsx —
+  // evita que transicionar duas oportunidades diferentes quase ao mesmo
+  // tempo reabilite o botão da primeira antes da resposta dela chegar.
+  const [transicionando, setTransicionando] = useState<Set<string>>(new Set());
 
   const [modalOrcamento, setModalOrcamento] = useState<Oportunidade | null>(null);
   const [form, setForm] = useState<FormOrcamento>(formInicial);
@@ -129,7 +132,7 @@ export default function OportunidadesPage() {
   useEffect(() => { carregar(); }, [carregar]);
 
   async function transicionar(op: Oportunidade, status: OportunidadeStatus) {
-    setTransicionando(op.id);
+    setTransicionando(prev => new Set(prev).add(op.id));
     try {
       const res = await fetch(`/api/oportunidades/${op.id}/transicao`, {
         method: 'POST',
@@ -145,7 +148,7 @@ export default function OportunidadesPage() {
       console.error(e);
       setErro(MSG_ERRO_PADRAO);
     } finally {
-      setTransicionando(null);
+      setTransicionando(prev => { const next = new Set(prev); next.delete(op.id); return next; });
     }
   }
 
@@ -262,13 +265,13 @@ export default function OportunidadesPage() {
                     <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: st.bg, color: st.color }}>{st.label}</span>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 260 }}>
                       {proxima && (
-                        <button className="op-btn" disabled={transicionando === op.id} onClick={() => transicionar(op, proxima.alvo)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{proxima.label}</button>
+                        <button className="op-btn" disabled={transicionando.has(op.id)} onClick={() => transicionar(op, proxima.alvo)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{proxima.label}</button>
                       )}
                       {elegivel && (
-                        <button className="op-btn" disabled={transicionando === op.id} onClick={() => abrirGerarOrcamento(op)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.1)', color: '#4ade80', fontSize: 11, cursor: 'pointer' }}>Gerar orçamento</button>
+                        <button className="op-btn" disabled={transicionando.has(op.id)} onClick={() => abrirGerarOrcamento(op)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.1)', color: '#4ade80', fontSize: 11, cursor: 'pointer' }}>Gerar orçamento</button>
                       )}
                       {PODE_PERDER.includes(op.status) && (
-                        <button className="op-btn" disabled={transicionando === op.id} onClick={() => transicionar(op, 'perdida')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #450a0a', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer' }}>Marcar perdida</button>
+                        <button className="op-btn" disabled={transicionando.has(op.id)} onClick={() => transicionar(op, 'perdida')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #450a0a', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer' }}>Marcar perdida</button>
                       )}
                     </div>
                   </div>

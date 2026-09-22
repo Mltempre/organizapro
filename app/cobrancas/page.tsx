@@ -301,7 +301,11 @@ export default function CobrancasPage() {
   return (
     <AdminShell
       title="Cobranças"
-      subtitle={`${filtradas.length} cobrança${filtradas.length !== 1 ? 's' : ''}${atrasadas.length > 0 ? ` · ${atrasadas.length} atrasada${atrasadas.length !== 1 ? 's' : ''}` : ''}`}
+      // "atrasada(s)" é indicador SEMPRE global (atrasadas vem de
+      // `abertas`/`cobrancas`, nunca de `filtradas`) — só aparece junto da
+      // contagem filtrada quando o filtro ativo é 'todos', mesma correção
+      // de app/tratamentos/page.tsx.
+      subtitle={`${filtradas.length} cobrança${filtradas.length !== 1 ? 's' : ''}${filtro === 'todos' && atrasadas.length > 0 ? ` · ${atrasadas.length} atrasada${atrasadas.length !== 1 ? 's' : ''} no total` : ''}`}
       actionLabel="+ Nova cobrança"
       actionOnClick={abrirNovo}
     >
