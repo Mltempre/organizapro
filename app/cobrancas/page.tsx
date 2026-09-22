@@ -91,6 +91,17 @@ export default function CobrancasPage() {
   const [enviadosAgora, setEnviadosAgora] = useState<Set<string>>(new Set());
   const idempotencyEnvioRef = React.useRef<Record<string, string>>({});
 
+  // A key fica estável só ENQUANTO a tentativa atual está em voo (protege
+  // contra duplo-clique disparando duas requisições para o mesmo envio,
+  // antes do botão desabilitar). Assim que a resposta chega — sucesso OU
+  // falha — a key é descartada: a próxima aprovação explícita do usuário
+  // (novo clique) gera uma key NOVA, exatamente como o backend já espera
+  // (ver comentário de app/api/cobrancas/[id]/aprovar-envio/route.ts:15-16:
+  // "uma falha permite nova tentativa no mesmo dia com uma nova
+  // idempotency_key"). Mesma correção já aplicada em app/follow-up/
+  // page.tsx — antes desta correção a key nunca era descartada aqui, um
+  // envio falho travava qualquer retry com 409 "já foi solicitado", mesmo
+  // sem nada ter sido de fato entregue.
   function idempotencyKeyEnvioPara(cobrancaId: string): string {
     if (!idempotencyEnvioRef.current[cobrancaId]) idempotencyEnvioRef.current[cobrancaId] = crypto.randomUUID();
     return idempotencyEnvioRef.current[cobrancaId];
@@ -105,12 +116,14 @@ export default function CobrancasPage() {
         body: JSON.stringify({ clinica_id: clinicaId, idempotency_key: idempotencyKeyEnvioPara(c.id) }),
       });
       const json = await res.json();
+      delete idempotencyEnvioRef.current[c.id];
       if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
       setEnviadosAgora(prev => new Set(prev).add(c.id));
       setMensagemPreparada(null);
       setSucesso('Mensagem enviada pelo WhatsApp.');
       setTimeout(() => setSucesso(''), 3500);
     } catch (e) {
+      delete idempotencyEnvioRef.current[c.id];
       console.error(e);
       setErro(MSG_ERRO_PADRAO);
     } finally {

@@ -85,6 +85,28 @@ test("Follow-up: a key ainda é gerada de forma estável DENTRO de uma mesma cha
   assert.match(codigo, /function idempotencyKeyEnvioPara\(entidadeId: string\): string \{\n\s*if \(!idempotencyEnvioRef\.current\[entidadeId\]\) idempotencyEnvioRef\.current\[entidadeId\] = crypto\.randomUUID\(\);/);
 });
 
+// ── Continuação curta: mesmo bug de idempotência em Cobranças ───────────
+// Observação lateral do relatório anterior, confirmada e agora corrigida:
+// app/cobrancas/page.tsx tinha exatamente o mesmo padrão do Achado #2
+// (idempotencyEnvioRef nunca invalidada), no fluxo de aprovar-envio de
+// WhatsApp de cobrança atrasada.
+
+test("Cobranças: idempotency key do envio é descartada após a resposta (sucesso OU falha) — próximo clique gera key nova", () => {
+  const codigo = ler("app/cobrancas/page.tsx");
+  const ocorrencias = (codigo.match(/delete idempotencyEnvioRef\.current\[c\.id\];/g) || []).length;
+  assert.equal(ocorrencias, 2, "esperado descarte da key tanto após a resposta quanto no catch de exceção de rede");
+});
+
+test("Cobranças: a key ainda é gerada de forma estável DENTRO de uma mesma chamada (protege duplo-clique em voo) — não virou um UUID novo por render", () => {
+  const codigo = ler("app/cobrancas/page.tsx");
+  assert.match(codigo, /function idempotencyKeyEnvioPara\(cobrancaId: string\): string \{\n\s*if \(!idempotencyEnvioRef\.current\[cobrancaId\]\) idempotencyEnvioRef\.current\[cobrancaId\] = crypto\.randomUUID\(\);/);
+});
+
+test("Cobranças: a key de CRIAR cobrança (idempotencyKeyRef, fluxo diferente) não foi tocada por esta correção — escopo estritamente limitado ao envio de WhatsApp", () => {
+  const codigo = ler("app/cobrancas/page.tsx");
+  assert.match(codigo, /idempotencyKeyRef\.current = crypto\.randomUUID\(\);/);
+});
+
 // ── Achados #3/#4/#5 — erro real de API virava lista vazia silenciosa ───
 // 7 superfícies identificadas na auditoria: Copiloto, Follow-up,
 // Orçamentos, Oportunidades, Cobranças, Pedidos, Tratamentos.
