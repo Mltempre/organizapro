@@ -27,7 +27,7 @@ type Props = {
 
 export default function FaixaExecutiva({ oportunidades, orcamentosParados, cobrancasAbertas, compromissosHoje, avaliacoesPendentes, onNavigate }: Props) {
   const indicadores: Indicador[] = [
-    { label: "Oportunidades",      valor: oportunidades,        destino: "/oportunidades", tom: oportunidades > 0 ? "atencao" : "neutro" },
+    { label: "Oportunidades",      valor: oportunidades,        destino: "/copiloto",      tom: oportunidades > 0 ? "atencao" : "neutro" },
     { label: "Orçamentos parados", valor: orcamentosParados,    destino: "/orcamentos",    tom: orcamentosParados > 0 ? "atencao" : "neutro" },
     { label: "A receber",          valor: cobrancasAbertas,     destino: "/cobrancas",     tom: (cobrancasAbertas ?? 0) > 0 ? "atencao" : "neutro" },
     { label: "Agenda hoje",        valor: compromissosHoje,     destino: "/agendamentos",  tom: "neutro" },

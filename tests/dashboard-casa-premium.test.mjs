@@ -96,8 +96,12 @@ test("narrativaDiretor continua vindo de gerarNarrativaDiretor (lib/ia-comercial
 
 // ── 6. CTA aponta para rota real ─────────────────────────────────────────
 
+// Atualizado — Correção da Última Milha (Achado #1): o tile "Oportunidades"
+// apontava para /oportunidades (domínio errado — interesse sem compra);
+// agora aponta para /copiloto, a profundidade real do mesmo motor do
+// Radar (gerarOportunidadesClientes, uncapped).
 test("FaixaExecutiva: todos os destinos são rotas reais do produto", () => {
-  for (const rota of ["/oportunidades", "/orcamentos", "/cobrancas", "/agendamentos"]) {
+  for (const rota of ["/copiloto", "/orcamentos", "/cobrancas", "/agendamentos"]) {
     assert.ok(fs.existsSync(path.join(root, `app${rota}/page.tsx`)), `rota ausente: app${rota}/page.tsx`);
     assert.match(faixaExecutiva, new RegExp(rota.replace("/", "\\/")));
   }

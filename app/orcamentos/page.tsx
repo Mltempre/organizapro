@@ -120,13 +120,16 @@ export default function OrcamentosPage() {
         supabase.from('pacientes').select('id, nome, telefone, whatsapp').eq('clinica_id', cid).order('nome'),
       ]);
 
-      // Falha na consulta nunca fabrica dado — lista fica vazia, nunca um erro escondido como "0 orçamentos".
+      // Falha na consulta nunca fabrica dado — lista fica vazia. Mas falha
+      // REAL (qualquer status != 404) precisa ficar visível: "0 orçamentos"
+      // por erro de backend não pode parecer igual a uma clínica sem
+      // nenhum orçamento registrado.
       if (orcRes.ok) {
         const json = await orcRes.json();
         setOrcamentos(Array.isArray(json.orcamentos) ? json.orcamentos : []);
       } else {
         setOrcamentos([]);
-        if (orcRes.status !== 404) console.error('Erro ao carregar orçamentos:', orcRes.status);
+        if (orcRes.status !== 404) { console.error('Erro ao carregar orçamentos:', orcRes.status); setErro(MSG_ERRO_PADRAO); }
       }
       setPacientes((pacRes.data || []) as ClientePicker[]);
     } catch (err: unknown) {

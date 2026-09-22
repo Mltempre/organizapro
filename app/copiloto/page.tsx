@@ -8,6 +8,7 @@ import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import { stTom, stTierOportunidade } from '../components/estilos-prioridade';
+import { fetchJsonSeguro } from '../../lib/fetch-seguro';
 import { gerarOportunidadesClientes, type OportunidadeCliente } from '../../lib/oportunidades-clientes';
 import { agregarClientesElegiveisRecompra } from '../../lib/motor-pedidos';
 import { gerarFollowUpsComerciais, type CasoFollowUp } from '../../lib/follow-up-comercial';
@@ -52,6 +53,9 @@ type Estado = {
   pendentesConfirmacao: AgItem[];
   receitaPerdida: ResumoReceitaPerdida | null;
   previsor: ResumoPrevisorFaturamento | null;
+  /** true quando ao menos uma das 5 APIs falhou de verdade (não 404) —
+   * distingue "nada pendente" real de "não deu para carregar tudo". */
+  falhaParcial: boolean;
 };
 
 export default function CopilotoPage() {
@@ -82,17 +86,21 @@ export default function CopilotoPage() {
       // nenhuma consulta nova além das duas queries diretas ao Supabase
       // abaixo (clientes sem próximo compromisso / cancelamento sem
       // reagendar / agenda de hoje), mesmo padrão já usado em
-      // app/dashboard/page.tsx.
-      const [oportunidadesRes, orcamentosRes, tratamentosRes, pedidosRes, cobrancasRes, agHojeRes, semProximoRes, canceladosRes] = await Promise.all([
-        fetch('/api/oportunidades', { headers: auth }).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
-        fetch(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }).then(r => r.ok ? r.json() : { orcamentos: [] }).catch(() => ({ orcamentos: [] })),
-        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { tratamentos: [] }).catch(() => ({ tratamentos: [] })),
-        fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { pedidos: [] }).catch(() => ({ pedidos: [] })),
-        fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { cobrancas: [] }).catch(() => ({ cobrancas: [] })),
+      // app/dashboard/page.tsx. fetchJsonSeguro distingue falha real de
+      // vazio real — uma API fora do ar nunca deve virar silenciosamente
+      // "nada pendente" (achado sistêmico da auditoria de última milha).
+      const [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR, agHojeRes, semProximoRes, canceladosRes] = await Promise.all([
+        fetchJsonSeguro<{ data: OportunidadeRow[] }>('/api/oportunidades', { headers: auth }, { data: [] }),
+        fetchJsonSeguro<{ orcamentos: OrcamentoRow[] }>(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }, { orcamentos: [] }),
+        fetchJsonSeguro<{ tratamentos: TratamentoRow[] }>(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }, { tratamentos: [] }),
+        fetchJsonSeguro<{ pedidos: PedidoRow[] }>(`/api/pedidos?clinica_id=${cid}`, { headers: auth }, { pedidos: [] }),
+        fetchJsonSeguro<{ cobrancas: CobrancaRow[] }>(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }, { cobrancas: [] }),
         supabase.from('agendamentos').select('id, hora, paciente_nome, telefone, status, data').eq('clinica_id', cid).eq('data', hoje).order('hora'),
         supabase.from('pacientes').select('id, nome, telefone, whatsapp, proxima_consulta').eq('clinica_id', cid).eq('status', 'ativo').or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`).order('nome').limit(20),
         supabase.from('agendamentos').select('id, paciente_nome, telefone, data').eq('clinica_id', cid).eq('status', 'cancelado').gte('data', trintaDiasAtras).order('data', { ascending: false }).limit(50),
       ]);
+      const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, tratamentosRes = tratamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
+      const falhaParcial = [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR].some(r => r.falhou);
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
@@ -194,6 +202,7 @@ export default function CopilotoPage() {
         pendentesConfirmacao: agendaHoje.filter(a => a.status === 'agendado' && a.data === hoje),
         receitaPerdida,
         previsor,
+        falhaParcial,
       });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') { router.push('/login'); return; }
@@ -214,6 +223,9 @@ export default function CopilotoPage() {
     <AdminShell title="Copiloto Administrativo" subtitle="O que precisa da sua atenção agora — só dados reais, nada fabricado">
       {carregando && <PageLoader title="Consolidando o que precisa da sua atenção..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && estado && estado.falhaParcial && (
+        <Feedback type="aviso" message="Alguns dados podem estar incompletos — houve falha ao carregar uma ou mais fontes (oportunidades, orçamentos, tratamentos, pedidos ou cobranças). O que aparece abaixo é real, mas pode não ser tudo." />
+      )}
 
       {!carregando && estado && totalItens === 0 && (
         <EmptyState icon="✅" title="Nada pedindo atenção agora." description="Nenhum atraso de agenda, oportunidade parada, orçamento parado, cobrança atrasada, pedido pendente ou follow-up em aberto identificado." />

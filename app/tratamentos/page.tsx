@@ -107,7 +107,9 @@ export default function TratamentosPage() {
         setTratamentos(Array.isArray(json.tratamentos) ? json.tratamentos : []);
       } else {
         setTratamentos([]);
-        if (tratRes.status !== 404) console.error('Erro ao carregar tratamentos:', tratRes.status);
+        // status != 404 é falha real — precisa ficar visível, nunca virar
+        // silenciosamente "nenhum tratamento".
+        if (tratRes.status !== 404) { console.error('Erro ao carregar tratamentos:', tratRes.status); setErro(MSG_ERRO_PADRAO); }
       }
       if (orcRes.ok) {
         const json = await orcRes.json();

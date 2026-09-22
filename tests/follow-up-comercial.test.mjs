@@ -282,8 +282,13 @@ test("idempotência/determinismo: mesma entrada duas vezes produz exatamente o m
 const pagina = fs.readFileSync(new URL("../app/follow-up/page.tsx", import.meta.url), "utf8");
 const rota = fs.readFileSync(new URL("../app/api/follow-up/tentativa/route.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
-test("follow-up: tela busca só pelas APIs canônicas já existentes (todas escopadas por clinica_id), nenhuma query direta a supabase.from em tabela de negócio", () => {
-  assert.match(pagina, /fetch\('\/api\/oportunidades'/);
+// Atualizado — Correção da Última Milha (achados #3/#4/#5): os 5 fetches
+// passaram a usar fetchJsonSeguro (lib/fetch-seguro.ts) em vez de
+// fetch(...).then(...).catch(...) direto, para distinguir falha real de
+// vazio real — mesmos 5 endpoints canônicos, nenhum novo, nenhum removido.
+test("follow-up: tela busca só pelas APIs canônicas já existentes (todas escopadas por clinica_id, via fetchJsonSeguro), nenhuma query direta a supabase.from em tabela de negócio", () => {
+  assert.match(pagina, /import \{ fetchJsonSeguro \} from '\.\.\/\.\.\/lib\/fetch-seguro'/);
+  assert.match(pagina, /fetchJsonSeguro<\{ data: OportunidadeRow\[\] \}>\('\/api\/oportunidades'/);
   assert.match(pagina, /\/api\/orcamentos\?clinica_id=\$\{cid\}/);
   assert.match(pagina, /\/api\/tratamentos\?clinica_id=\$\{cid\}/);
   assert.match(pagina, /\/api\/pedidos\?clinica_id=\$\{cid\}/);

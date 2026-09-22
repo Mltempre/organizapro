@@ -7,6 +7,7 @@ import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
+import { fetchJsonSeguro } from '../../lib/fetch-seguro';
 import { gerarFollowUpsComerciais, type CasoFollowUp, type TipoFollowUpProprio } from '../../lib/follow-up-comercial';
 import { agregarClientesElegiveisRecompra } from '../../lib/motor-pedidos';
 import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
@@ -49,6 +50,7 @@ export default function FollowUpPage() {
   const [accessToken, setAccessToken] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
+  const [falhaParcial, setFalhaParcial] = useState(false);
   const [sucesso, setSucesso] = useState('');
   const [registrando, setRegistrando] = useState<string | null>(null);
   const [registradosAgora, setRegistradosAgora] = useState<Set<string>>(new Set());
@@ -64,7 +66,7 @@ export default function FollowUpPage() {
 
   const carregar = useCallback(async () => {
     try {
-      setCarregando(true); setErro('');
+      setCarregando(true); setErro(''); setFalhaParcial(false);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) { router.push('/login'); return; }
@@ -78,13 +80,15 @@ export default function FollowUpPage() {
       setClinicaId(cid || '');
       if (!cid) { setCasos([]); setCarregando(false); return; }
 
-      const [oportunidadesRes, orcamentosRes, tratamentosRes, pedidosRes, cobrancasRes] = await Promise.all([
-        fetch('/api/oportunidades', { headers: auth }).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
-        fetch(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }).then(r => r.ok ? r.json() : { orcamentos: [] }).catch(() => ({ orcamentos: [] })),
-        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { tratamentos: [] }).catch(() => ({ tratamentos: [] })),
-        fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { pedidos: [] }).catch(() => ({ pedidos: [] })),
-        fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { cobrancas: [] }).catch(() => ({ cobrancas: [] })),
+      const [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR] = await Promise.all([
+        fetchJsonSeguro<{ data: OportunidadeRow[] }>('/api/oportunidades', { headers: auth }, { data: [] }),
+        fetchJsonSeguro<{ orcamentos: OrcamentoRow[] }>(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }, { orcamentos: [] }),
+        fetchJsonSeguro<{ tratamentos: TratamentoRow[] }>(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }, { tratamentos: [] }),
+        fetchJsonSeguro<{ pedidos: PedidoRow[] }>(`/api/pedidos?clinica_id=${cid}`, { headers: auth }, { pedidos: [] }),
+        fetchJsonSeguro<{ cobrancas: CobrancaRow[] }>(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }, { cobrancas: [] }),
       ]);
+      const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, tratamentosRes = tratamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
+      setFalhaParcial([oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR].some(r => r.falhou));
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
@@ -150,6 +154,16 @@ export default function FollowUpPage() {
     }
   }
 
+  // A key fica estável só ENQUANTO a tentativa atual está em voo (protege
+  // contra duplo-clique disparando duas requisições para o mesmo envio,
+  // antes do botão desabilitar). Assim que a resposta chega — sucesso OU
+  // falha — a key é descartada: a próxima aprovação explícita do usuário
+  // (novo clique) gera uma key NOVA, exatamente como o backend já espera
+  // (ver comentário de app/api/follow-up/aprovar-envio/route.ts:6-8: "uma
+  // falha permite nova tentativa no mesmo dia com uma nova idempotency_
+  // key"). Antes desta correção a key nunca era descartada — um envio
+  // falho travava qualquer retry com 409 "já foi solicitado", mesmo sem
+  // nada ter sido de fato entregue.
   function idempotencyKeyEnvioPara(entidadeId: string): string {
     if (!idempotencyEnvioRef.current[entidadeId]) idempotencyEnvioRef.current[entidadeId] = crypto.randomUUID();
     return idempotencyEnvioRef.current[entidadeId];
@@ -164,12 +178,14 @@ export default function FollowUpPage() {
         body: JSON.stringify({ clinica_id: clinicaId, tipo: caso.tipo as TipoFollowUpProprio, entidade_id: caso.entidadeId, idempotency_key: idempotencyKeyEnvioPara(caso.entidadeId) }),
       });
       const json = await res.json();
+      delete idempotencyEnvioRef.current[caso.entidadeId];
       if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
       setEnviadosAgora(prev => new Set(prev).add(caso.entidadeId));
       setMensagemPreparada(null);
       setSucesso('Mensagem enviada pelo WhatsApp.');
       setTimeout(() => setSucesso(''), 3500);
     } catch (e) {
+      delete idempotencyEnvioRef.current[caso.entidadeId];
       console.error(e);
       setErro(MSG_ERRO_PADRAO);
     } finally {
@@ -184,6 +200,9 @@ export default function FollowUpPage() {
     <AdminShell title="Follow-up Comercial" subtitle={`${casosProprios.length} caso${casosProprios.length !== 1 ? 's' : ''} precisando de acompanhamento`}>
       {carregando && <PageLoader title="Reconstruindo os casos de follow-up..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && falhaParcial && (
+        <Feedback type="aviso" message="Alguns dados podem estar incompletos — houve falha ao carregar uma ou mais fontes. Os casos abaixo são reais, mas pode haver mais." />
+      )}
       {!carregando && sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />}
 
       {!carregando && casos.length === 0 && (

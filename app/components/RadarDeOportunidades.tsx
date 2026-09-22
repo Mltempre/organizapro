@@ -9,7 +9,9 @@
 //
 // `limite` (Correção Visual Final V1): a Home mostra só um RESUMO — "Radar
 // resumido, não motor inteiro" — os primeiros N (por prioridade/desempate,
-// mesma ordem já calculada) e um link "Ver todas" para /oportunidades
+// mesma ordem já calculada) e um link "Ver todas" para `verTodasDestino`
+// (hoje /copiloto — mesmo motor gerarOportunidadesClientes, uncapped, a
+// profundidade real deste Radar; nunca /oportunidades, outro domínio)
 // quando há mais. Sem `limite`, mostra a lista inteira (comportamento
 // original, preservado para qualquer reaproveitamento futuro).
 import type { OportunidadeCliente } from "../../lib/oportunidades-clientes";

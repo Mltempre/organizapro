@@ -515,14 +515,17 @@ export default function DashboardView(props: DashboardViewProps) {
       )}
 
       {/* ── BLOCO D · RADAR DE OPORTUNIDADES — RESUMIDO (top 3), não o motor
-          inteiro. "Ver todas" abre /oportunidades (profundidade real). ── */}
+          inteiro. "Ver todas" abre /copiloto — mesmo motor
+          (gerarOportunidadesClientes), uncapped, profundidade real deste
+          Radar. /oportunidades é outro domínio (interesse sem compra via
+          oportunidades_demanda), não a profundidade deste bloco. ── */}
       {temDados && (
         <RadarDeOportunidades
           oportunidades={oportunidadesClientes}
           resumo={resumoRadar}
           onNavigate={onNavigate}
           limite={3}
-          verTodasDestino="/oportunidades"
+          verTodasDestino="/copiloto"
         />
       )}
 

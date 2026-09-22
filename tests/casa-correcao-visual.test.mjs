@@ -83,11 +83,18 @@ test("Diretor Digital: recebe o pulso da Central de Oportunidades (contagemPorTi
   assert.match(trecho, /contagemPorTier=\{contagemPorTier\}/);
 });
 
+// Atualizado — Correção da Última Milha (Achado #1): "Ver todas" levava a
+// /oportunidades, um domínio diferente (interesse sem compra via
+// oportunidades_demanda) do que o Radar mostra (gerarOportunidadesClientes:
+// orçamento/tratamento/pedido/recompra/cobrança + agenda). O destino
+// correto é /copiloto — mesmo motor, uncapped, a profundidade real deste
+// bloco (ver app/copiloto/page.tsx, comentário "uncapped, nunca limitado
+// a 3 como no Dashboard").
 test("Radar de Oportunidades: Home passa limite={3} e verTodasDestino real — resumo, não o motor inteiro", () => {
   const idx = dashboardView.indexOf("<RadarDeOportunidades");
   const trecho = dashboardView.slice(idx, idx + 300);
   assert.match(trecho, /limite=\{3\}/);
-  assert.match(trecho, /verTodasDestino="\/oportunidades"/);
+  assert.match(trecho, /verTodasDestino="\/copiloto"/);
 });
 
 test("RadarDeOportunidades: com limite, mostra só os N primeiros (ordem já calculada preservada) e um link 'Ver todas' quando há mais", () => {

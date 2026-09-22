@@ -87,7 +87,10 @@ export default function OportunidadesPage() {
       const opRes = await fetch('/api/oportunidades', { headers: { Authorization: `Bearer ${session.access_token}` } });
       if (!opRes.ok) {
         setOportunidades([]);
-        if (opRes.status !== 404) console.error('Erro ao carregar oportunidades:', opRes.status);
+        // status != 404 é falha real (backend fora do ar, sessão inválida
+        // no servidor, etc.) — precisa ficar visível, nunca virar
+        // silenciosamente "nenhuma oportunidade".
+        if (opRes.status !== 404) { console.error('Erro ao carregar oportunidades:', opRes.status); setErro(MSG_ERRO_PADRAO); }
         setCarregando(false);
         return;
       }

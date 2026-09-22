@@ -144,7 +144,9 @@ export default function CobrancasPage() {
         setCobrancas(Array.isArray(json.cobrancas) ? json.cobrancas : []);
       } else {
         setCobrancas([]);
-        if (cobRes.status !== 404) console.error('Erro ao carregar cobranças:', cobRes.status);
+        // status != 404 é falha real — precisa ficar visível, nunca virar
+        // silenciosamente "nenhuma cobrança".
+        if (cobRes.status !== 404) { console.error('Erro ao carregar cobranças:', cobRes.status); setErro(MSG_ERRO_PADRAO); }
       }
       if (tratRes.ok) {
         const json = await tratRes.json();

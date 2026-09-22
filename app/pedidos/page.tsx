@@ -101,7 +101,10 @@ export default function PedidosPage() {
         setPedidos(Array.isArray(json.pedidos) ? json.pedidos : []);
       } else {
         setPedidos([]);
-        if (pedRes.status !== 404) console.error('Erro ao carregar pedidos:', pedRes.status);
+        // status != 404 é falha real (inclui a tabela ainda não existir em
+        // produção) — precisa ficar visível, nunca virar silenciosamente
+        // "nenhum pedido".
+        if (pedRes.status !== 404) { console.error('Erro ao carregar pedidos:', pedRes.status); setErro(MSG_ERRO_PADRAO); }
       }
       setPacientes((pacRes.data || []) as ClientePicker[]);
       // preco_centavos/disponivel ainda não existem antes da migration rodar

@@ -18,6 +18,11 @@ export default function GooglePresencaPage() {
   const [accessToken, setAccessToken] = useState("");
   const [status, setStatus] = useState<Status | null>(null);
   const [erro, setErro] = useState("");
+  // true quando o status da conexão não pôde ser consultado (ex.: tabela
+  // de conexão ainda não existe em produção) — nunca deve ser confundido
+  // com "não conectado ainda" (status.conectado === false), que permite
+  // iniciar a conexão normalmente.
+  const [indisponivel, setIndisponivel] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   const [avaliacoesIndisponiveis, setAvaliacoesIndisponiveis] = useState<string | null>(null);
@@ -54,7 +59,7 @@ export default function GooglePresencaPage() {
       setNomeEmpresa(clinica.nome || "");
       const response = await fetch(`/api/google-business-profile?clinica_id=${encodeURIComponent(clinica.clinica_id)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
       const data = await response.json() as Status;
-      if (!response.ok) setErro(data.error ?? "Não foi possível consultar a conexão.");
+      if (!response.ok) { setErro(data.error ?? "Não foi possível consultar a conexão."); setIndisponivel(true); }
       else {
         setStatus(data);
         if (data.conectado) void carregarAvaliacoes(clinica.clinica_id, session.access_token);
@@ -150,7 +155,10 @@ export default function GooglePresencaPage() {
           <button type="button" onClick={desconectar} style={{ border: "1px solid #a12b25", background: "transparent", color: "#a12b25", borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer" }}>Desconectar</button>
         </div>
       )}
-      {!carregando && !status?.conectado && <button type="button" onClick={conectar} style={{ marginTop: 12, display: "inline-flex", gap: 8, alignItems: "center", border: 0, borderRadius: 6, padding: "11px 16px", background: "#176b52", color: "#fff", fontWeight: 700, cursor: "pointer" }}>Conectar com Google <ExternalLink size={16} /></button>}
+      {/* Nunca oferece "Conectar com Google" quando o status é desconhecido
+          por falha real (indisponivel) — evita o usuário completar um
+          OAuth real do Google fadado a falhar no fim. */}
+      {!carregando && !indisponivel && !status?.conectado && <button type="button" onClick={conectar} style={{ marginTop: 12, display: "inline-flex", gap: 8, alignItems: "center", border: 0, borderRadius: 6, padding: "11px 16px", background: "#176b52", color: "#fff", fontWeight: 700, cursor: "pointer" }}>Conectar com Google <ExternalLink size={16} /></button>}
     </section>
 
     {!carregando && status?.conectado && (
