@@ -124,9 +124,24 @@ test("Cliente 360 (lib/cliente-360.ts): existe e é consumido por app/clientes/[
   assert.match(ler("app/clientes/[id]/page.tsx"), /cliente-360/);
 });
 
-test("Gerente Comercial AI e Copiloto Administrativo: nenhum arquivo com esse nome existe no repositório — não encontrados, não inventar", () => {
-  const arquivos = arquivosComTrecho(["app", "lib", "docs"], /Gerente Comercial|Copiloto Administrativo/);
-  assert.deepEqual(arquivos, [], "não deveria haver nenhuma referência real a esses dois nomes — confirma NÃO ENCONTRADA");
+// P1.2 (CONSTRUIR O QUE AINDA FALTA): Copiloto Administrativo deixou de
+// ser NÃO ENCONTRADO — app/copiloto/page.tsx é uma implementação real.
+// Gerente Comercial AI continua sem motor/arquivo próprio, por decisão
+// explícita da missão (é composição dos motores existentes, nunca um
+// motor duplicado) — a única referência ao nome é documentação desse
+// veredito, nunca um arquivo com esse nome.
+test("Copiloto Administrativo: EXISTE — app/copiloto/page.tsx é implementação real, não apenas o nome citado", () => {
+  assert.ok(fs.existsSync(path.join(root, "app/copiloto/page.tsx")));
+  assert.match(ler("app/copiloto/page.tsx"), /gerarOportunidadesClientes|organizarSinaisCanonicos/);
+});
+
+test("Gerente Comercial AI: nenhum arquivo/motor com esse nome existe — decisão explícita de não duplicar, só composição dos motores existentes", () => {
+  const arquivos = arquivosComTrecho(["app", "lib"], /Gerente Comercial/).filter((f) => !f.includes("test"));
+  for (const f of arquivos) {
+    // única forma aceita: comentário documentando a composição, nunca um
+    // export/função/tipo com esse nome (o que seria um motor duplicado).
+    assert.doesNotMatch(ler(path.relative(root, f)), /export (function|const|type|class) \w*[Gg]erente ?[Cc]omercial/);
+  }
 });
 
 // ── Clientes usa RLS direto (Supabase client), não API service-role ──────

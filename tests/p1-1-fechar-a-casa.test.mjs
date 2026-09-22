@@ -112,7 +112,11 @@ test("NotaFácil: fetch tem timeout real (AbortController) e todo caminho (suces
 
 // ── Item 7: nada inventado ────────────────────────────────────────────────
 
-test("Copiloto Administrativo: continua sem nenhuma implementação real no repositório", () => {
-  const arquivos = arquivosTs(["app", "lib"]).filter((f) => /Copiloto Administrativo/i.test(ler(path.relative(root, f))) && !f.includes("test"));
-  assert.deepEqual(arquivos, []);
+// Verdade em P1.1: sem nenhuma implementação real. P1.2 (CONSTRUIR O QUE
+// AINDA FALTA) construiu app/copiloto/page.tsx por ordem explícita da
+// missão seguinte — ver tests/p1-2-gerente-comercial-copiloto.test.mjs
+// para a prova de que é composição real dos motores existentes, não um
+// motor novo/duplicado.
+test("Copiloto Administrativo: implementado em P1.2 (app/copiloto/page.tsx) — este teste passou a documentar a mudança, não mais a ausência", () => {
+  assert.ok(fs.existsSync(path.join(root, "app/copiloto/page.tsx")));
 });

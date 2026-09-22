@@ -51,6 +51,13 @@ const ORIGEM_POR_TIPO: Partial<Record<OportunidadeCliente["sinais"][number]["tip
   tratamento_sem_retorno: { evidencia: "no tratamento real registrado", destino: "/tratamentos", destinoLabel: "Ver tratamento" },
   pedido_nao_concluido:   { evidencia: "no pedido real registrado", destino: "/pedidos", destinoLabel: "Ver pedido" },
   recompra_possivel:      { evidencia: "no histórico real de pedidos", destino: "/pedidos", destinoLabel: "Ver pedidos" },
+  // P1.2 — Gerente Comercial AI: fechar a cadeia sinal→ação. Estes dois
+  // tipos são fundamentalmente sobre um COMPROMISSO real (confirmar hoje,
+  // reagendar um horário cancelado) — antes caíam no destino padrão
+  // genérico (/clientes), que nunca abre o compromisso em questão. Corrige
+  // a ligação, sem criar sinal nem regra nova.
+  confirmacao_pendente:            { evidencia: "no compromisso real registrado", destino: "/agendamentos", destinoLabel: "Confirmar na agenda" },
+  cancelamento_sem_reagendamento:  { evidencia: "no cancelamento real registrado", destino: "/agendamentos", destinoLabel: "Reagendar" },
 };
 const ORIGEM_PADRAO = { evidencia: "no histórico real de agendamentos", destino: "/clientes" as string | undefined, destinoLabel: "Ver cliente" as string | undefined };
 

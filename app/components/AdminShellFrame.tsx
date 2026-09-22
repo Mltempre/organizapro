@@ -63,6 +63,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
   {
     titulo: "Inteligência",
     itens: [
+      { l: "Copiloto",              h: "/copiloto",              i: "🧑‍💼" },
       { l: "Métricas",              h: "/metricas",              i: "📈" },
       { l: "Raio-X",                h: "/raio-x",                i: "🔍" },
       { l: "Previsor de Faturamento", h: "/previsor-faturamento", i: "🔮" },
