@@ -15,10 +15,11 @@
 // como antes (ver AdminShell.tsx) — só o título/subtítulo/ação viajam via
 // Context (AdminShellContext) para esta chrome persistente atualizar,
 // nunca remontando o <aside>.
-import { ReactNode, useCallback, useState } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { AdminShellContext, type AdminShellHeader } from "./AdminShellContext";
+import NegocioNaoVinculado from "./NegocioNaoVinculado";
 
 export const navGrupos: { titulo: string; itens: { l: string; h: string; i: string }[] }[] = [
   {
@@ -88,6 +89,28 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
   const router   = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [header, setHeaderState] = useState<AdminShellHeader>(DEFAULT_HEADER);
+
+  // ── P1.1: Fechar a Casa — causa raiz do vínculo negócio/usuário ────────
+  // Verificado UMA vez aqui (chrome persistente, nunca desmonta entre
+  // navegações) em vez de cada page.tsx repetir a mesma checagem e
+  // degradar de um jeito diferente (branco, lista vazia, texto de erro
+  // sem ação) — mesmo /api/minha-clinica que todas as páginas já usam,
+  // nenhuma consulta nova. "sem_sessao" e erros ambíguos nunca bloqueiam
+  // — cada página continua responsável pelo próprio redirect de login,
+  // exatamente como antes; só um 404 confirmado (usuário autenticado,
+  // sem vínculo real) troca o conteúdo pela tela de provisionamento.
+  const [semVinculo, setSemVinculo] = useState(false);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token || cancelado) return;
+      const res = await fetch("/api/minha-clinica", { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!cancelado) setSemVinculo(res.status === 404);
+    })();
+    return () => { cancelado = true; };
+  }, []);
 
   // Defesa em profundidade contra o loop de render corrigido em
   // AdminShell.tsx: descarta a atualização quando o conteúdo é idêntico
@@ -408,7 +431,9 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
 
           {/* CONTENT — troca a cada navegação; a sidebar acima, não. */}
           <main className="ash-content">
-            {children}
+            {semVinculo
+              ? <NegocioNaoVinculado onProvisionado={() => setSemVinculo(false)} />
+              : children}
           </main>
         </div>
       </div>

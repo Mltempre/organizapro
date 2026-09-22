@@ -171,7 +171,7 @@ export default function Cliente360Page() {
       {carregando && <PageLoader title="Reconstruindo a história do cliente..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
       {!carregando && naoEncontrado && (
-        <EmptyState icon="🔍" title="Cliente não encontrado." description="Ele pode ter sido removido, ou não pertence a esta clínica." actionLabel="Voltar para Clientes" onAction={() => router.push('/clientes')} />
+        <EmptyState icon="🔍" title="Cliente não encontrado." description="Ele pode ter sido removido, ou não pertence a este negócio." actionLabel="Voltar para Clientes" onAction={() => router.push('/clientes')} />
       )}
 
       {!carregando && resumo && (

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       .eq("ativo", true)
       .maybeSingle();
 
-    if (!cu?.clinica_id) return NextResponse.json({ error: "Clínica não encontrada" }, { status: 404 });
+    if (!cu?.clinica_id) return NextResponse.json({ error: "Negócio não vinculado ao usuário." }, { status: 404 });
 
     const cid = cu.clinica_id;
 
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       .eq("id", cid)
       .maybeSingle();
     if (clinicaCheck?.produto !== "organizapro") {
-      return NextResponse.json({ error: "Clínica não encontrada" }, { status: 404 });
+      return NextResponse.json({ error: "Negócio não vinculado ao usuário." }, { status: 404 });
     }
 
     // Date ranges (Brasília)

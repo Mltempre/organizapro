@@ -20,31 +20,53 @@ export default function NotaFacilPage() {
   useEffect(() => {
     let ativo = true;
 
+    // Falha de rede/timeout nunca pode deixar "Consultando operações
+    // pagas..." girando para sempre — try/catch/finally cobre TODO caminho
+    // (sessão ausente, vínculo ausente, fetch que rejeita, resposta que não
+    // é JSON válido, ou que demora demais) e sempre encerra em setCarregando
+    // (false), nunca só nos caminhos "felizes".
     async function carregar() {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data: vinculo } = await supabase
-        .from("clinica_usuarios")
-        .select("clinica_id")
-        .eq("usuario_id", session?.user.id ?? "")
-        .eq("ativo", true)
-        .limit(1)
-        .maybeSingle();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const { data: vinculo } = await supabase
+          .from("clinica_usuarios")
+          .select("clinica_id")
+          .eq("usuario_id", session?.user.id ?? "")
+          .eq("ativo", true)
+          .limit(1)
+          .maybeSingle();
 
-      if (!session || !vinculo?.clinica_id) {
-        if (ativo) setErro("Sessão ou vínculo de clínica não encontrado.");
-        setCarregando(false);
-        return;
-      }
+        if (!session || !vinculo?.clinica_id) {
+          if (ativo) setErro("Negócio não vinculado ao usuário.");
+          return;
+        }
 
-      const resposta = await fetch(`/api/notafacil?clinica_id=${encodeURIComponent(vinculo.clinica_id)}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      const dados = await resposta.json() as Resposta;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        let resposta: Response;
+        try {
+          resposta = await fetch(`/api/notafacil?clinica_id=${encodeURIComponent(vinculo.clinica_id)}`, {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
-      if (ativo) {
-        if (!resposta.ok) setErro(dados.error ?? "Não foi possível carregar a preparação.");
-        else setOperacoes(dados.operacoes ?? []);
-        setCarregando(false);
+        const dados = await resposta.json().catch(() => ({} as Resposta)) as Resposta;
+
+        if (ativo) {
+          if (!resposta.ok) setErro(dados.error ?? "Não foi possível carregar a preparação.");
+          else setOperacoes(dados.operacoes ?? []);
+        }
+      } catch (e) {
+        if (ativo) {
+          setErro(e instanceof Error && e.name === "AbortError"
+            ? "A consulta demorou demais para responder. Tente novamente."
+            : "Não foi possível carregar a preparação. Verifique sua conexão e tente novamente.");
+        }
+      } finally {
+        if (ativo) setCarregando(false);
       }
     }
 
