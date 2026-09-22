@@ -27,7 +27,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
     itens: [
       { l: "Visão Geral",   h: "/dashboard",     i: "⚡" },
       { l: "Oportunidades", h: "/oportunidades", i: "📡" },
-      { l: "Dinheiro",      h: "/cobrancas",     i: "💵" },
+      { l: "Dinheiro",      h: "/financeiro",    i: "💵" },
     ],
   },
   {
