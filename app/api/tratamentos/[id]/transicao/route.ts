@@ -11,6 +11,7 @@ import {
   transicionar, MOTIVOS_INTERRUPCAO,
   type Tratamento, type StatusTratamento, type MotivoInterrupcao,
 } from "../../../../../lib/motor-tratamento";
+import { registrarResultadoSeHouveDecisao } from "../../../../../lib/auditoria-resultado-persistencia";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -120,6 +121,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (erroEvento && !/duplicate|unique/i.test(erroEvento.message ?? "")) {
     logOperacao({ operacao: "tratamento.transicao", clinica_id, entidade_id: id, resultado: "erro", motivo: `evento nao gravado: ${erroEvento.message}` });
   }
+
+  // P1.3 (Missão 3) — fecha SINAL → RECOMENDAÇÃO → AÇÃO → RESULTADO: se
+  // este tratamento já teve uma decisão auditada (Follow-up Comercial
+  // registrou "tratamento_sem_retorno"), vincula este status real como
+  // resultado. Best-effort — nunca bloqueia a transição já confirmada.
+  await registrarResultadoSeHouveDecisao(admin, {
+    clinicaId: clinica_id, entidadeTipo: "tratamento", entidadeId: id,
+    fatoObservado: `tratamento_${resultado.status}`, observadoEm: agora,
+  });
 
   logOperacao({ operacao: "tratamento.transicao", clinica_id, entidade_id: id, resultado: "sucesso", motivo: `${tratamento.status} -> ${resultado.status}` });
   return NextResponse.json({ sucesso: true, idempotente: false, tratamento: atualizado });

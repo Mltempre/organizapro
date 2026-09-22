@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../../../lib/auth-clinica";
 import { logOperacao } from "../../../../../lib/log-estruturado";
+import { registrarResultadoSeHouveDecisao } from "../../../../../lib/auditoria-resultado-persistencia";
 import {
   transicionar, MOTIVOS_DECISAO,
   type Orcamento, type StatusOrcamento, type MotivoDecisao,
@@ -112,6 +113,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (erroEvento && !/duplicate|unique/i.test(erroEvento.message ?? "")) {
     logOperacao({ operacao: "orcamento.transicao", clinica_id, entidade_id: id, resultado: "erro", motivo: `evento nao gravado: ${erroEvento.message}` });
   }
+
+  // P1.3 (Missão 3) — fecha SINAL → RECOMENDAÇÃO → AÇÃO → RESULTADO: se
+  // este orçamento já teve uma decisão auditada (Follow-up Comercial
+  // registrou "orcamento_parado"), vincula este status real como
+  // resultado. Best-effort — nunca bloqueia a transição já confirmada.
+  await registrarResultadoSeHouveDecisao(admin, {
+    clinicaId: clinica_id, entidadeTipo: "orcamento", entidadeId: id,
+    fatoObservado: `orcamento_${resultado.status}`, observadoEm: agora,
+  });
 
   logOperacao({ operacao: "orcamento.transicao", clinica_id, entidade_id: id, resultado: "sucesso", motivo: `${orcamento.status} -> ${resultado.status}` });
   return NextResponse.json({ sucesso: true, idempotente: false, orcamento: atualizado });

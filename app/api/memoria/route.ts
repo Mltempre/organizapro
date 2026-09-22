@@ -46,9 +46,9 @@ export async function GET(req: NextRequest) {
       .eq("payload->cliente->>pacienteId", paciente_id)
       .order("criado_em", { ascending: false }),
     admin.from("eventos_dominio")
-      .select("id, tipo, entidade_tipo, payload, criado_em")
+      .select("id, tipo, entidade_tipo, payload, criado_em, chave_idempotencia")
       .eq("clinica_id", clinica_id)
-      .in("tipo", ["auditoria.decisao", "auditoria.resultado_posterior"])
+      .eq("tipo", "auditoria.decisao")
       .eq("payload->>cliente_id", paciente_id)
       .order("criado_em", { ascending: false }),
   ]);
@@ -56,7 +56,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Não foi possível consultar memória/auditoria" }, { status: 500 });
   }
 
-  return NextResponse.json({ fatos: fatos ?? [], decisoes: decisoes ?? [] });
+  // auditoria.resultado_posterior (P1.3, Missão 3) nunca duplica cliente_id
+  // no próprio payload (referência, nunca duplicação — ver lib/auditoria-
+  // decisoes.ts) — só é encontrável via decisao_origem_chave apontando
+  // para uma das decisões deste cliente, já resolvidas acima.
+  const chavesDecisao = (decisoes ?? []).map((d) => d.chave_idempotencia);
+  const { data: resultados, error: erroResultados } = chavesDecisao.length > 0
+    ? await admin.from("eventos_dominio")
+        .select("id, tipo, entidade_tipo, payload, criado_em")
+        .eq("clinica_id", clinica_id)
+        .eq("tipo", "auditoria.resultado_posterior")
+        .in("payload->>decisao_origem_chave", chavesDecisao)
+        .order("criado_em", { ascending: false })
+    : { data: [], error: null };
+  if (erroResultados) {
+    return NextResponse.json({ error: "Não foi possível consultar resultados de auditoria" }, { status: 500 });
+  }
+
+  return NextResponse.json({ fatos: fatos ?? [], decisoes: [...(decisoes ?? []), ...(resultados ?? [])] });
 }
 
 export async function POST(req: NextRequest) {

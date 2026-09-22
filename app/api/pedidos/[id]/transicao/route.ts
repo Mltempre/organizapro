@@ -14,6 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../../../lib/auth-clinica";
 import { logOperacao } from "../../../../../lib/log-estruturado";
 import { aplicarEvento, type EventoPedido, type Pedido, type PedidoStatus } from "../../../../../lib/motor-pedidos";
+import { registrarResultadoSeHouveDecisao } from "../../../../../lib/auditoria-resultado-persistencia";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,6 +107,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (erroEvento && !/duplicate|unique/i.test(erroEvento.message ?? "")) {
     logOperacao({ operacao: "pedido.transicao", clinica_id, entidade_id: id, resultado: "erro", motivo: `evento nao gravado: ${erroEvento.message}` });
   }
+
+  // P1.3 (Missão 3) — fecha SINAL → RECOMENDAÇÃO → AÇÃO → RESULTADO: se
+  // este pedido já teve uma decisão auditada (Follow-up Comercial
+  // registrou "pedido_nao_concluido"), vincula este status real como
+  // resultado. Best-effort — nunca bloqueia a transição já confirmada.
+  await registrarResultadoSeHouveDecisao(admin, {
+    clinicaId: clinica_id, entidadeTipo: "pedido", entidadeId: id,
+    fatoObservado: `pedido_${resultado.novoStatus}`, observadoEm: agora,
+  });
 
   logOperacao({ operacao: "pedido.transicao", clinica_id, entidade_id: id, resultado: "sucesso", motivo: `${pedido.status} -> ${resultado.novoStatus}` });
   return NextResponse.json({ sucesso: true, pedido: atualizado });
