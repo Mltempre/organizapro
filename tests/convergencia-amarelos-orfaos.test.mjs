@@ -134,11 +134,19 @@ test("nenhuma mudança desta missão tocou atribuição/Google Ads/Meta Ads/CAC/
   }
 });
 
-// A captura pública de interesse (E-commerce IA/Guardião) pertence a
-// feat/ecommerce-ia-v1 @ 3cea951, uma branch IRMÃ desta (mesmo pai
-// 563b3e2, nenhuma é ancestral da outra — confirmado por auditoria de
-// linhagem via git). Nunca existiu nesta base e não deveria ser
-// incorporada por esta missão.
-test("captura pública de interesse (frente E-commerce/Guardião) não existe nesta base — confirma que não foi incorporada sem autorização", () => {
-  assert.ok(!fs.existsSync(path.join(root, "app/api/site-publico/interesse/route.ts")));
+// Atualizado — Convergência Final Controlada (Fase 2), autorizada pela
+// Torre: a captura pública de interesse (E-commerce IA/Guardião,
+// feat/ecommerce-ia-v1 @ 3cea951) foi trazida deliberadamente para esta
+// pista de convergência. Esta asserção documentava o limite de escopo da
+// missão anterior (Convergência dos Amarelos/Órfãos, em
+// convergencia-canonica-bloco1) — aqui, no worktree/branch de
+// convergência final, o escopo é justamente integrar essa frente. A
+// checagem que importa agora não é mais "não existe", e sim "existe e é
+// exatamente o conteúdo autorizado do Guardião" — não redesenhado, não
+// reescrito.
+test("captura pública de interesse (E-commerce/Guardião) foi incorporada nesta pista de convergência, com autorização explícita da Torre", () => {
+  assert.ok(fs.existsSync(path.join(root, "app/api/site-publico/interesse/route.ts")));
+  const codigo = ler("app/api/site-publico/interesse/route.ts");
+  assert.match(codigo, /oportunidades_demanda/);
+  assert.match(codigo, /canal.*site|"site"/);
 });

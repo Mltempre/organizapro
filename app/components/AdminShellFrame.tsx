@@ -69,6 +69,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Previsor de Faturamento", h: "/previsor-faturamento", i: "🔮" },
       { l: "Linha Econômica",       h: "/linha-economica",       i: "📐" },
       { l: "Atribuição",            h: "/atribuicao",            i: "🎯" },
+      { l: "Pesquisa de Preços",    h: "/pesquisa-precos",       i: "💲" },
       { l: "NotaFácil",             h: "/notafacil",             i: "📄" },
     ],
   },
