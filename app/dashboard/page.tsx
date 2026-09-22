@@ -555,6 +555,7 @@ export default function Dashboard() {
       ideia={ideia}
       missaoDoDia={missaoDoDia}
       contagemPorTier={{ alta: centralOportunidades.alta.length, media: centralOportunidades.media.length, baixa: centralOportunidades.baixa.length }}
+      central={centralOportunidades}
       indicadores={{
         compromissosHoje: dash.compromissosHoje,
         horariosVagosHoje: dash.horariosVagosHoje,

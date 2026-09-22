@@ -8,7 +8,7 @@ import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import {
-  estaParado, diasParado, MOTIVOS_DECISAO,
+  estaParado, diasParado, calcularScoreOportunidade, MOTIVOS_DECISAO,
   type Orcamento, type StatusOrcamento, type MotivoDecisao,
 } from '../../lib/motor-orcamentos';
 
@@ -49,6 +49,24 @@ const MOTIVO_LABELS: Record<MotivoDecisao, string> = {
 };
 
 type FiltroStatus = 'todos' | StatusOrcamento;
+
+// ── Orçamento que Fecha — score de prioridade (calcularScoreOportunidade,
+// lib/motor-orcamentos.ts) conectado aqui: já existia como motor puro,
+// nunca era chamado por nenhuma superfície (órfão). Nenhuma regra nova —
+// só os 3 fatores reais que o motor já definia (dias parado, valor
+// relativo entre os abertos, recorrência do mesmo cliente). Orienta
+// ordem (mais prioritário primeiro) e o texto de próxima ação — nunca só
+// um número decorativo.
+function tierDoScore(score: number): 'alta' | 'media' | 'baixa' {
+  if (score >= 67) return 'alta';
+  if (score >= 34) return 'media';
+  return 'baixa';
+}
+const TIER_SCORE_CONFIG: Record<'alta' | 'media' | 'baixa', { label: string; color: string }> = {
+  alta:  { label: 'Prioridade alta',  color: '#f87171' },
+  media: { label: 'Prioridade média', color: '#fbbf24' },
+  baixa: { label: 'Prioridade baixa', color: '#64748b' },
+};
 
 function normalizar(tel: string) { return tel.replace(/\D/g, ''); }
 function formatarValor(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -210,8 +228,42 @@ export default function OrcamentosPage() {
   // ── Filtro ────────────────────────────────────────────────────────────
 
   const agora = new Date().toISOString();
-  const filtrados = orcamentos.filter(o => filtro === 'todos' || o.status === filtro);
   const quantidadeParados = orcamentos.filter(o => o.status === 'apresentado' && estaParado(o.apresentado_em, agora)).length;
+
+  // Score de prioridade — só para 'apresentado' (um orçamento decidido não
+  // tem oportunidade a calcular). valorMaximoEntreAbertos e recorrência são
+  // sempre recalculados sobre o conjunto REAL de abertos no momento, nunca
+  // uma escala fixa.
+  const abertos = orcamentos.filter(o => o.status === 'apresentado');
+  const valorMaximoEntreAbertos = abertos.reduce((max, o) => Math.max(max, o.valor), 0);
+  const contagemPorChave = new Map<string, number>();
+  for (const o of abertos) {
+    const chave = normalizar(o.telefone || '') || o.paciente_nome.trim().toLowerCase();
+    contagemPorChave.set(chave, (contagemPorChave.get(chave) || 0) + 1);
+  }
+  const scorePorId = new Map<string, number>();
+  for (const o of abertos) {
+    const chave = normalizar(o.telefone || '') || o.paciente_nome.trim().toLowerCase();
+    scorePorId.set(o.id, calcularScoreOportunidade({
+      diasParado: diasParado(o.apresentado_em, agora),
+      valor: o.valor,
+      valorMaximoEntreAbertos,
+      quantidadeAbertosDoMesmoPaciente: contagemPorChave.get(chave) || 1,
+    }));
+  }
+
+  let filtrados = orcamentos.filter(o => filtro === 'todos' || o.status === filtro);
+  if (filtro === 'apresentado') {
+    filtrados = [...filtrados].sort((a, b) => (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0));
+  } else if (filtro === 'todos') {
+    // Abertos (o que ainda precisa de decisão) sempre primeiro, ordenados
+    // por prioridade real; o histórico já decidido continua depois, na
+    // ordem original — nunca reordenado sem motivo.
+    const abertosOrdenados = [...filtrados].filter(o => o.status === 'apresentado')
+      .sort((a, b) => (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0));
+    const resto = filtrados.filter(o => o.status !== 'apresentado');
+    filtrados = [...abertosOrdenados, ...resto];
+  }
 
   return (
     <AdminShell
@@ -284,9 +336,20 @@ export default function OrcamentosPage() {
             const st = STATUS_CONFIG[o.status];
             const parado = o.status === 'apresentado' && estaParado(o.apresentado_em, agora);
             const dias = diasParado(o.apresentado_em, agora);
+            const score = o.status === 'apresentado' ? scorePorId.get(o.id) ?? null : null;
+            const tier = score !== null ? tierDoScore(score) : null;
             const proximaAcao = o.status !== 'apresentado'
               ? null
-              : parado ? 'Fazer follow-up do orçamento' : 'Aguardando decisão do cliente';
+              : !parado ? 'Aguardando decisão do cliente'
+              : tier === 'alta' ? 'Priorizar contato hoje — fazer follow-up do orçamento'
+              : 'Fazer follow-up do orçamento';
+            const chaveCliente = normalizar(o.telefone || '') || o.paciente_nome.trim().toLowerCase();
+            const outrosAbertosDoCliente = tier !== null ? (contagemPorChave.get(chaveCliente) || 1) - 1 : 0;
+            const motivoScore = tier !== null
+              ? `Score ${score}/100 — parado há ${dias} dia${dias === 1 ? '' : 's'}` +
+                (valorMaximoEntreAbertos > 0 && o.valor === valorMaximoEntreAbertos ? ', maior valor entre os abertos' : '') +
+                (outrosAbertosDoCliente > 0 ? `, +${outrosAbertosDoCliente} outro${outrosAbertosDoCliente === 1 ? '' : 's'} orçamento${outrosAbertosDoCliente === 1 ? '' : 's'} aberto${outrosAbertosDoCliente === 1 ? '' : 's'} deste cliente` : '')
+              : null;
 
             return (
               <div key={o.id} className="orc-card" style={{ background: '#1e2130', border: `1px solid ${parado ? 'rgba(251,191,36,0.35)' : '#2d3148'}`, borderRadius: 14, padding: '20px 24px' }}>
@@ -309,6 +372,11 @@ export default function OrcamentosPage() {
                         ⏱ Parado sem decisão
                       </div>
                     )}
+                    {motivoScore && (
+                      <div style={{ fontSize: 11.5, marginTop: 6, color: '#64748b', fontStyle: 'italic' }}>
+                        {motivoScore}
+                      </div>
+                    )}
                     {o.motivo_decisao && (
                       <div style={{ fontSize: 12, marginTop: 6, color: '#94a3b8' }}>
                         Motivo: {MOTIVO_LABELS[o.motivo_decisao as MotivoDecisao]}
@@ -326,6 +394,11 @@ export default function OrcamentosPage() {
                     <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: st.bg, color: st.color }}>
                       {st.label}
                     </span>
+                    {tier && (
+                      <span title={`Score de prioridade: ${score}/100`} style={{ padding: '3px 10px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'rgba(255,255,255,0.05)', border: `1px solid ${TIER_SCORE_CONFIG[tier].color}55`, color: TIER_SCORE_CONFIG[tier].color }}>
+                        {TIER_SCORE_CONFIG[tier].label} · {score}
+                      </span>
+                    )}
                     {o.status === 'apresentado' && (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <button

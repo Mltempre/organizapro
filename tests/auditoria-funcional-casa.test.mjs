@@ -112,12 +112,23 @@ test("lib/atribuicao-origem.ts: calcularCAC/calcularROAS existem (preparação-f
   assert.deepEqual(arquivos, [], "nenhuma página/rota deveria chamar calcularCAC/calcularROAS ainda — confirma preparação-fundação sem consumidor");
 });
 
-test("ProximaMelhorAcao.tsx, DiretorDigitalCard.tsx, CentralDeOportunidades.tsx e IndicadoresExecutivos.tsx: existem, mas não são mais importados por DashboardView.tsx (existe mas está escondida, por decisão de UX de missão anterior, não removida)", () => {
+test("ProximaMelhorAcao.tsx, DiretorDigitalCard.tsx e IndicadoresExecutivos.tsx: existem, mas continuam não importados por DashboardView.tsx (por decisão de UX de missão anterior, não removidos)", () => {
   const dashboardView = ler("app/components/DashboardView.tsx");
   for (const arquivo of ["app/components/ProximaMelhorAcao.tsx", "app/components/DiretorDigitalCard.tsx", "app/components/CentralDeOportunidades.tsx", "app/components/IndicadoresExecutivos.tsx"]) {
     assert.ok(fs.existsSync(path.join(root, arquivo)), `${arquivo} deveria continuar existindo`);
   }
-  assert.doesNotMatch(dashboardView, /import DiretorDigitalCard|import CentralDeOportunidadesCard|import IndicadoresExecutivos/);
+  assert.doesNotMatch(dashboardView, /import DiretorDigitalCard|import IndicadoresExecutivos/);
+});
+
+// Atualizado — Convergência dos Amarelos/Órfãos: CentralDeOportunidades.tsx
+// era o único dos 4 componentes desta lista cuja funcionalidade nunca
+// tinha NENHUMA superfície equivalente reintegrada em outro lugar (ao
+// contrário de ProximaMelhorAcao/DiretorDigitalCard, cuja função virou o
+// pulso do MissaoDoDiaCard) — auditoria confirmou como órfã real, não
+// redundância de UX. Volta a ser importada e renderizada.
+test("CentralDeOportunidades.tsx voltou a ser importada por DashboardView.tsx — deixou de ser órfã (grade completa nunca tinha superfície nenhuma antes desta missão)", () => {
+  const dashboardView = ler("app/components/DashboardView.tsx");
+  assert.match(dashboardView, /import CentralDeOportunidadesCard from ".\/CentralDeOportunidades"/);
 });
 
 test("Cliente 360 (lib/cliente-360.ts): existe e é consumido por app/clientes/[id]/page.tsx — não órfão, embutido na ficha do cliente", () => {

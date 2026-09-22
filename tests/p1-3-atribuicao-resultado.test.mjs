@@ -131,7 +131,29 @@ test("/api/memoria GET: auditoria.resultado_posterior é encontrada via decisao_
   assert.doesNotMatch(codigo, /"auditoria\.decisao", "auditoria\.resultado_posterior"\]\)\s*\n\s*\.eq\("payload->>cliente_id"/, "resultado_posterior nunca deveria ser buscado pelo mesmo filtro de cliente_id que auditoria.decisao usa");
 });
 
-test("Gerente Comercial: oportunidades (RPC transicionar_oportunidade_demanda_v1) NÃO chama registrarResultadoSeHouveDecisao — gap real e conhecido, não fabricado silenciosamente", () => {
+// Atualizado — Convergência dos Amarelos/Órfãos: o gap era real (a
+// transição vive numa RPC, não numa rota [id]/transicao comum), mas o
+// caminho para fechá-lo sem migration existia — a RPC já devolve a linha
+// completa (to_jsonb(atual)), incluindo o telefone, então o mesmo uuid
+// determinístico usado para gravar a auditoria.decisao de
+// oportunidade_parada (entidadeTipo "cliente", nunca o id da linha —
+// ver app/api/follow-up/tentativa/route.ts) pode ser recalculado em
+// código de aplicação para achar a decisão certa. Zero migration, zero
+// causalidade fabricada (prepararVinculoResultado continua gravando
+// prova_causalidade:false).
+test("Gerente Comercial: oportunidades (RPC transicionar_oportunidade_demanda_v1) agora chama registrarResultadoSeHouveDecisao em código de aplicação, usando o telefone que a RPC devolve — sem migration na função", () => {
   const codigo = ler("app/api/oportunidades/[id]/transicao/route.ts");
-  assert.doesNotMatch(codigo, /registrarResultadoSeHouveDecisao/, "esta rota usa uma RPC de banco — vincular resultado aqui exigiria migration na função, fora do escopo desta missão");
+  assert.match(codigo, /registrarResultadoSeHouveDecisao\(supabase/);
+  assert.match(codigo, /entidadeIdDeTelefone\(auth\.clinicaId, telefoneOportunidade\)/);
+  assert.match(codigo, /entidadeTipo: "cliente"/);
+  const idxRpc = codigo.indexOf('supabase.rpc("transicionar_oportunidade_demanda_v1"');
+  const idxResultado = codigo.indexOf("registrarResultadoSeHouveDecisao(supabase");
+  assert.ok(idxResultado > idxRpc, "resultado deveria ser registrado DEPOIS da RPC ter transicionado de verdade, nunca antes");
+});
+
+test("vínculo de resultado da oportunidade é best-effort e condicional a telefone real — nunca bloqueia a resposta da transição nem fabrica cliente", () => {
+  const codigo = ler("app/api/oportunidades/[id]/transicao/route.ts");
+  const idxIf = codigo.indexOf("if (telefoneOportunidade) {");
+  const idxReturn = codigo.indexOf("return NextResponse.json({ data });");
+  assert.ok(idxIf > -1 && idxReturn > idxIf, "o registro de resultado deveria estar condicionado a telefone real e antes do return final, sem impedir a resposta");
 });

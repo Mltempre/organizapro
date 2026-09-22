@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../../../lib/auth-clinica";
 import { OPORTUNIDADE_STATUS, type OportunidadeStatus } from "../../../../../lib/oportunidades-demanda";
+import { registrarResultadoSeHouveDecisao } from "../../../../../lib/auditoria-resultado-persistencia";
+import { entidadeIdDeTelefone } from "../../../../../lib/whatsapp-governado";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,5 +47,29 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const status = error.message.includes("não encontrada") ? 404 : error.message.includes("transição inválida") ? 409 : 500;
     return NextResponse.json({ error: status === 500 ? "Não foi possível transicionar a oportunidade" : error.message }, { status });
   }
+
+  // Auditoria IA — decisão → ação → resultado (P1.3 fechou orçamento/
+  // pedido/tratamento; oportunidade_parada ficou documentada como gap
+  // porque a transição vive numa RPC, não numa rota [id]/transicao comum.
+  // Fecho aqui, em código de aplicação (zero migration): a auditoria.
+  // decisao de oportunidade_parada foi gravada com entidade_id derivado
+  // do TELEFONE (lib/follow-up-comercial.ts usa entidadeTipo "cliente",
+  // nunca o id da linha de oportunidade — ver app/api/follow-up/tentativa/
+  // route.ts, entidadeIdParaEvento) — a RPC devolve a linha completa
+  // (to_jsonb(atual)), então o mesmo telefone real está em data.telefone;
+  // derivamos o MESMO uuid determinístico para achar a decisão certa,
+  // nunca a "mais parecida". Best-effort, nunca bloqueia a transição real
+  // que já aconteceu.
+  const telefoneOportunidade = (data as { telefone?: string } | null)?.telefone;
+  if (telefoneOportunidade) {
+    await registrarResultadoSeHouveDecisao(supabase, {
+      clinicaId: auth.clinicaId,
+      entidadeTipo: "cliente",
+      entidadeId: entidadeIdDeTelefone(auth.clinicaId, telefoneOportunidade),
+      fatoObservado: `oportunidade_${body.status}`,
+      observadoEm: new Date().toISOString(),
+    });
+  }
+
   return NextResponse.json({ data });
 }

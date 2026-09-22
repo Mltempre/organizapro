@@ -12,6 +12,7 @@ import { gerarOportunidadesClientes, type OportunidadeCliente } from '../../lib/
 import { agregarClientesElegiveisRecompra } from '../../lib/motor-pedidos';
 import { gerarFollowUpsComerciais, type CasoFollowUp } from '../../lib/follow-up-comercial';
 import { agregarReceitaPerdida, type ResumoReceitaPerdida } from '../../lib/receita-perdida';
+import { gerarPrevisorFaturamento, type ResumoPrevisorFaturamento } from '../../lib/previsor-faturamento';
 import { adaptarOportunidadesClientes, adaptarOportunidadesDemanda, organizarSinaisCanonicos, type SinalCanonico } from '../../lib/nucleo-inteligente';
 import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
 
@@ -33,7 +34,7 @@ type OportunidadeRow = { id: string; telefone: string; nome_informado: string | 
 type OrcamentoRow = { id: string; paciente_nome: string; telefone: string | null; procedimento: string; valor: number; status: string; apresentado_em: string };
 type TratamentoRow = { id: string; paciente_nome: string; paciente_telefone: string | null; tipo_tratamento: string; status: string; proxima_data_prevista: string | null; updated_at: string; interrompido_em: string | null; valor_estimado: number | null };
 type PedidoRow = { id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string; paciente_id: string | null; pagamento_confirmado_em: string | null; pedido_itens?: { descricao: string }[] };
-type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: string | null; descricao: string; valor: number; vencimento: string; status: string };
+type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: string | null; descricao: string; valor: number; vencimento: string; status: string; tratamento_origem_id: string | null };
 
 const TIPO_FOLLOWUP_LABELS: Record<string, string> = {
   oportunidade_parada: 'Oportunidade parada', orcamento_parado: 'Orçamento parado',
@@ -50,6 +51,7 @@ type Estado = {
   atrasados: AgItem[];
   pendentesConfirmacao: AgItem[];
   receitaPerdida: ResumoReceitaPerdida | null;
+  previsor: ResumoPrevisorFaturamento | null;
 };
 
 export default function CopilotoPage() {
@@ -166,12 +168,32 @@ export default function CopilotoPage() {
         oportunidadesAbertas: oportunidades.map(op => ({ id: op.id, pacienteNome: op.nome_informado || op.telefone, status: op.status, orcamentoVinculadoId: op.orcamento_vinculado_id })),
       });
 
+      // ── Previsor de Faturamento 30 Dias (mesmo motor real de
+      // app/previsor-faturamento) — reaproveita orçamentos/cobranças/
+      // oportunidades já buscados acima; tratamentos e pedidos precisam
+      // do filtro PRÓPRIO do previsor (inclui 'retorno_agendado' e
+      // 'aguardando_confirmacao_pagamento', que os filtros de Radar/
+      // Follow-up acima não incluem) — nunca reaproveitar a lista já
+      // filtrada para outro propósito, para nunca sub-contar o total.
+      const tratamentosParaPrevisor = ((tratamentosRes.tratamentos ?? []) as TratamentoRow[])
+        .filter(t => t.status === 'em_andamento' || t.status === 'retorno_agendado' || t.status === 'interrompido');
+      const pedidosParaPrevisor = todosPedidos.filter(p => p.status === 'criado' || p.status === 'confirmado' || p.status === 'aguardando_confirmacao_pagamento');
+      const previsor = gerarPrevisorFaturamento({
+        hoje, agora,
+        cobrancasAbertas: cobrancas.map(c => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca', tratamentoOrigemId: c.tratamento_origem_id })),
+        orcamentosApresentados: orcamentos.map(o => ({ id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento, valor: o.valor, apresentadoEm: o.apresentado_em })),
+        tratamentos: tratamentosParaPrevisor.map(t => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status as 'em_andamento' | 'retorno_agendado' | 'interrompido', valorEstimado: t.valor_estimado, proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em })),
+        pedidosAbertos: pedidosParaPrevisor.map(p => ({ id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone, descricao: 'pedido', valor: p.valor_centavos / 100, criadoEm: p.criado_em, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' })),
+        oportunidadesAbertas: oportunidades.map(op => ({ id: op.id, pacienteNome: op.nome_informado || op.telefone, status: op.status, orcamentoVinculadoId: op.orcamento_vinculado_id })),
+      });
+
       setEstado({
         sinais,
         followUpsPendentes,
         atrasados: agendaHoje.filter(a => a.data < hoje && a.status === 'agendado'),
         pendentesConfirmacao: agendaHoje.filter(a => a.status === 'agendado' && a.data === hoje),
         receitaPerdida,
+        previsor,
       });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') { router.push('/login'); return; }
@@ -277,6 +299,24 @@ export default function CopilotoPage() {
             </section>
           )}
         </>
+      )}
+
+      {/* ── PREVISOR DE FATURAMENTO 30 DIAS (mesmo motor real de
+          app/previsor-faturamento) — informativo, sempre visível quando há
+          dado real, mesmo sem nada pedindo atenção agora; distingue
+          confirmado de perspectiva, nunca soma risco ao total. ── */}
+      {!carregando && estado && estado.previsor && estado.previsor.totalEsperado30Dias > 0 && (
+        <section style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Previsor de Faturamento (30 dias)</div>
+          <button onClick={() => router.push('/previsor-faturamento')} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 12, padding: '16px 18px', color: 'inherit', font: 'inherit' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#4ade80' }}>{formatarValor(estado.previsor.totalEsperado30Dias)}</div>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 6 }}>
+              <span style={{ fontSize: 11.5, color: '#94a3b8' }}>Confirmado: {formatarValor(estado.previsor.confirmadoProgramado.total)}</span>
+              <span style={{ fontSize: 11.5, color: '#94a3b8' }}>Em perspectiva: {formatarValor(estado.previsor.emPerspectiva.totalComData + estado.previsor.emPerspectiva.totalSemData)}</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Nunca inclui o que está em risco (ver Receita Perdida acima) — ver detalhamento →</div>
+          </button>
+        </section>
       )}
     </AdminShell>
   );

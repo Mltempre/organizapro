@@ -95,13 +95,23 @@ test("RadarDeOportunidades: com limite, mostra só os N primeiros (ordem já cal
   assert.match(radar, /restantes > 0 && verTodasDestino/);
 });
 
-test("Home não renderiza mais: Resumo da IA, Foco do Dia/Próximos 7 Dias, Lembretes, Objetivos do Dia, Agora/Próxima Melhor Ação, Diretor Digital completo (DiretorDigitalCard), Central de Oportunidades", () => {
+test("Home não renderiza mais: Resumo da IA, Foco do Dia/Próximos 7 Dias, Lembretes, Objetivos do Dia, Agora/Próxima Melhor Ação, Diretor Digital completo (DiretorDigitalCard)", () => {
   // Comentários explicando O QUE foi removido (e por quê) podem mencionar
   // esses nomes em prosa — só o JSX/render real precisa estar livre deles.
   const codigoReal = dashboardView.split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*")).join("\n");
-  for (const termo of ["💬 Resumo da IA", "🎯 Foco do Dia", "📆 Próximos 7 Dias", "⚠️ Lembretes", "✅ Objetivos do Dia", "<ProximaMelhorAcao", "<DiretorDigitalCard", "<CentralDeOportunidadesCard"]) {
+  for (const termo of ["💬 Resumo da IA", "🎯 Foco do Dia", "📆 Próximos 7 Dias", "⚠️ Lembretes", "✅ Objetivos do Dia", "<ProximaMelhorAcao", "<DiretorDigitalCard"]) {
     assert.doesNotMatch(codigoReal, new RegExp(termo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `"${termo}" não deveria mais aparecer na Home`);
   }
+});
+
+// Atualizado — Convergência dos Amarelos/Órfãos: ao contrário dos demais
+// itens desta lista (cuja remoção era redundância de UX real, com a
+// função já reintegrada em outro lugar), Central de Oportunidades tinha
+// virado uma capacidade real sem NENHUMA superfície — o pulso mostrava
+// "🔴 3" sem nenhum jeito de saber o quê ou agir. Volta a renderizar,
+// gated por ter item real (nunca grade vazia decorativa).
+test("CentralDeOportunidadesCard voltou a renderizar na Home, só quando há oportunidade real (mesmo dado que já gerava o pulso do Diretor Digital)", () => {
+  assert.match(dashboardView, /<CentralDeOportunidadesCard central={central} onNavigate={onNavigate} \/>/);
 });
 
 test("nenhum motor foi apagado: ProximaMelhorAcao.tsx, DiretorDigitalCard.tsx e CentralDeOportunidades.tsx continuam no repositório", () => {

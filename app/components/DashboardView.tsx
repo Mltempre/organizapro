@@ -21,8 +21,9 @@ import OnboardingCard from "./onboarding/OnboardingCard";
 import MissaoDoDiaCard, { type ContagemPorTier } from "./MissaoDoDiaCard";
 import { type AcaoPrioritaria } from "./ProximaMelhorAcao";
 import RadarDeOportunidades from "./RadarDeOportunidades";
+import CentralDeOportunidadesCard from "./CentralDeOportunidades";
 import type { OportunidadeCliente } from "../../lib/oportunidades-clientes";
-import type { Recomendacao } from "../../lib/recomendacoes";
+import type { Recomendacao, CentralOportunidades } from "../../lib/recomendacoes";
 import { adaptarOportunidadesClientes, adaptarRecomendacoes, organizarSinaisCanonicos, type SinalCanonico } from "../../lib/nucleo-inteligente";
 import type { IndicadoresCobranca } from "../../lib/motor-cobranca";
 import type { ItemAtividade } from "../../lib/organizapro-trabalhando";
@@ -267,6 +268,11 @@ export type DashboardViewProps = {
   /** Pulso da Central de Oportunidades (contagem por tier) — omitido
    * quando não há dados suficientes, nunca fabricado como 0/0/0. */
   contagemPorTier?: ContagemPorTier;
+  /** Central de Oportunidades completa (mesmo dado que gera o pulso acima)
+   * — grade de cartões com motivo/evidência/ação, renderizada em detalhe
+   * logo abaixo do Radar. Sem isso o pulso não tinha nenhum jeito de virar
+   * ação (Convergência dos Amarelos/Órfãos). */
+  central?: CentralOportunidades;
   indicadores: { compromissosHoje: number; horariosVagosHoje: number; pendentes: number; atrasados: number; avaliacoesPendentes: number };
   narrativaDiretor: string;
   oportunidadesClientes: OportunidadeCliente[];
@@ -290,7 +296,7 @@ export type DashboardViewProps = {
 export default function DashboardView(props: DashboardViewProps) {
   const {
     clinicaId, dataStr, saudacaoCard, temDados, situacaoEmoji, situacaoTom, ocupacaoPct,
-    botoesRapidos, onboarding, ideia, missaoDoDia, contagemPorTier, indicadores,
+    botoesRapidos, onboarding, ideia, missaoDoDia, contagemPorTier, central, indicadores,
     narrativaDiretor,
     oportunidadesClientes, resumoRadar,
     orcamentosParadosCount, cobrancasAbertasCount, indicadoresCobranca, itensAtividade, atividadeIndisponivel,
@@ -518,6 +524,17 @@ export default function DashboardView(props: DashboardViewProps) {
           limite={3}
           verTodasDestino="/oportunidades"
         />
+      )}
+
+      {/* ── BLOCO D.1 · CENTRAL DE OPORTUNIDADES — grade completa (motivo +
+          evidência + ação por item), mesmo dado que já gera o pulso do
+          Diretor Digital acima. Fecha o gap: antes o pulso mostrava
+          "🔴 3 🟡 2" sem nenhum jeito de saber o quê ou agir — nenhum
+          motor novo, nenhuma regra nova, só o componente que já existia
+          (CentralDeOportunidades.tsx) e nunca era renderizado em lugar
+          nenhum (Convergência dos Amarelos/Órfãos). ──────────────────── */}
+      {temDados && central && (central.alta.length + central.media.length + central.baixa.length > 0) && (
+        <CentralDeOportunidadesCard central={central} onNavigate={onNavigate} />
       )}
 
       {/* ── BLOCO F · DINHEIRO — resumo (4 números); só o que public.

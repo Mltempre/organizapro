@@ -184,9 +184,20 @@ test("Radar de Oportunidades usa grid responsivo (auto-fill/minmax), nunca uma t
 
 // ── Consolidação — sem duplicar apresentação do mesmo sinal ─────────────
 
-test("Central de Oportunidades e o bloco solto 'Oportunidades encontradas' foram removidos do render padrão do Dashboard (redundantes com Faixa Executiva + Radar)", () => {
-  assert.doesNotMatch(dashboardView, /CentralDeOportunidadesCard/);
+test("o bloco solto 'Oportunidades encontradas' continua removido do render padrão do Dashboard (redundante com Faixa Executiva + Radar)", () => {
   assert.doesNotMatch(dashboardView, /Oportunidades encontradas/);
+});
+
+// Atualizado — Convergência dos Amarelos/Órfãos: a Central de Oportunidades
+// tinha virado órfã de verdade (grade completa nunca renderizada em lugar
+// nenhum, só a contagem/pulso) — auditoria funcional confirmou isso como
+// gap real, não redundância. Volta a ser renderizada em DashboardView,
+// agora logo abaixo do Radar, só quando há item real (nunca grade vazia
+// decorativa) — mesmo dado que já gerava o pulso, nenhum motor novo.
+test("Central de Oportunidades voltou a ser renderizada no Dashboard (grade completa, não só o pulso) — fecha o órfão real identificado na auditoria funcional", () => {
+  assert.match(dashboardView, /import CentralDeOportunidadesCard from ".\/CentralDeOportunidades"/);
+  assert.match(dashboardView, /temDados && central && \(central\.alta\.length \+ central\.media\.length \+ central\.baixa\.length > 0\)/);
+  assert.match(dashboardView, /<CentralDeOportunidadesCard central={central} onNavigate={onNavigate} \/>/);
 });
 
 test("nenhum motor foi apagado — lib/recomendacoes.ts (Central) e o componente CentralDeOportunidades.tsx continuam existindo no repositório", () => {

@@ -13,6 +13,8 @@ import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../lib/auth-clinica";
 import { logOperacao } from "../../../lib/log-estruturado";
 import { capturarValorItem, type ItemCatalogo } from "../../../lib/motor-pedidos";
+import { registrarResultadoSeHouveDecisao } from "../../../lib/auditoria-resultado-persistencia";
+import { entidadeIdDeTelefone } from "../../../lib/whatsapp-governado";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -225,6 +227,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ sucesso: true, idempotente: true, pedido: pedidoVencedor });
     }
     return NextResponse.json({ sucesso: false, error: "Erro de concorrência ao registrar auditoria — tente novamente" }, { status: 409 });
+  }
+
+  // Auditoria IA — decisão → ação → resultado: fecha o gap documentado em
+  // P1.3 para "recompra" (nunca existiu uma rota de "transição" para
+  // recompra_possivel — o resultado real é o cliente fazer um pedido
+  // NOVO). auditoria.decisao de recompra_possivel usa entidade_id
+  // derivado do telefone, entidadeTipo "cliente" (mesmo padrão de
+  // oportunidade_parada — ver app/api/follow-up/tentativa/route.ts).
+  // Fail-safe/best-effort: só grava quando existe uma decisão real prévia
+  // para ESTE telefone (nunca infere, nunca bloqueia a criação do pedido).
+  if (telefone?.trim()) {
+    await registrarResultadoSeHouveDecisao(admin, {
+      clinicaId: clinica_id,
+      entidadeTipo: "cliente",
+      entidadeId: entidadeIdDeTelefone(clinica_id, telefone),
+      fatoObservado: "pedido_criado",
+      observadoEm: agora,
+    });
   }
 
   logOperacao({ operacao: "pedido.criar", clinica_id, entidade_id: novoPedido.id, resultado: "sucesso" });
