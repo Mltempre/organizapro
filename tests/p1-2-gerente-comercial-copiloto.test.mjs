@@ -89,3 +89,16 @@ test("Copiloto: nenhum array/lista de dados de exemplo hardcoded (nunca fabrica 
   const codigo = ler("app/copiloto/page.tsx");
   assert.doesNotMatch(codigo, /nome:\s*['"](?!.*\$\{)[A-ZÀ-Ú][a-zà-ú]+['"]/, "nenhum nome de cliente literal deveria aparecer no código");
 });
+
+// ── Smart Commerce V1: canal/confiança do primeiro elo (interesse sem
+// orçamento) nunca podem ser fabricados no Copiloto — mesma oportunidade
+// pode vir do site (feat/ecommerce-ia-v1, captura pública) e o Copiloto
+// não pode reportar "via WhatsApp" para um lead que chegou pelo site. ────
+
+test("Copiloto: canal e confiança do sinal de demanda vêm do dado real (/api/oportunidades já retorna canal/confianca_classificacao), nunca hardcoded", () => {
+  const codigo = ler("app/copiloto/page.tsx");
+  assert.doesNotMatch(codigo, /canal:\s*'whatsapp'\s*as const/, "canal não pode ser fixado como 'whatsapp' — apagaria leads reais do site/manual");
+  assert.doesNotMatch(codigo, /confianca_classificacao:\s*'media'\s*as const/, "confiança não pode ser fixada como 'media' — apagaria a classificação real");
+  assert.match(codigo, /canal:\s*op\.canal/, "deveria repassar op.canal (já presente na resposta de \/api\/oportunidades)");
+  assert.match(codigo, /confianca_classificacao:\s*op\.confianca_classificacao/, "deveria repassar op.confianca_classificacao real");
+});

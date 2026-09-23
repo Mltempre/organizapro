@@ -31,7 +31,7 @@ type ClienteSemProximoRow = { id: string; nome: string; telefone: string | null;
 type CancelamentoSemReagendamentoRow = { id: string; nome: string; telefone: string | null; data: string };
 type CanceladoRow = { id: string; paciente_nome: string; telefone: string | null; data: string };
 type AgItem = { id: string; hora: string; paciente_nome: string; telefone?: string; status: string; data: string };
-type OportunidadeRow = { id: string; telefone: string; nome_informado: string | null; status: OportunidadeStatus; orcamento_vinculado_id: string | null; ultima_interacao_em: string };
+type OportunidadeRow = { id: string; telefone: string; nome_informado: string | null; status: OportunidadeStatus; orcamento_vinculado_id: string | null; ultima_interacao_em: string; canal: 'whatsapp' | 'manual' | 'site'; confianca_classificacao: 'alta' | 'media' | 'baixa' };
 type OrcamentoRow = { id: string; paciente_nome: string; telefone: string | null; procedimento: string; valor: number; status: string; apresentado_em: string };
 type TratamentoRow = { id: string; paciente_nome: string; paciente_telefone: string | null; tipo_tratamento: string; status: string; proxima_data_prevista: string | null; updated_at: string; interrompido_em: string | null; valor_estimado: number | null };
 type PedidoRow = { id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string; paciente_id: string | null; pagamento_confirmado_em: string | null; pedido_itens?: { descricao: string }[] };
@@ -150,7 +150,7 @@ export default function CopilotoPage() {
 
       const sinais = organizarSinaisCanonicos([
         ...adaptarOportunidadesClientes(oportunidadesClientes),
-        ...adaptarOportunidadesDemanda(oportunidades.map(op => ({ id: op.id, canal: 'whatsapp' as const, telefone: op.telefone, nome_informado: op.nome_informado, status: op.status, confianca_classificacao: 'media' as const, orcamento_vinculado_id: op.orcamento_vinculado_id }))),
+        ...adaptarOportunidadesDemanda(oportunidades.map(op => ({ id: op.id, canal: op.canal, telefone: op.telefone, nome_informado: op.nome_informado, status: op.status, confianca_classificacao: op.confianca_classificacao, orcamento_vinculado_id: op.orcamento_vinculado_id }))),
       ]);
 
       // ── Follow-ups pendentes (mesmo motor real de app/follow-up) ─────
