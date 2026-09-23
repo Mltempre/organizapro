@@ -66,7 +66,7 @@ export default function DepoimentosAdmin() {
       const { error } = await supabase.from("clinica_depoimentos").insert({ ...payload, ordem:maxOrdem });
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     } else if (modal?.item) {
-      const { error } = await supabase.from("clinica_depoimentos").update(payload).eq("id", modal.item.id);
+      const { error } = await supabase.from("clinica_depoimentos").update(payload).eq("id", modal.item.id).eq("clinica_id", clinicaId);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     }
     setSalvando(false); setModal(null); carregar();
@@ -74,7 +74,7 @@ export default function DepoimentosAdmin() {
 
   async function excluir(id: string) {
     if (!window.confirm("Excluir este depoimento?")) return;
-    await supabase.from("clinica_depoimentos").delete().eq("id", id);
+    await supabase.from("clinica_depoimentos").delete().eq("id", id).eq("clinica_id", clinicaId);
     carregar();
   }
 
@@ -84,8 +84,8 @@ export default function DepoimentosAdmin() {
     const swap = sorted[idx + dir];
     if (!swap) return;
     await Promise.all([
-      supabase.from("clinica_depoimentos").update({ ordem: swap.ordem }).eq("id", item.id),
-      supabase.from("clinica_depoimentos").update({ ordem: item.ordem }).eq("id", swap.id),
+      supabase.from("clinica_depoimentos").update({ ordem: swap.ordem }).eq("id", item.id).eq("clinica_id", clinicaId),
+      supabase.from("clinica_depoimentos").update({ ordem: item.ordem }).eq("id", swap.id).eq("clinica_id", clinicaId),
     ]);
     carregar();
   }

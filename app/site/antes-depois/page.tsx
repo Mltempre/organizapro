@@ -81,7 +81,7 @@ export default function AntesDepoisAdmin() {
       const { error } = await supabase.from("clinica_antes_depois").insert({ ...payload, ordem:maxOrdem });
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     } else if (modal?.item) {
-      const { error } = await supabase.from("clinica_antes_depois").update(payload).eq("id", modal.item.id);
+      const { error } = await supabase.from("clinica_antes_depois").update(payload).eq("id", modal.item.id).eq("clinica_id", clinicaId);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     }
     setSalvando(false); setModal(null); carregar();
@@ -89,7 +89,7 @@ export default function AntesDepoisAdmin() {
 
   async function excluir(id: string) {
     if (!window.confirm("Excluir este caso?")) return;
-    await supabase.from("clinica_antes_depois").delete().eq("id", id);
+    await supabase.from("clinica_antes_depois").delete().eq("id", id).eq("clinica_id", clinicaId);
     carregar();
   }
 
@@ -99,8 +99,8 @@ export default function AntesDepoisAdmin() {
     const swap = sorted[idx + dir];
     if (!swap) return;
     await Promise.all([
-      supabase.from("clinica_antes_depois").update({ ordem: swap.ordem }).eq("id", item.id),
-      supabase.from("clinica_antes_depois").update({ ordem: item.ordem }).eq("id", swap.id),
+      supabase.from("clinica_antes_depois").update({ ordem: swap.ordem }).eq("id", item.id).eq("clinica_id", clinicaId),
+      supabase.from("clinica_antes_depois").update({ ordem: item.ordem }).eq("id", swap.id).eq("clinica_id", clinicaId),
     ]);
     carregar();
   }

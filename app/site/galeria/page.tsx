@@ -61,7 +61,7 @@ export default function GaleriaAdmin() {
       const { error } = await supabase.from("clinica_galeria").insert({ clinica_id:clinicaId, url:form.url, categoria:form.categoria, titulo:form.titulo||null, ordem:maxOrdem });
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     } else if (modal?.item) {
-      const { error } = await supabase.from("clinica_galeria").update({ url:form.url, categoria:form.categoria, titulo:form.titulo||null }).eq("id", modal.item.id);
+      const { error } = await supabase.from("clinica_galeria").update({ url:form.url, categoria:form.categoria, titulo:form.titulo||null }).eq("id", modal.item.id).eq("clinica_id", clinicaId);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     }
     setSalvando(false); setModal(null); carregar();
@@ -69,7 +69,7 @@ export default function GaleriaAdmin() {
 
   async function excluir(id: string) {
     if (!window.confirm("Excluir esta foto?")) return;
-    await supabase.from("clinica_galeria").delete().eq("id", id);
+    await supabase.from("clinica_galeria").delete().eq("id", id).eq("clinica_id", clinicaId);
     carregar();
   }
 
@@ -79,8 +79,8 @@ export default function GaleriaAdmin() {
     const swap = sorted[idx + dir];
     if (!swap) return;
     await Promise.all([
-      supabase.from("clinica_galeria").update({ ordem: swap.ordem }).eq("id", item.id),
-      supabase.from("clinica_galeria").update({ ordem: item.ordem }).eq("id", swap.id),
+      supabase.from("clinica_galeria").update({ ordem: swap.ordem }).eq("id", item.id).eq("clinica_id", clinicaId),
+      supabase.from("clinica_galeria").update({ ordem: item.ordem }).eq("id", swap.id).eq("clinica_id", clinicaId),
     ]);
     carregar();
   }

@@ -48,7 +48,7 @@ export default function FaqAdmin() {
       const { error } = await supabase.from("clinica_faq").insert({ ...payload, ordem: maxOrdem });
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     } else if (modal?.item) {
-      const { error } = await supabase.from("clinica_faq").update(payload).eq("id", modal.item.id);
+      const { error } = await supabase.from("clinica_faq").update(payload).eq("id", modal.item.id).eq("clinica_id", clinicaId);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     }
     setSalvando(false); setModal(null); carregar();
@@ -56,7 +56,7 @@ export default function FaqAdmin() {
 
   async function excluir(id: string) {
     if (!window.confirm("Excluir esta pergunta?")) return;
-    await supabase.from("clinica_faq").delete().eq("id", id);
+    await supabase.from("clinica_faq").delete().eq("id", id).eq("clinica_id", clinicaId);
     carregar();
   }
 
@@ -66,8 +66,8 @@ export default function FaqAdmin() {
     const swap = sorted[idx + dir];
     if (!swap) return;
     await Promise.all([
-      supabase.from("clinica_faq").update({ ordem: swap.ordem }).eq("id", item.id),
-      supabase.from("clinica_faq").update({ ordem: item.ordem }).eq("id", swap.id),
+      supabase.from("clinica_faq").update({ ordem: swap.ordem }).eq("id", item.id).eq("clinica_id", clinicaId),
+      supabase.from("clinica_faq").update({ ordem: item.ordem }).eq("id", swap.id).eq("clinica_id", clinicaId),
     ]);
     carregar();
   }

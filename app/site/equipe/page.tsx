@@ -72,7 +72,7 @@ export default function EquipeAdmin() {
       const { error } = await supabase.from("clinica_equipe").insert({ ...payload, ordem: maxOrdem });
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     } else if (modal?.item) {
-      const { error } = await supabase.from("clinica_equipe").update(payload).eq("id", modal.item.id);
+      const { error } = await supabase.from("clinica_equipe").update(payload).eq("id", modal.item.id).eq("clinica_id", clinicaId);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
     }
     setSalvando(false); setModal(null); carregar();
@@ -80,7 +80,7 @@ export default function EquipeAdmin() {
 
   async function excluir(id: string) {
     if (!window.confirm("Excluir este profissional?")) return;
-    await supabase.from("clinica_equipe").delete().eq("id", id);
+    await supabase.from("clinica_equipe").delete().eq("id", id).eq("clinica_id", clinicaId);
     carregar();
   }
 
@@ -90,8 +90,8 @@ export default function EquipeAdmin() {
     const swap = sorted[idx + dir];
     if (!swap) return;
     await Promise.all([
-      supabase.from("clinica_equipe").update({ ordem: swap.ordem }).eq("id", item.id),
-      supabase.from("clinica_equipe").update({ ordem: item.ordem }).eq("id", swap.id),
+      supabase.from("clinica_equipe").update({ ordem: swap.ordem }).eq("id", item.id).eq("clinica_id", clinicaId),
+      supabase.from("clinica_equipe").update({ ordem: item.ordem }).eq("id", swap.id).eq("clinica_id", clinicaId),
     ]);
     carregar();
   }

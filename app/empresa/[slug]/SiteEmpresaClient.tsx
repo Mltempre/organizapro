@@ -24,7 +24,7 @@ import { gradienteDe, brilhoCta } from "./_lib/theme";
 import { resolverFamilia, font } from "./_lib/families";
 import { CTA_CONTEXTUAL } from "./_lib/content";
 import { construirLinkComRastreio } from "../../../lib/atribuicao-origem";
-import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura, DBFaq } from "./_lib/types";
+import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura, DBFaq, DBAntes } from "./_lib/types";
 
 // ── Site Institucional Universal — OrganizaPro (Site Premium 10.0) ──────────
 //
@@ -46,11 +46,19 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
   const [servicos, setServicos] = useState<DBServico[]>([]);
   const [estrutura, setEstrutura] = useState<DBEstrutura[]>([]);
   const [faqs, setFaqs] = useState<DBFaq[]>([]);
+  const [antesDepois, setAntesDepois] = useState<DBAntes[]>([]);
+  const [loadedSlug, setLoadedSlug] = useState(slug);
+  const [erroCarga, setErroCarga] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!slug) return;
+    let active = true;
+    setLoading(true);
+    setErroCarga(false);
+    setEmpresa(null);
     async function carregar() {
+      try {
+      if (!slug) return;
       type DadosPublicos = {
         clinica_id: string; nome?: string; especialidade?: string; cidade?: string; estado?: string;
         telefone?: string; email?: string; endereco?: string; whatsapp?: string; google_maps_url?: string;
@@ -64,22 +72,27 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
       // produto internamente (ver sql/isolamento-produto-clinicas-clinica-usuarios.sql);
       // slug de outro produto ou clinicas.produto IS NULL devolvem 0 linhas
       // por design, tratados abaixo como "empresa não encontrada".
-      const { data: dados } = await supabase
+      const { data: dados, error: erro } = await supabase
         .rpc("site_publico_por_slug_v2", { p_slug: slug, p_produto: "organizapro" })
         .maybeSingle<DadosPublicos>();
 
-      if (!dados?.clinica_id) { setEmpresa(null); setLoading(false); return; }
+      if (!active) return;
+      if (erro) throw erro;
+      if (!dados?.clinica_id) return;
       const cid = dados.clinica_id;
 
-      const [galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes] = await Promise.all([
+      const [galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes, antesRes] = await Promise.all([
         supabase.from("clinica_galeria").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_equipe").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_depoimentos").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_servicos").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_estrutura").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_faq").select("*").eq("clinica_id", cid).order("ordem"),
+        supabase.from("clinica_antes_depois").select("*").eq("clinica_id", cid).order("ordem"),
       ]);
 
+      if (!active) return;
+      setErroCarga([galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes, antesRes].some(res => Boolean(res.error)));
       setEmpresa({
         nome: dados.nome,
         especialidade: normalizarEspecialidade(dados.especialidade),
@@ -107,17 +120,23 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
       setGaleria(safeData(galeriaRes as { data: DBGaleria[] | null; error: { code?: string } | null }));
       setEquipe(safeData(equipeRes as { data: DBEquipe[] | null; error: { code?: string } | null }));
       setDepoimentos(safeData(depRes as { data: DBDepoimento[] | null; error: { code?: string } | null }));
-      setServicos(safeData(srvRes as { data: DBServico[] | null; error: { code?: string } | null }));
+      setServicos(safeData(srvRes as { data: DBServico[] | null; error: { code?: string } | null }).filter(s => s.disponivel !== false));
       setEstrutura(safeData(estRes as { data: DBEstrutura[] | null; error: { code?: string } | null }));
       setFaqs(safeData(faqRes as { data: DBFaq[] | null; error: { code?: string } | null }));
-      setLoading(false);
+      setAntesDepois(safeData(antesRes as { data: DBAntes[] | null; error: { code?: string } | null }));
+      } catch {
+        if (active) { setEmpresa(null); setErroCarga(true); }
+      } finally {
+        if (active) { setLoadedSlug(slug); setLoading(false); }
+      }
     }
     carregar();
+    return () => { active = false; };
   }, [slug]);
 
   const tema = resolverFamilia(empresa?.especialidade);
 
-  if (loading) return (
+  if (loading || loadedSlug !== slug) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, background: "#0d1016" }}>
       <div style={{ textAlign: "center" }}>
         <div style={{ width: 40, height: 40, border: "3px solid rgba(255,255,255,.1)", borderTop: "3px solid #79bdcd", borderRadius: "50%", margin: "0 auto 14px", animation: "spin 0.8s linear infinite" }}/>
@@ -131,8 +150,8 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
     <div style={{ minHeight: "100vh", background: "#0d1016", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: 24 }}>
       <div style={{ maxWidth: 520, textAlign: "center", background: "rgba(255,255,255,.03)", borderRadius: 20, padding: "40px 32px", border: "1px solid rgba(255,255,255,.1)" }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>:(</div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, margin: "0 0 16px", color: "#f8fafc" }}>Página não encontrada</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.7, color: "#9aa8b9", margin: 0 }}>Não existe um site cadastrado com esse endereço.</p>
+        <h1 style={{ fontSize: 28, fontWeight: 800, margin: "0 0 16px", color: "#f8fafc" }}>{erroCarga ? "Site temporariamente indisponível" : "Página não encontrada"}</h1>
+        <p style={{ fontSize: 16, lineHeight: 1.7, color: "#9aa8b9", margin: 0 }}>{erroCarga ? "Não foi possível carregar o conteúdo. Recarregue a página para tentar novamente." : "Não existe um site cadastrado com esse endereço."}</p>
       </div>
     </div>
   );
@@ -144,7 +163,7 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
   // falhou, ou origem ainda não persistida), o link continua idêntico ao
   // de sempre — nunca quebra por causa disto.
   const waComMsg = (msg: string) => {
-    if (!whatsappNumber) return "#";
+    if (!whatsappNumber) return "";
     const link = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
     return codigoRastreio ? construirLinkComRastreio(link, codigoRastreio) : link;
   };
@@ -161,7 +180,7 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
   const titulo = gerarTituloHero(empresa, tema.id);
   const subtitulo = gerarSubtituloHero(empresa, local, tema.id);
   const mediaHero = empresa.hero_url || empresa.banner_url;
-  const temGaleria = galeria.length + estrutura.length > 0;
+  const temGaleria = galeria.some(g => g.url) || estrutura.some(e => e.imagem_url) || antesDepois.some(a => a.antes_url && a.depois_url);
   const temContato = Boolean(empresa.endereco || empresa.telefone || empresa.email || whatsappNumber);
 
   // Ritmo claro/escuro (§5) calculado só entre as seções que vão de fato
@@ -260,6 +279,7 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
 
       <Header nome={nome} logoUrl={empresa.logo_url} waLink={waHero} whatsappNumber={whatsappNumber} navItems={navItems} tema={tema}/>
       <Hero empresa={empresa} esp={esp} local={local} titulo={titulo} subtitulo={subtitulo} waLink={waHero} whatsappNumber={whatsappNumber} mediaUrl={mediaHero} hasServices={servicos.length > 0} tema={tema}/>
+      {erroCarga && <p role="status" style={{ padding: "20px 24px", textAlign: "center" }}>Parte do conteúdo está temporariamente indisponível. Recarregue a página para tentar novamente.</p>}
       <Banner bannerUrl={empresa.hero_url ? empresa.banner_url : null} nome={nome} tema={tema}/>
       <Problema familiaId={tema.id} tema={tema} ctaHref={waProblema} ctaTexto="Conte com a gente para resolver isso" tone={tons.problema?.tone} variant={tons.problema?.variant}/>
       <Sobre empresa={empresa} nome={nome} sobre={sobre} tema={tema} tone={tons.sobre?.tone} variant={tons.sobre?.variant}/>
@@ -268,7 +288,7 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
       <Servicos servicos={servicos} empresa={empresa} tema={tema} familiaId={tema.id} waBase={waBase} codigoRastreio={codigoRastreio} tone={tons.servicos?.tone} variant={tons.servicos?.variant}/>
       <PedidoPublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}/>
       <InteressePublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}/>
-      <Galeria galeria={galeria} estrutura={estrutura} empresa={empresa} tema={tema} tone={tons.galeria?.tone} variant={tons.galeria?.variant}/>
+      <Galeria antesDepois={antesDepois} galeria={galeria} estrutura={estrutura} empresa={empresa} tema={tema} tone={tons.galeria?.tone} variant={tons.galeria?.variant}/>
       <Equipe equipe={equipe} tema={tema} tone={tons.equipe?.tone} variant={tons.equipe?.variant}/>
       <Depoimentos depoimentos={depoimentos} tema={tema} tone={tons.depoimentos?.tone} variant={tons.depoimentos?.variant}/>
       <Faq faqs={faqs} tema={tema} tone={tons.faq?.tone} variant={tons.faq?.variant}/>

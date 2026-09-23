@@ -27,21 +27,27 @@ type Props = {
 export default function SiteWorkspaceNav({ siteUrl: suppliedUrl, onPreview, onPublish, publishing = false }: Props) {
   const pathname = usePathname();
   const [loadedUrl, setLoadedUrl] = useState("");
-  const publicUrl = suppliedUrl || loadedUrl;
+  const publicUrl = suppliedUrl ?? loadedUrl;
 
   useEffect(() => {
-    if (suppliedUrl) return;
+    if (suppliedUrl !== undefined) return;
 
     let active = true;
     async function loadPublicUrl() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const response = await fetch("/api/minha-clinica", { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!response.ok) return;
+      const tenant = await response.json();
+      if (!tenant?.clinica_id) return;
       const { data } = await supabase
         .from("clinica_config")
         .select("slug")
-        .eq("user_id", user.id)
+        .eq("clinica_id", tenant.clinica_id)
         .maybeSingle();
       if (active && data?.slug) setLoadedUrl(`${window.location.origin}/empresa/${data.slug}`);
+      } catch { if (active) setLoadedUrl(""); }
     }
     loadPublicUrl();
     return () => { active = false; };

@@ -94,7 +94,7 @@ export default function ServicosAdmin() {
   // serviço em si.
   async function salvarPreco(id: string) {
     const precoCentavos = parsePrecoParaCentavos(form.preco);
-    const { error } = await supabase.from("clinica_servicos").update({ preco_centavos: precoCentavos, disponivel: form.disponivel }).eq("id", id);
+    const { error } = await supabase.from("clinica_servicos").update({ preco_centavos: precoCentavos, disponivel: form.disponivel }).eq("id", id).eq("clinica_id", clinicaId);
     if (error) setAvisoPreco("Preço/disponibilidade ainda não pôde ser salvo (funcionalidade em ativação).");
     else setAvisoPreco("");
   }
@@ -110,7 +110,7 @@ export default function ServicosAdmin() {
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
       idParaPreco = data.id;
     } else if (modal?.item) {
-      const { error } = await supabase.from("clinica_servicos").update(payload).eq("id", modal.item.id);
+      const { error } = await supabase.from("clinica_servicos").update(payload).eq("id", modal.item.id).eq("clinica_id", clinicaId);
       if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
       idParaPreco = modal.item.id;
     }
@@ -120,7 +120,7 @@ export default function ServicosAdmin() {
 
   async function excluir(id: string) {
     if (!window.confirm("Excluir este servico?")) return;
-    await supabase.from("clinica_servicos").delete().eq("id", id);
+    await supabase.from("clinica_servicos").delete().eq("id", id).eq("clinica_id", clinicaId);
     carregar();
   }
 
@@ -130,8 +130,8 @@ export default function ServicosAdmin() {
     const swap = sorted[idx + dir];
     if (!swap) return;
     await Promise.all([
-      supabase.from("clinica_servicos").update({ ordem: swap.ordem }).eq("id", item.id),
-      supabase.from("clinica_servicos").update({ ordem: item.ordem }).eq("id", swap.id),
+      supabase.from("clinica_servicos").update({ ordem: swap.ordem }).eq("id", item.id).eq("clinica_id", clinicaId),
+      supabase.from("clinica_servicos").update({ ordem: item.ordem }).eq("id", swap.id).eq("clinica_id", clinicaId),
     ]);
     carregar();
   }

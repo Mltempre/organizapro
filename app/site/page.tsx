@@ -74,6 +74,7 @@ function SectionEyebrow({ children }: { children: string }) {
 export default function Site() {
   const router = useRouter();
   const [loading, setLoading]                   = useState(true);
+  const [configReady, setConfigReady]           = useState(false);
   const [clinicaId, setClinicaId]               = useState("");
   const [userId, setUserId]                     = useState("");
   const [salvando, setSalvando]                 = useState(false);
@@ -104,6 +105,7 @@ export default function Site() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
+    setConfigReady(false);
     setErro("");
     // try/catch envolvendo toda a função — sem isso, uma exceção inesperada
     // (rede instável, etc.) em qualquer chamada ao Supabase deixava
@@ -122,6 +124,7 @@ export default function Site() {
       });
       const cu = cuRes.ok ? await cuRes.json() : null;
 
+      if (!cu?.clinica_id) throw new Error("Tenant indisponível");
       if (cu?.clinica_id) {
         const c = cu as ClinicaInfo;
         setClinicaId(cu.clinica_id);
@@ -139,12 +142,14 @@ export default function Site() {
         }));
       }
 
-      const { data: config } = await supabase
+      const { data: config, error: configLoadError } = await supabase
         .from("clinica_config")
         .select("slug, logo_url, hero_url, nota_google, num_avaliacoes, horario_funcionamento, banner_url, instagram_url, facebook_url, linkedin_url, tiktok_url, seo_titulo, seo_descricao, seo_imagem_url")
-        .eq("user_id", user.id)
+        .eq("clinica_id", cu.clinica_id)
         .maybeSingle();
 
+      if (configLoadError) throw configLoadError;
+      setPublishedSlug(config?.slug || "");
       if (config) {
         setPublishedSlug(config.slug || "");
         setForm(prev => ({
@@ -165,6 +170,7 @@ export default function Site() {
           seo_imagem_url:        config.seo_imagem_url             || "",
         }));
       }
+      setConfigReady(true);
     } catch (e) {
       console.error(e);
       setErro("Não foi possível carregar as configurações do seu site agora. Recarregue a página; se o problema continuar, tente novamente em instantes.");
@@ -279,6 +285,7 @@ export default function Site() {
   }
 
   async function salvar() {
+    if (!configReady) { setErro("Recarregue as configurações do site antes de publicar."); return; }
     // Trava síncrona (ref, não state) — ver docs/kensa-premium-dashboard-relatorio.md, K-03.
     // O try/catch/finally externo também evita que uma exceção inesperada
     // (ex.: falha de rede) deixe o botão travado em "Publicando..." para sempre.
@@ -292,41 +299,20 @@ export default function Site() {
     if (!normalizedSlug) { setErro("Informe o nome do negócio para gerar o endereço do site."); setSalvando(false); return; }
     if (!clinicaId || !userId) { setErro("Não foi possível identificar seu negócio. Recarregue a página e tente novamente."); setSalvando(false); return; }
 
-    const { data: existing } = await supabase
+    const { data: existing, error: slugError } = await supabase
       .from("clinica_config")
       .select("user_id")
       .eq("slug", normalizedSlug)
-      .neq("user_id", userId)
+      .neq("clinica_id", clinicaId)
       .maybeSingle();
 
+    if (slugError) throw slugError;
     if (existing) { setErro("Este endereço (slug) já está sendo usado por outro negócio. Escolha outro."); setSalvando(false); return; }
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) { setErro("Sessão expirada. Recarregue a página e tente novamente."); setSalvando(false); return; }
 
-    const clinicaRes = await fetch("/api/minha-clinica", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        nome:            form.nome,
-        especialidade:   form.especialidade,
-        telefone:        form.telefone,
-        whatsapp:        form.whatsapp,
-        endereco:        form.endereco,
-        cidade:          form.cidade,
-        estado:          form.estado,
-        google_maps_url: form.google_maps_url,
-        email:           form.email,
-      }),
-    });
-
-    if (!clinicaRes.ok) { setErro("Não foi possível salvar os dados do negócio. Tente novamente em instantes."); setSalvando(false); return; }
-
     const configBase = {
-      user_id:    userId,
       clinica_id: clinicaId,
       slug:       normalizedSlug,
       logo_url:   form.logo_url || null,
@@ -363,9 +349,34 @@ export default function Site() {
       seo_imagem_url:        form.seo_imagem_url || null,
     };
 
-    const { error: configError } = await supabase
-      .from("clinica_config")
-      .upsert(configFull, { onConflict: "user_id" });
+    const { data: currentConfig, error: currentError } = await supabase
+      .from("clinica_config").select("user_id").eq("clinica_id", clinicaId).maybeSingle();
+    if (currentError) throw currentError;
+
+    const clinicaRes = await fetch("/api/minha-clinica", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        nome:            form.nome,
+        especialidade:   form.especialidade,
+        telefone:        form.telefone,
+        whatsapp:        form.whatsapp,
+        endereco:        form.endereco,
+        cidade:          form.cidade,
+        estado:          form.estado,
+        google_maps_url: form.google_maps_url,
+        email:           form.email,
+      }),
+    });
+
+    if (!clinicaRes.ok) { setErro("Não foi possível salvar os dados do negócio. Tente novamente em instantes."); setSalvando(false); return; }
+
+    const { error: configError } = currentConfig
+      ? await supabase.from("clinica_config").update(configFull).eq("clinica_id", clinicaId).select("slug").single()
+      : await supabase.from("clinica_config").insert({ ...configFull, user_id: userId }).select("slug").single();
 
     if (configError) {
       setErro("Não foi possível salvar as configurações do site. Tente novamente."); setSalvando(false); return;

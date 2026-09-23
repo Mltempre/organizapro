@@ -16,7 +16,7 @@ export default function Problema({ familiaId, tema, ctaHref, ctaTexto, tone = "l
           <span className="section-label">O que você precisa saber</span>
           <h2>{conteudo.titulo}</h2>
           <p>{conteudo.corpo}</p>
-          <a className="soft-cta" href={ctaHref} target="_blank" rel="noreferrer">{ctaTexto} →</a>
+          {ctaHref && <a className="soft-cta" href={ctaHref} target="_blank" rel="noreferrer">{ctaTexto} →</a>}
         </div>
       </Reveal>
       <style>{`
