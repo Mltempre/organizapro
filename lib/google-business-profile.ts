@@ -1,4 +1,6 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
+import "server-only";
+
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const GOOGLE_BUSINESS_SCOPE = "https://www.googleapis.com/auth/business.manage";
 const STATE_TTL_SECONDS = 600;
@@ -25,11 +27,14 @@ export function criarEstadoGoogle(clinicaId: string, userId: string, secret: str
 }
 
 export function validarEstadoGoogle(state: string, secret: string, now = Math.floor(Date.now() / 1000)): GoogleOAuthState | null {
-  const [payload, signature] = state.split(".");
-  if (!payload || !signature || assinar(payload, secret) !== signature) return null;
+  const [payload, signature, extra] = state.split(".");
+  if (!payload || !signature || extra !== undefined || !/^[A-Za-z0-9_-]+$/.test(signature)) return null;
+  const esperado = assinar(payload, secret);
+  if (signature.length !== esperado.length || !timingSafeEqual(Buffer.from(esperado), Buffer.from(signature))) return null;
   try {
     const estado = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as GoogleOAuthState;
-    if (!estado.clinicaId || !estado.userId || !estado.nonce || !Number.isInteger(estado.exp) || estado.exp < now) return null;
+    if (typeof estado.clinicaId !== "string" || !estado.clinicaId || typeof estado.userId !== "string" || !estado.userId
+      || typeof estado.nonce !== "string" || !/^[a-f0-9]{48}$/.test(estado.nonce) || !Number.isInteger(estado.exp) || estado.exp <= now) return null;
     return estado;
   } catch {
     return null;
@@ -136,36 +141,8 @@ export function podePublicarResposta(estadoAtual: EstadoAvaliacaoGoogle, texto: 
   return estadoAtual === "sem_resposta" && texto.trim().length > 0;
 }
 
-// ── Prompt para a resposta sugerida — reaproveita /api/ia existente ────
-// Nunca cria uma segunda chamada de IA: o texto abaixo é o PROMPT que a
-// TELA envia para o já existente /api/ia (mesmo endpoint de app/conteudo/
-// page.tsx), nunca uma chamada nova ao OpenAI feita daqui.
-
-export type DadosAvaliacaoParaPrompt = {
-  nomeEmpresa: string;
-  nota: number; // 1-5, real, do Google
-  comentario: string | null; // texto real do cliente, ou null quando a avaliação não tem comentário (só nota)
-};
-
-/**
- * Monta o prompt determinístico para /api/ia — nunca inclui um fato que
- * não veio da avaliação real (nunca inventa produto/atendimento/entrega
- * específicos), nunca instrui a admitir culpa/responsabilidade jurídica,
- * nunca instrui a oferecer desconto/reembolso/promessa.
- */
-export function montarPromptRespostaAvaliacao(dados: DadosAvaliacaoParaPrompt): string {
-  const comentarioTexto = dados.comentario && dados.comentario.trim()
-    ? `O comentário do cliente foi: "${dados.comentario.trim()}"`
-    : "O cliente não deixou comentário, só a nota.";
-  return [
-    `Escreva uma resposta profissional e cordial, em português do Brasil, para uma avaliação do Google recebida pela empresa "${dados.nomeEmpresa}".`,
-    `A nota dada foi ${dados.nota} de 5 estrelas. ${comentarioTexto}`,
-    "Regras obrigatórias: nunca invente detalhes sobre a compra, atendimento, entrega ou produto que não estejam no comentário acima.",
-    "Nunca admita culpa ou responsabilidade jurídica. Nunca ofereça desconto, reembolso, indenização ou qualquer promessa.",
-    "Se a nota for baixa, agradeça o retorno e convide a pessoa a entrar em contato diretamente para resolver, sem prometer nada específico.",
-    "Responda só com o texto da resposta, sem aspas, sem explicações, com no máximo 3 frases.",
-  ].join(" ");
-}
+export { montarPromptRespostaAvaliacao } from "./google-business-profile-shared";
+export type { DadosAvaliacaoParaPrompt } from "./google-business-profile-shared";
 
 // ── Bloco 8 — sinal para Reputação/Diretor Digital (provado isoladamente) ──
 // NÃO integrado a lib/oportunidades-clientes.ts (Radar), lib/follow-up-

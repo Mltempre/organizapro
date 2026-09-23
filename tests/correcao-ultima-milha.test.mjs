@@ -160,10 +160,13 @@ test("google-presenca: status indisponível (GET falhou) nunca oferece 'Conectar
   assert.match(codigo, /\{!carregando && !indisponivel && !status\?\.conectado && <button type="button" onClick=\{conectar\}/);
 });
 
-test("google-presenca: fluxo OAuth (conectar()) continua intocado quando o status é válido", () => {
+test("google-presenca: OAuth inicia por POST autenticado antes da navegação", () => {
   const codigo = ler("app/google-presenca/page.tsx");
   assert.match(codigo, /async function conectar\(\) \{/);
-  assert.match(codigo, /window\.location\.href = `\/api\/google-business-profile\/oauth\/start\?clinica_id=\$\{encodeURIComponent\(clinicaId\)\}`;/);
+  assert.ok(codigo.includes('fetch("/api/google-business-profile/oauth/start", { method: "POST"'));
+  assert.ok(codigo.includes('Authorization: `Bearer ${session.access_token}`'));
+  assert.ok(codigo.includes('window.location.href = url.toString()'));
+  assert.ok(!codigo.includes('oauth/start?clinica_id='));
 });
 
 // ── Regra de colisão: nada fora do pacote autorizado foi tocado ─────────

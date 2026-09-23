@@ -34,13 +34,13 @@ test("vínculo comprovado sem receita ainda: conta em totalVinculados, mas recei
   assert.equal(r[0].receitaComprovadaCentavos, 0);
 });
 
-test("receita comprovada soma exatamente o que foi passado por paciente vinculado — nunca um valor a mais/menos", () => {
+test("contrato legado por paciente não prova receita de campanha; exige vínculo por pagamento", () => {
   const r = agregarAtribuicao(
     [{ classificacao: "google_ads", pacienteId: "pac-1" }, { classificacao: "google_ads", pacienteId: "pac-2" }],
     { "pac-1": 10000, "pac-2": 5000 }
   );
-  assert.equal(r[0].receitaComprovadaCentavos, 15000);
-  assert.equal(r[0].totalComReceitaComprovada, 2);
+  assert.equal(r[0].receitaComprovadaCentavos, 0);
+  assert.equal(r[0].totalComReceitaComprovada, 0);
 });
 
 test("CAC/ROAS SEMPRE null nesta versão — nenhuma integração real de gasto de mídia (custoCentavos é sempre null, nunca fabricado)", () => {
@@ -69,7 +69,8 @@ test("sql/atribuicao-origem-fase1.sql: PREPARADA, nunca executada nesta missão 
 
 test("GET /api/atribuicao: erro de tabela ausente nunca vira 500 nem fabrica dado — devolve indisponivel:true (mesmo padrão de /api/atividade-recente)", () => {
   const codigo = ler("app/api/atribuicao/route.ts");
-  assert.match(codigo, /indisponivel: true, motivo: error\.message, origens: \[\]/);
+  assert.match(codigo, /indisponivel: true, schemaPendente/);
+  assert.match(codigo, /status: 503/);
 });
 
 test("Atribuição: página distingue explicitamente Google Ads/Meta Ads de Google Presença (nunca confunde os dois domínios)", () => {
@@ -80,8 +81,8 @@ test("Atribuição: página distingue explicitamente Google Ads/Meta Ads de Goog
 
 test("Atribuição: CAC/ROAS renderizados como '—' quando null, nunca '0' ou 'R$ 0,00' (que pareceria um fato medido)", () => {
   const codigo = ler("app/atribuicao/page.tsx");
-  assert.match(codigo, /l\.cac !== null \? formatarValor\(l\.cac\) : '—'/);
-  assert.match(codigo, /l\.roas !== null \? l\.roas\.toFixed\(2\) : '—'/);
+  assert.match(codigo, /CAC\/ROAS: —/);
+  assert.match(codigo, /gastos não integrados/);
 });
 
 test("Atribuição: item de navegação real em Inteligência", () => {

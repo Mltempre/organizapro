@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { DBServico } from "../_lib/types";
 
-type Props = { slug: string; servicos: DBServico[] };
+type Props = { slug: string; servicos: DBServico[]; codigoRastreio?: string };
 type Quantidades = Record<string, number>;
 
 function dinheiro(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function PedidoPublico({ slug, servicos }: Props) {
+export default function PedidoPublico({ slug, servicos, codigoRastreio }: Props) {
+  const tentativa = useRef<{ corpo: string; chave: string } | null>(null);
   const compraveis = servicos.filter((servico) => servico.disponivel !== false && typeof servico.preco_centavos === "number" && servico.preco_centavos > 0);
   const [quantidades, setQuantidades] = useState<Quantidades>({});
   const [nome, setNome] = useState("");
@@ -33,20 +34,25 @@ export default function PedidoPublico({ slug, servicos }: Props) {
     if (selecionados.length === 0) { setMensagem({ tipo: "erro", texto: "Escolha ao menos um item." }); return; }
     setEnviando(true); setMensagem(null);
     try {
+      const corpo = JSON.stringify({ slug, nome_cliente: nome, telefone, observacao: observacao || null,
+        itens: selecionados.map(s => ({ servico_id: s.id, quantidade: quantidades[s.id] })), codigo_rastreio: codigoRastreio });
+      if (tentativa.current?.corpo !== corpo) tentativa.current = { corpo, chave: crypto.randomUUID() };
       const resposta = await fetch("/api/site-publico/pedidos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug,
+          codigo_rastreio: codigoRastreio,
           nome_cliente: nome,
           telefone,
           observacao: observacao || null,
           itens: selecionados.map((servico) => ({ servico_id: servico.id, quantidade: quantidades[servico.id] })),
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: tentativa.current!.chave,
         }),
       });
       const dados = await resposta.json() as { sucesso?: boolean; error?: string; pedido?: { id?: string } };
       if (!resposta.ok || !dados.sucesso) throw new Error(dados.error || "Não foi possível registrar seu pedido.");
+      tentativa.current = null;
       setMensagem({ tipo: "sucesso", texto: `Pedido registrado com sucesso. Código: ${dados.pedido?.id?.slice(0, 8) ?? "confirmado"}.` });
       setQuantidades({}); setNome(""); setTelefone(""); setObservacao("");
     } catch (error) {

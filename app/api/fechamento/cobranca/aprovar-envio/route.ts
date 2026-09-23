@@ -10,6 +10,7 @@
 // entre a tentativa e agora, a aprovação é recusada (nunca cobra
 // novamente documento já resolvido).
 
+import { reservarOperacao, finalizarOperacao } from "../../../../../lib/seguranca-operacoes";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../../../lib/auth-clinica";
@@ -59,11 +60,13 @@ export async function POST(req: NextRequest) {
   const hoje = hojeStr();
 
   // Recalcula a prontidão AGORA — nunca confia na tentativa antiga.
-  const [{ data: tiposRows }, { data: excecoesRows }, { data: documentosRows }] = await Promise.all([
+  const consultas = await Promise.all([
     admin.from("fechamento_tipos_documento").select("nome, obrigatorio, ativo").eq("clinica_id", clinica_id),
     admin.from("fechamento_excecoes_cliente").select("cliente_id, tipo_documento, incluido").eq("clinica_id", clinica_id).eq("cliente_id", cliente_id),
     admin.from("fechamento_documentos").select("cliente_id, tipo_documento, status").eq("clinica_id", clinica_id).eq("cliente_id", cliente_id).eq("competencia", competencia),
   ]);
+  if (consultas.some(r => r.error)) return NextResponse.json({ sucesso: false, error: "Não foi possível verificar as pendências. Nenhum envio realizado." }, { status: 503 });
+  const [{ data: tiposRows }, { data: excecoesRows }, { data: documentosRows }] = consultas;
   const tipos: TipoDocumentoConfig[] = (tiposRows ?? []).map((t) => ({ nome: t.nome, obrigatorio: t.obrigatorio, ativo: t.ativo }));
   const excecoes: ExcecaoClienteConfig[] = (excecoesRows ?? []).map((e) => ({ clienteId: e.cliente_id, tipoDocumento: e.tipo_documento, incluido: e.incluido }));
   const documentos: DocumentoRegistrado[] = (documentosRows ?? []).map((d) => ({ clienteId: d.cliente_id, tipoDocumento: d.tipo_documento, status: d.status }));
@@ -76,10 +79,11 @@ export async function POST(req: NextRequest) {
   }
 
   const chaveTentativa = `${cliente_id}:fechamento.cobranca_tentativa:${competencia}:${hoje}`;
-  const { data: tentativaHoje } = await admin.from("eventos_dominio").select("id").eq("clinica_id", clinica_id).eq("chave_idempotencia", chaveTentativa).maybeSingle();
+  const { data: tentativaHoje, error: erroTentativa } = await admin.from("eventos_dominio").select("id").eq("clinica_id", clinica_id).eq("chave_idempotencia", chaveTentativa).maybeSingle();
 
-  const { data: enviosHoje } = await admin.from("eventos_dominio").select("payload")
+  const { data: enviosHoje, error: erroEnvios } = await admin.from("eventos_dominio").select("payload")
     .eq("clinica_id", clinica_id).eq("entidade_tipo", "cliente").eq("entidade_id", cliente_id).eq("tipo", "fechamento.cobranca_envio");
+  if (erroTentativa || erroEnvios) return NextResponse.json({ sucesso: false, error: "Histórico de envio indisponível." }, { status: 503 });
   const jaEnviadoComSucessoHoje = (enviosHoje ?? []).some((e) => {
     const p = e.payload as { dia?: string; competencia?: string; resultado?: string };
     return p.dia === hoje && p.competencia === competencia && p.resultado === "sucesso";
@@ -89,8 +93,9 @@ export async function POST(req: NextRequest) {
   let consentimento: EstadoConsentimento = "desconhecido";
   if (telefone) {
     const entidadeIdTelefone = entidadeIdDeTelefone(clinica_id, telefone);
-    const { data: eventosConsentimento } = await admin.from("eventos_dominio").select("payload, criado_em")
+    const { data: eventosConsentimento, error: erroConsentimento } = await admin.from("eventos_dominio").select("payload, criado_em")
       .eq("clinica_id", clinica_id).eq("entidade_tipo", "contato_whatsapp").eq("entidade_id", entidadeIdTelefone).eq("tipo", "whatsapp.consentimento");
+    if (erroConsentimento) return NextResponse.json({ sucesso: false, error: "Consentimento indisponível." }, { status: 503 });
     consentimento = estadoConsentimentoAtual(
       (eventosConsentimento ?? []).map((e) => ({ criadoEm: e.criado_em as string, estado: (e.payload as { estado: "permitido" | "bloqueado" }).estado }))
     );
@@ -119,6 +124,11 @@ export async function POST(req: NextRequest) {
   }
 
   const mensagem = gerarMensagemCobrancaFechamento(cliente.nome, competencia, pendencias);
+  // Identidade derivada no servidor; trocar a chave do browser não libera reenvio.
+  const operacao = `fechamento:${cliente_id}:${competencia}:${hoje}`;
+  const reserva = await reservarOperacao(admin, clinica_id, operacao, JSON.stringify([telefone, mensagem]), true);
+  if (!reserva) return NextResponse.json({ sucesso: false, error: "Envio reservado ou persistência indisponível; verifique antes de repetir." }, { status: 409 });
+  let rejeitadoAntesDoEnvio = false;
   const baseUrl = new URL(req.url).origin;
   let zapiOk = false;
   let motivoFalha: string | null = null;
@@ -126,31 +136,32 @@ export async function POST(req: NextRequest) {
     const r = await fetch(`${baseUrl}/api/whatsapp`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${internalServiceSecret}` },
-      body: JSON.stringify({ clinica_id, telefone, mensagem }),
+      body: JSON.stringify({ clinica_id, telefone, mensagem, operacao }),
     });
     zapiOk = r.ok;
     if (!zapiOk) {
       const j = await r.json().catch(() => null);
-      motivoFalha = (j as { error?: string } | null)?.error ?? `Z-API retornou status ${r.status}`;
+      rejeitadoAntesDoEnvio = (j as { nao_enviado?: boolean } | null)?.nao_enviado === true;
+      motivoFalha = "Serviço de envio recusou a operação";
     }
-  } catch (e) {
+  } catch {
     zapiOk = false;
-    motivoFalha = e instanceof Error ? e.message : "falha de rede ao chamar /api/whatsapp";
+    motivoFalha = "Resultado desconhecido após falha de comunicação";
   }
 
+  const finalizado = await finalizarOperacao(admin, reserva, zapiOk ? "sucesso" : rejeitadoAntesDoEnvio ? "rejeitado" : "incerto");
+  if (!finalizado) return NextResponse.json({ sucesso: false, error: "Resultado não persistido; não repita sem verificar." }, { status: 503 });
   const { error: erroEvento } = await admin.from("eventos_dominio").insert({
     clinica_id, tipo: "fechamento.cobranca_envio", entidade_tipo: "cliente", entidade_id: cliente_id,
     chave_idempotencia: chaveEnvio,
-    payload: { dia: hoje, competencia, telefone, pendencias, mensagem, resultado: zapiOk ? "sucesso" : "falhou", motivo: zapiOk ? null : motivoFalha },
+    payload: { dia: hoje, competencia, telefone, pendencias, mensagem, resultado: zapiOk ? "sucesso" : rejeitadoAntesDoEnvio ? "falhou" : "incerto", motivo: zapiOk ? null : motivoFalha },
     criado_em: new Date().toISOString(),
   });
-  if (erroEvento && !/duplicate|unique/i.test(erroEvento.message ?? "")) {
-    logOperacao({ operacao: "fechamento.cobranca.aprovar_envio", clinica_id, entidade_id: cliente_id, resultado: "erro", motivo: `evento nao gravado: ${erroEvento.message}` });
-  }
+  if (erroEvento) return NextResponse.json({ sucesso: false, error: "Registro do resultado indisponível; verifique antes de repetir." }, { status: 503 });
 
   if (!zapiOk) {
     logOperacao({ operacao: "fechamento.cobranca.aprovar_envio", clinica_id, entidade_id: cliente_id, resultado: "erro", motivo: motivoFalha ?? "falha ao enviar" });
-    return NextResponse.json({ sucesso: false, error: "Falha ao enviar pelo WhatsApp — tente novamente." }, { status: 502 });
+    return NextResponse.json({ sucesso: false, error: "Envio não confirmado — verifique o resultado antes de repetir." }, { status: 502 });
   }
 
   logOperacao({ operacao: "fechamento.cobranca.aprovar_envio", clinica_id, entidade_id: cliente_id, resultado: "sucesso", motivo: "envio aprovado e realizado" });

@@ -69,14 +69,14 @@ test("capturarOrigem: referrer invalido vira null, nunca lanca excecao", () => {
 
 // ── classificarOrigem ────────────────────────────────────────────────────
 
-test("classificarOrigem: gclid presente sempre classifica google_ads, mesmo com outros dados", () => {
+test("classificarOrigem: gclid com origem Meta conflitante permanece incerto", () => {
   const o = { utmSource: "instagram", utmMedium: null, utmCampaign: null, utmContent: null, gclid: "abc", fbclid: null, referrerHost: null, capturadoEm: AGORA };
-  assert.equal(classificarOrigem(o), "google_ads");
+  assert.equal(classificarOrigem(o), "campanha_utm");
 });
 
-test("classificarOrigem: fbclid presente (sem gclid) classifica meta_ads", () => {
+test("classificarOrigem: fbclid isolado não prova mídia paga Meta", () => {
   const o = { utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, gclid: null, fbclid: "xyz", referrerHost: null, capturadoEm: AGORA };
-  assert.equal(classificarOrigem(o), "meta_ads");
+  assert.equal(classificarOrigem(o), "referencia");
 });
 
 test("classificarOrigem: apenas utm (sem click id) classifica campanha_utm", () => {
@@ -103,10 +103,9 @@ test("classificarOrigem: nada capturado classifica direto (origem desconhecida/d
 // Requisito explícito do Capitão: jamais classificar google_ads/meta_ads
 // sem o click id correspondente, mesmo com UTM ou referrer parecidos.
 
-test("classificarOrigem: utm_source='google' SEM gclid NUNCA vira google_ads — só campanha_utm", () => {
+test("classificarOrigem: UTM google/cpc é marcação explícita de campanha paga, não verificação da plataforma", () => {
   const o = { utmSource: "google", utmMedium: "cpc", utmCampaign: "promo", utmContent: null, gclid: null, fbclid: null, referrerHost: null, capturadoEm: AGORA };
-  assert.equal(classificarOrigem(o), "campanha_utm");
-  assert.notEqual(classificarOrigem(o), "google_ads");
+  assert.equal(classificarOrigem(o), "google_ads");
 });
 
 test("classificarOrigem: utm_source='facebook' SEM fbclid NUNCA vira meta_ads — só campanha_utm", () => {

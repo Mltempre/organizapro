@@ -4,34 +4,29 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { gerarCentralOportunidades } from "../../lib/recomendacoes";
 import { obterHorariosVagos } from "../../lib/horarios";
-import { gerarOportunidadesClientes, gerarResumoRadar, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
+import { gerarOportunidadesClientes, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import type { Orcamento } from "../../lib/motor-orcamentos";
 import type { Tratamento } from "../../lib/motor-tratamento";
 import { calcularIndicadoresCobranca, type Cobranca, type IndicadoresCobranca } from "../../lib/motor-cobranca";
 import { agregarClientesElegiveisRecompra, type PedidoStatus } from "../../lib/motor-pedidos";
-import { calcularAtividadeRecente, type ItemAtividade } from "../../lib/organizapro-trabalhando";
 
 type PedidoRow = {
   id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string;
   paciente_id?: string | null; pagamento_confirmado_em?: string | null;
   pedido_itens?: { descricao: string }[];
 };
-import { gerarRecomendacoesConsultivas, gerarNarrativaDiretor, gerarMensagemDadosInsuficientes } from "../../lib/ia-comercial";
 import {
   adaptarOportunidadesClientes,
   adaptarRecomendacoes,
   adaptarOportunidadesDemanda,
-  adaptarCentralCanonicaParaLegado,
   existemDadosComerciaisReais,
   gerarEstadoComercialCanonico,
-  ordenarOportunidadesPorEstadoCanonico,
   type SinalCanonico,
   type OportunidadeDemandaSinal,
 } from "../../lib/nucleo-inteligente";
-import DashboardView, {
-  gerarIdeia, gerarInsights, gerarSaudacaoCard,
-  type AgItem,
-} from "../components/DashboardView";
+import CasaDashboard from "../components/CasaDashboard";
+import { agregarReceitaPerdida } from "../../lib/receita-perdida";
+import type { AgItem } from "../components/DashboardView";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 
@@ -78,13 +73,12 @@ type DashData = {
   cobrancasAbertasRows: Cobranca[];
   todasCobrancasRows: Cobranca[];
   oportunidadesDemandaRows: OportunidadeDemandaSinal[];
-  itensAtividade: ItemAtividade[];
-  atividadeIndisponivel: boolean;
 };
 
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [erroCarga, setErroCarga] = useState("");
   const [clinicaId, setClinicaId] = useState("");
   const [dash, setDash] = useState<DashData>({
     compromissosHoje: 0, pendentes: 0, atrasados: 0,
@@ -100,11 +94,11 @@ export default function Dashboard() {
     cobrancasAbertasRows: [],
     todasCobrancasRows: [],
     oportunidadesDemandaRows: [],
-    itensAtividade: [],
-    atividadeIndisponivel: false,
   });
 
   const carregarDados = useCallback(async () => {
+    setLoading(true);
+    setErroCarga("");
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
@@ -115,7 +109,7 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
-      if (!cid) { setLoading(false); return; }
+      if (!cid) throw new Error("Não foi possível identificar sua empresa. Verifique seu acesso e tente novamente.");
       setClinicaId(cid);
 
       const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -129,40 +123,41 @@ export default function Dashboard() {
       // dump de schema real), então a leitura passa pela API já autorizada
       // (/api/orcamentos), nunca por uma query direta do client aqui. Corre
       // em paralelo com o bloco abaixo; falha de rede/autorização nunca
-      // fabrica orçamento — só resulta em lista vazia (nenhum sinal novo).
+      // fabrica orçamento — a indisponibilidade impede exibir um resumo falso.
       const orcamentosParadosPromise = fetch(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then(async (r) => (r.ok ? ((await r.json()).orcamentos as Orcamento[]) ?? [] : []))
-        .catch(() => [] as Orcamento[]);
+        .then(async (r) => (r.ok ? ((await r.json()).orcamentos as Orcamento[]) ?? null : null))
+        .catch(() => null);
 
       // E-commerce IA V1 — mesmo raciocínio: public.pedidos só é acessível
       // via service role, leitura via /api/pedidos. Busca TODOS os pedidos
       // de uma vez (a API não filtra por múltiplos status numa única
       // chamada); "não concluídos" e "recompra possível" são dois recortes
       // client-side da MESMA lista, nunca uma segunda consulta — falha
-      // nunca fabrica pedido, só lista vazia.
+      // resulta em indisponibilidade explícita.
       const todosPedidosPromise = fetch(`/api/pedidos?clinica_id=${cid}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then(async (r) => (r.ok ? ((await r.json()).pedidos as PedidoRow[]) ?? [] : []))
-        .catch(() => [] as PedidoRow[]);
+        .then(async (r) => (r.ok ? ((await r.json()).pedidos as PedidoRow[]) ?? null : null))
+        .catch(() => null);
 
       // Smart Commerce Canônico — mesmo raciocínio: public.tratamentos e
       // public.cobrancas só são acessíveis via service role, leitura via
       // /api/tratamentos e /api/cobrancas. Sem filtro de status na URL
       // (mesmo padrão de pedidos) — o filtro real acontece aqui e dentro
       // do próprio Radar (estaAtrasada/precisaRetorno). Falha nunca
-      // fabrica tratamento/cobrança, só resulta em lista vazia.
+      // fabrica tratamento/cobrança: impede apresentar um resumo falso.
       const tratamentosAtivosPromise = fetch(`/api/tratamentos?clinica_id=${cid}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
         .then(async (r) => {
-          if (!r.ok) return [] as Tratamento[];
-          const todos = ((await r.json()).tratamentos as Tratamento[]) ?? [];
+          if (!r.ok) return null;
+          const todos = (await r.json()).tratamentos as Tratamento[];
+          if (!Array.isArray(todos)) return null;
           return todos.filter((t) => t.status === "em_andamento" || t.status === "interrompido");
         })
-        .catch(() => [] as Tratamento[]);
+        .catch(() => null);
 
       // Dinheiro (Bloco F) precisa de TODAS as cobranças (inclusive pagas/
       // canceladas) para calcularIndicadoresCobranca (recebido/recuperado no
@@ -171,45 +166,21 @@ export default function Dashboard() {
       const todasCobrancasPromise = fetch(`/api/cobrancas?clinica_id=${cid}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then(async (r) => (r.ok ? ((await r.json()).cobrancas as Cobranca[]) ?? [] : []))
-        .catch(() => [] as Cobranca[]);
+        .then(async (r) => (r.ok ? ((await r.json()).cobrancas as Cobranca[]) ?? null : null))
+        .catch(() => null);
 
-      // Bloco G "OrganizaPro trabalhando" — atividade real dos últimos dias,
-      // via /api/atividade-recente (eventos_dominio, service role). Falha
-      // nunca fabrica atividade, só resulta em lista vazia + indisponivel.
       // Smart Commerce Canônico · primeiro elo ("interesse sem compra") —
       // P1: Reintegração da Inteligência. public.oportunidades_demanda só é
       // acessível via service role, leitura via /api/oportunidades (mesma
       // rota que /oportunidades já usa). Falha nunca fabrica oportunidade,
-      // só resulta em lista vazia (nenhum sinal novo).
+      // resulta em indisponibilidade explícita.
       const oportunidadesDemandaPromise = fetch(`/api/oportunidades`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then(async (r) => (r.ok ? ((await r.json()).data as OportunidadeDemandaSinal[]) ?? [] : []))
-        .catch(() => [] as OportunidadeDemandaSinal[]);
+        .then(async (r) => (r.ok ? ((await r.json()).data as OportunidadeDemandaSinal[]) ?? null : null))
+        .catch(() => null);
 
-      const atividadeRecentePromise = fetch(`/api/atividade-recente?clinica_id=${cid}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-        .then(async (r) => {
-          if (!r.ok) return { eventos: [] as { tipo: string; resultado: string | null }[], indisponivel: true };
-          const json = await r.json();
-          return { eventos: (json.eventos ?? []) as { tipo: string; resultado: string | null }[], indisponivel: !!json.indisponivel };
-        })
-        .catch(() => ({ eventos: [] as { tipo: string; resultado: string | null }[], indisponivel: true }));
-
-      const [
-        { data: agHoje },
-        { data: prox },
-        { data: atrasados },
-        { count: pacCount },
-        { count: reativarCount },
-        { count: agTotalCount },
-        { count: avaliacoesPendentesCount },
-        { data: cfg },
-        { data: semProximoData },
-        { data: canceladosRecentes },
-      ] = await Promise.all([
+      const consultas = await Promise.all([
         supabase.from("agendamentos")
           .select("id, hora, paciente_nome, telefone, tipo_consulta, status, data")
           .eq("clinica_id", cid).eq("data", hoje)
@@ -261,15 +232,32 @@ export default function Dashboard() {
           .order("data", { ascending: false }).limit(50),
       ]);
 
+      if (consultas.some(resultado => resultado.error)) throw new Error("Não foi possível carregar os dados do negócio. Tente novamente.");
+      const [
+        { data: agHoje },
+        { data: prox },
+        { data: atrasados },
+        { count: pacCount },
+        { count: reativarCount },
+        { count: agTotalCount },
+        { count: avaliacoesPendentesCount },
+        { data: cfg },
+        { data: semProximoData },
+        { data: canceladosRecentes },
+      ] = consultas;
+
       const orcamentosParadosRows = await orcamentosParadosPromise;
       const todosPedidosRows = await todosPedidosPromise;
-      const pedidosNaoConcluidosRows = todosPedidosRows.filter((p) => p.status === "criado" || p.status === "confirmado");
+
       const tratamentosAtivosRows = await tratamentosAtivosPromise;
       const todasCobrancasRows = await todasCobrancasPromise;
-      const cobrancasAbertasRows = todasCobrancasRows.filter((c) => c.status === "pendente" || c.status === "em_cobranca");
+
       const oportunidadesDemandaRows = await oportunidadesDemandaPromise;
-      const { eventos: eventosAtividade, indisponivel: atividadeIndisponivel } = await atividadeRecentePromise;
-      const itensAtividade = calcularAtividadeRecente(eventosAtividade);
+      if (!Array.isArray(orcamentosParadosRows) || !Array.isArray(todosPedidosRows) || !Array.isArray(tratamentosAtivosRows) || !Array.isArray(todasCobrancasRows) || !Array.isArray(oportunidadesDemandaRows)) {
+        throw new Error("Os dados comerciais estão indisponíveis. Tente novamente para consultar valores e prioridades.");
+      }
+      const pedidosNaoConcluidosRows = todosPedidosRows.filter((p) => p.status === "criado" || p.status === "confirmado");
+      const cobrancasAbertasRows = todasCobrancasRows.filter((c) => c.status === "pendente" || c.status === "em_cobranca");
 
       // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
       // mesmo telefone não tiver nenhum compromisso futuro já remarcado.
@@ -278,13 +266,14 @@ export default function Dashboard() {
       const telefonesCancelados = Array.from(new Set(canceladosComTelefone.map(a => a.telefone)));
       let telefonesComReagendamento = new Set<string>();
       if (telefonesCancelados.length > 0) {
-        const { data: futuros } = await supabase
+        const { data: futuros, error: erroFuturos } = await supabase
           .from("agendamentos")
           .select("telefone")
           .eq("clinica_id", cid)
           .in("telefone", telefonesCancelados)
           .gte("data", hoje)
           .not("status", "in", '("cancelado","faltou")');
+        if (erroFuturos) throw new Error("Não foi possível conferir os reagendamentos. Tente novamente.");
         telefonesComReagendamento = new Set((futuros || []).map(f => f.telefone));
       }
       // Um cliente pode ter cancelado mais de uma vez em 30 dias — mantém só o cancelamento mais recente.
@@ -331,11 +320,10 @@ export default function Dashboard() {
         cobrancasAbertasRows,
         todasCobrancasRows,
         oportunidadesDemandaRows,
-        itensAtividade,
-        atividadeIndisponivel,
       });
     } catch (err) {
       console.error(err);
+      setErroCarga(err instanceof Error ? err.message : "Não foi possível carregar a Casa. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -346,51 +334,10 @@ export default function Dashboard() {
   // Date helpers
   const agoraIso   = new Date().toISOString(); // referência de "agora" para o motor de orçamentos (timestamptz, não data-only)
   const hojeStr    = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-  const hojeDate   = new Date();
-  const diasSemana = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
-  const mesesArr   = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-  const dataStr    = `${diasSemana[hojeDate.getDay()]}, ${hojeDate.getDate()} de ${mesesArr[hojeDate.getMonth()]}`;
-
-  // Botões Rápidos — Bloco H da Casa (Convergência Final V1: Orçamentos e
-  // Reputação adicionados, ambos já reais e agora diretamente referenciados
-  // pela Faixa Executiva/Radar/Dinheiro acima — nunca um menu duplicado,
-  // só os atalhos que a própria Casa já cita). WhatsApp e Relatórios ainda
-  // não têm uma página própria com esse nome — direcionam para /chatbot e
-  // /metricas, as páginas reais mais próximas hoje.
-  const botoesRapidos = [
-    // ?novo=1: as próprias telas de destino já leem esse parâmetro e
-    // abrem o modal real de criação (abrirNovo, mesmo botão "+" que já
-    // existia) — nenhum formulário novo, só liga o atalho à ação real.
-    { icon: "➕", label: "Novo Cliente",     destino: "/clientes?novo=1"     },
-    { icon: "📅", label: "Novo Agendamento", destino: "/agendamentos?novo=1" },
-    { icon: "💰", label: "Orçamentos",       destino: "/orcamentos"   },
-    { icon: "⭐", label: "Reputação",        destino: "/reputacao"    },
-    { icon: "💬", label: "WhatsApp",         destino: "/chatbot"      },
-    { icon: "📊", label: "Relatórios",       destino: "/metricas"     },
-  ];
-
-  const ideia = gerarIdeia({
-    totalPacientes: dash.totalPacientes,
-    atrasados:      dash.atrasados,
-    pendentes:      dash.pendentes,
-    proximosSemana: dash.proximos.length,
-    temLogo:        dash.temLogo,
-    temEmail:       dash.temEmail,
-    temTelefone:    dash.temTelefone,
-    temEndereco:    dash.temEndereco,
-    hoje:           hojeStr,
-  });
-
-  const insights = gerarInsights({
-    totalPacientes:       dash.totalPacientes,
-    pendentes:            dash.pendentes,
-    atrasados:            dash.atrasados,
-  });
+  const dataStr = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: "America/Sao_Paulo" }).format(new Date());
 
   // A existência de inteligência comercial não depende da existência de
-  // paciente cadastrado. Lead público, oportunidade, pedido ou cobrança são
-  // fatos reais por si só. Disponibilidade/erro de cada fonte continua fora
-  // deste hunk porque está sendo tratada na pista do Capitão.
+  // paciente cadastrado. Leads e transações também são fatos reais.
   const temDadosComerciais = existemDadosComerciaisReais({
     totalPacientes: dash.totalPacientes,
     totalAgendamentos: dash.totalAgendamentos,
@@ -495,20 +442,18 @@ export default function Dashboard() {
   const indicadoresCobranca: IndicadoresCobranca | null =
     dash.todasCobrancasRows.length > 0 ? calcularIndicadoresCobranca(dash.todasCobrancasRows, agoraIso) : null;
 
-  // V2: ambienteProducao virá de um sinal real de conta/ambiente. Mantido
-  // desligado em V1 para nunca personalizar em contas de demonstração.
-  const saudacaoCard = gerarSaudacaoCard({
-    nomeNegocio:      dash.nomeNegocio,
-    ambienteProducao: false,
-  });
+  // Mesmo adaptador usado no Financeiro; sem consultas adicionais.
+  const receitaPerdida = agregarReceitaPerdida({
+        hoje: hojeStr, agora: agoraIso,
+        orcamentosParados: dash.orcamentosParadosRows.map((o) => ({ id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento, valor: o.valor, apresentadoEm: o.apresentado_em })),
+        cobrancasAtrasadas: dash.cobrancasAbertasRows.map((c) => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca' })),
+        tratamentosSemRetorno: dash.tratamentosAtivosRows.map((t) => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status, proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em, valorEstimado: t.valor_estimado })),
+        pedidosNaoConcluidos: dash.pedidosNaoConcluidosRows.map((p) => ({ id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone, descricao: 'pedido', valor: p.valor_centavos / 100, criadoEm: p.criado_em })),
+        oportunidadesAbertas: [], // Sem valor financeiro; permanecem na lista canônica de prioridades.
+      });
 
-  // ── Dashboard Executivo IA v1 (2026-07-27) ───────────────────────────────
-  // Ocupação da agenda — só um cálculo sobre dados já carregados, nenhuma
-  // consulta nova. null quando não há base para calcular (evita 0/0).
-  const totalSlotsHoje = dash.compromissosHoje + dash.horariosVagosHoje;
-  const ocupacaoPct = insights.temDados && totalSlotsHoje > 0
-    ? Math.round((dash.compromissosHoje / totalSlotsHoje) * 100)
-    : null;
+
+  const saudacaoCard = { linha1: dash.nomeNegocio ? `Olá, ${dash.nomeNegocio}.` : "Olá!", subtitulo: "Acompanhe seu negócio." };
 
   // Central de Oportunidades continua alimentando Missão do Dia/Diretor
   // Digital abaixo — nenhuma regra de negócio nova.
@@ -532,59 +477,37 @@ export default function Dashboard() {
     : [];
   const estadoComercial = gerarEstadoComercialCanonico(sinaisCanonicos);
   const missaoDoDia: SinalCanonico[] = estadoComercial.missaoDoDia;
-  const centralOportunidades = adaptarCentralCanonicaParaLegado(estadoComercial.central);
-  const oportunidadesClientesRadar = ordenarOportunidadesPorEstadoCanonico(oportunidadesClientes, estadoComercial);
-  const resumoRadar = gerarResumoRadar(oportunidadesClientesRadar.length);
-
-  // ── IA Comercial V1 · Diretor Digital (docs/ia-comercial-v1-arquitetura.md) ──
-  // Reaproveita 100% os mesmos dados já calculados acima para o Radar e para
-  // a Central de Oportunidades — nenhuma consulta nova, nenhuma regra de
-  // priorização nova, nenhum dos dois arquivos originais foi alterado.
-  const recomendacoesConsultivas = gerarRecomendacoesConsultivas({
-    temDadosSuficientes: temDadosComerciais,
-    oportunidadesClientes,
-    recomendacoes: todasRecomendacoesAcionaveis,
-    ocupacaoPct,
-    sinaisCanonicos: estadoComercial.diretor,
-  });
-  const narrativaDiretor = temDadosComerciais
-    ? gerarNarrativaDiretor({ ocupacaoPct, recomendacoes: recomendacoesConsultivas })
-    : gerarMensagemDadosInsuficientes();
-
-  // Conta nova vs. madura — mesma condição já usada pelo OnboardingCard
-  // (temEmpresa/temWhatsapp/temCliente/temCompromisso), decide só a
-  // POSIÇÃO de Onboarding/Recursos/Consultoria (topo vs. rodapé), sem
-  // nenhuma consulta nova.
-  const contaMadura = dash.temEmail && dash.temTelefone && dash.temEndereco
-    && dash.temWhatsapp && dash.totalPacientes > 0 && dash.totalAgendamentos > 0;
-
-  if (loading) return (
+  if (loading || (!clinicaId && !erroCarga)) return (
     <AdminShell title="Painel Executivo">
       <PageLoader title="Preparando seu painel..." />
     </AdminShell>
   );
 
+  if (erroCarga) return (
+    <AdminShell title="Casa">
+      <section role="alert" style={{ color: "#e2e8f0", padding: 24 }}>
+        <h1>Não foi possível carregar a Casa</h1><p>{erroCarga}</p>
+        <button onClick={carregarDados} style={{ padding: "12px 18px", cursor: "pointer" }}>Tentar novamente</button>
+      </section>
+    </AdminShell>
+  );
+
   return (
-    <DashboardView
+    <CasaDashboard
+      outrasPrioridades={estadoComercial.sinais.slice(missaoDoDia.length)}
+      agendaHoje={dash.agendaHoje}
+      receitaPerdida={receitaPerdida}
       clinicaId={clinicaId}
       dataStr={dataStr}
       saudacaoCard={saudacaoCard}
       temDados={temDadosComerciais}
-      situacaoEmoji={insights.situacao.emoji}
-      situacaoTom={insights.situacao.tom}
-      ocupacaoPct={ocupacaoPct}
-      botoesRapidos={botoesRapidos}
-      contaMadura={contaMadura}
       onboarding={{
         temEmpresa: dash.temEmail && dash.temTelefone && dash.temEndereco,
         temWhatsapp: dash.temWhatsapp,
         temCliente: dash.totalPacientes > 0,
         temCompromisso: dash.totalAgendamentos > 0,
       }}
-      ideia={ideia}
       missaoDoDia={missaoDoDia}
-      contagemPorTier={{ alta: centralOportunidades.alta.length, media: centralOportunidades.media.length, baixa: centralOportunidades.baixa.length }}
-      central={centralOportunidades}
       indicadores={{
         compromissosHoje: dash.compromissosHoje,
         horariosVagosHoje: dash.horariosVagosHoje,
@@ -592,15 +515,8 @@ export default function Dashboard() {
         atrasados: dash.atrasados,
         avaliacoesPendentes: dash.avaliacoesPendentes,
       }}
-      narrativaDiretor={narrativaDiretor}
-      oportunidadesClientes={oportunidadesClientesRadar}
-      resumoRadar={resumoRadar}
       orcamentosParadosCount={dash.orcamentosParadosRows.length}
-      cobrancasAbertasCount={dash.todasCobrancasRows.length > 0 ? dash.cobrancasAbertasRows.length : null}
       indicadoresCobranca={indicadoresCobranca}
-      itensAtividade={dash.itensAtividade}
-      atividadeIndisponivel={dash.atividadeIndisponivel}
-      onNavigate={(destino) => router.push(destino)}
     />
   );
 }

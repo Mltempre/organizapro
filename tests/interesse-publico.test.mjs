@@ -56,7 +56,7 @@ test("UI: preço/valor nunca é enviado pelo frontend (rota não aceita nem calc
 });
 
 test("orquestrador: componente aditivo, sem alterar nenhuma seção existente do Site Premium", () => {
-  assert.match(orquestrador, /<PedidoPublico slug={slug} servicos={servicos}\/>\s*\n\s*<InteressePublico slug={slug} servicos={servicos}\/>/);
+  assert.match(orquestrador, /<PedidoPublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}\/>\s*\n\s*<InteressePublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}\/>/);
 });
 
 console.log("interesse-publico: 10 gates de segurança e composição OK");

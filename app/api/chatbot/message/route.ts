@@ -1,3 +1,4 @@
+import { produtoOrganizaPro } from "../../../../lib/seguranca-operacoes";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolverComCamadaUniversal, resolverModuloSegmento, type DadosEmpresaUniversal } from "../../../../lib/ia-universal";
@@ -316,7 +317,7 @@ function processarColetaSDR(etapa: Etapa, mensagem: string, lead: Lead): ColetaR
     case "qualificacao_nome": {
       const nome = valor.split(/\s+/).slice(0, 4).join(" ");
       const proximaEtapa = "qualificacao_cidade" as const;
-      console.log("[CHATBOT] próxima etapa", proximaEtapa);
+      console.log("[CHATBOT] próxima etapa");
       return {
         updates:      { nome },
         resposta:     `Prazer, ${nome}! 😊\n\nEm qual cidade seu negócio está?`,
@@ -428,8 +429,8 @@ async function localizarPacientePorTelefone(clinica_id: string, telefone: string
       .maybeSingle();
     if (!e2 && d2) return (d2 as { id: string }).id;
     return null;
-  } catch (e) {
-    console.warn("[CHATBOT] localizarPacientePorTelefone falhou:", e instanceof Error ? e.message : e);
+  } catch {
+    console.warn("[CHATBOT] localizarPacientePorTelefone falhou:");
     return null;
   }
 }
@@ -440,7 +441,7 @@ async function vincularOrigemSeReferenciada(clinica_id: string, telefone: string
 
   const pacienteId = await localizarPacientePorTelefone(clinica_id, telefone);
   if (!pacienteId) {
-    console.log("[CHATBOT] ref: reconhecido mas ainda sem paciente correspondente cadastrado — nada a vincular", { codigo });
+    console.log("[CHATBOT] ref: reconhecido mas ainda sem paciente correspondente cadastrado — nada a vincular");
     return;
   }
 
@@ -462,7 +463,7 @@ async function fetchLead(clinica_id: string, telefone: string): Promise<Lead | n
     const { data, error } = await query(COLS, { tipo: "eq", valor: telefone });
     if (!error && data) {
       const row = data as unknown as Record<string, unknown>;
-      console.log("[CHATBOT] fetchLead: encontrado (exato)", { etapa: row.etapa });
+      console.log("[CHATBOT] fetchLead: encontrado (exato)");
       return { ...row, score: normalizarLeadScore(row.score) } as Lead;
     }
 
@@ -471,18 +472,18 @@ async function fetchLead(clinica_id: string, telefone: string): Promise<Lead | n
     //    5538999412822 (com 9) → últimos 8 = 99412822  ← mesmo sufixo!
     if (!error) {
       const sufixo = sufixoTelefone(telefone, 8);
-      console.log("[CHATBOT] fetchLead: exact sem resultado — tentando sufixo8:", sufixo);
+      console.log("[CHATBOT] fetchLead: exact sem resultado — tentando sufixo8:");
       const { data: ds, error: es } = await query(COLS, { tipo: "ilike", valor: sufixo });
       if (!es && ds) {
         const row = ds as unknown as Record<string, unknown>;
-        console.log("[CHATBOT] fetchLead: encontrado (sufixo8)", { etapa: row.etapa });
+        console.log("[CHATBOT] fetchLead: encontrado (sufixo8)");
         return { ...row, score: normalizarLeadScore(row.score) } as Lead;
       }
     }
 
     // 3. Fallback: colunas mínimas (migration 000001 apenas — sem porte_clinica, sistema_atual, dor_principal)
     if (error) {
-      console.warn("[CHATBOT] fetchLead — colunas avançadas ausentes (migration 000003 pendente):", error.message);
+      console.warn("[CHATBOT] fetchLead — colunas avançadas ausentes (migration 000003 pendente):");
       const { data: d2, error: e2 } = await query(COLS_MIN, { tipo: "eq", valor: telefone });
       if (!e2 && d2) {
         const row = d2 as unknown as Record<string, unknown>;
@@ -494,13 +495,13 @@ async function fetchLead(clinica_id: string, telefone: string): Promise<Lead | n
         const row = d3 as unknown as Record<string, unknown>;
         return { ...row, score: normalizarLeadScore(row.score) } as Lead;
       }
-      if (e3) console.error("[CHATBOT] fetchLead FALHOU — execute migration 20260624000003:", e3.message);
+      if (e3) console.error("[CHATBOT] fetchLead FALHOU — execute migration 20260624000003:");
     }
 
     console.log("[CHATBOT] fetchLead: sem registro para este lead");
     return null;
-  } catch (e) {
-    console.error("[CHATBOT] fetchLead exception:", e instanceof Error ? e.message : e);
+  } catch {
+    console.error("[CHATBOT] fetchLead exception:");
     return null;
   }
 }
@@ -534,21 +535,21 @@ async function salvarLead(clinica_id: string, telefone: string, updates: LeadUpd
     );
 
     if (!error) {
-      console.log("[CHATBOT] lead salvo:", { etapa: updates.etapa, score: updates.score });
+      console.log("[CHATBOT] lead salvo:");
       return;
     }
 
     // Fallback: remove colunas exclusivas da migration 000003
-    console.warn("[CHATBOT] salvarLead — usando fallback sem colunas v3. Execute migration 20260624000003:", error.message);
+    console.warn("[CHATBOT] salvarLead — usando fallback sem colunas v3. Execute migration 20260624000003:");
     const fallback = Object.fromEntries(
       Object.entries(payload).filter(([k]) => !(COLUNAS_V3 as readonly string[]).includes(k))
     );
     const { error: e2 } = await supabase.from("chatbot_leads").upsert(
       fallback, { onConflict: "clinica_id,telefone" }
     );
-    if (e2) console.error("[CHATBOT] salvarLead FALHOU — execute migration 20260624000003:", e2.message);
-  } catch (e) {
-    console.error("[CHATBOT] salvarLead exception:", e instanceof Error ? e.message : e);
+    if (e2) console.error("[CHATBOT] salvarLead FALHOU — execute migration 20260624000003:");
+  } catch {
+    console.error("[CHATBOT] salvarLead exception:");
   }
 }
 
@@ -583,21 +584,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { clinica_id, telefone, mensagem, nome_paciente } = body as {
+    const { clinica_id, telefone, mensagem } = body as {
       clinica_id?: string;
       telefone?: string;
       mensagem?: string;
+      operacao?: string;
       nome_paciente?: string;
     };
 
-    console.log("[CHATBOT] requisição recebida:", { clinica_id, telefone, mensagem });
+    console.log("[CHATBOT] requisição recebida:");
 
     if (!clinica_id || !telefone || !mensagem) {
-      console.warn("[CHATBOT] retorno antecipado: campos obrigatórios ausentes", {
-        tem_clinica_id: !!clinica_id,
-        tem_telefone:   !!telefone,
-        tem_mensagem:   !!mensagem,
-      });
+      console.warn("[CHATBOT] retorno antecipado: campos obrigatórios ausentes");
       return NextResponse.json(
         { sucesso: false, error: "clinica_id, telefone e mensagem são obrigatórios" },
         { status: 400 }
@@ -607,8 +605,9 @@ export async function POST(req: NextRequest) {
     // Fase D — nunca bloqueia nem altera o fluxo do chatbot abaixo; roda em
     // paralelo à lógica normal, mesmo para uma mensagem de confirmação de
     // consulta (é evidência real de contato de qualquer forma).
-    await vincularOrigemSeReferenciada(clinica_id, telefone, mensagem).catch((e) => {
-      console.warn("[CHATBOT] vincularOrigemSeReferenciada falhou (ignorado):", e instanceof Error ? e.message : e);
+    if (!await produtoOrganizaPro(supabase, clinica_id)) return NextResponse.json({ sucesso: false, error: "Tenant não autorizado" }, { status: 403 });
+    await vincularOrigemSeReferenciada(clinica_id, telefone, mensagem).catch(() => {
+      console.warn("[CHATBOT] vincularOrigemSeReferenciada falhou (ignorado):");
     });
 
     if (ehConfirmacaoDeConsulta(mensagem)) {
@@ -625,17 +624,17 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (configErr) {
-      console.error("[CHATBOT] retorno antecipado: erro ao buscar chatbot_config:", configErr.message);
+      console.error("[CHATBOT] retorno antecipado: erro ao buscar chatbot_config:");
       return NextResponse.json({ sucesso: false, error: configErr.message }, { status: 500 });
     }
 
     if (!config) {
-      console.warn("[CHATBOT] retorno antecipado: chatbot_config NÃO encontrado para clinica_id:", clinica_id);
+      console.warn("[CHATBOT] retorno antecipado: chatbot_config NÃO encontrado para clinica_id:");
       return NextResponse.json({ sucesso: true, ignorado: "chatbot_sem_config" });
     }
 
     if (!config.ativo) {
-      console.warn("[CHATBOT] retorno antecipado: chatbot INATIVO (config.ativo = false) para clinica_id:", clinica_id);
+      console.warn("[CHATBOT] retorno antecipado: chatbot INATIVO (config.ativo = false) para clinica_id:");
       return NextResponse.json({ sucesso: true, ignorado: "chatbot_inativo" });
     }
 
@@ -657,7 +656,7 @@ export async function POST(req: NextRequest) {
     ]);
 
     // ── LOG 2: estado do lead lido do banco ──────────────────────────────────
-    console.log("[CHATBOT] lead", leadAtual);
+    console.log("[CHATBOT] lead");
 
     const treinamentos = (treinaResult.data ?? []) as Treinamento[];
     const msgNorm      = normalizar(mensagem);
@@ -669,7 +668,7 @@ export async function POST(req: NextRequest) {
     const emColeta     = etapaAtual !== "inicial" && etapaAtual !== "concluido";
 
     // ── LOG 3: decisão da máquina de estados ─────────────────────────────────
-    console.log("[CHATBOT] emColeta", { emColeta, etapa: leadAtual?.etapa });
+    console.log("[CHATBOT] emColeta");
 
     let resposta:      string;
     let processadoPor: string;
@@ -695,7 +694,7 @@ export async function POST(req: NextRequest) {
         processadoPor = "sdr_com_treinamento";
         topico        = `sdr_${etapaAtual}`;
         // Não avança etapa — mantém a mesma pergunta pendente
-        console.log("[CHATBOT] sdr: questão durante coleta, repetindo etapa:", etapaAtual);
+        console.log("[CHATBOT] sdr: questão durante coleta, repetindo etapa:");
       } else {
         // Resposta direta à pergunta de qualificação → avança etapa
         const coleta  = processarColetaSDR(etapaAtual, mensagem, leadAtual ?? ({} as Lead));
@@ -703,7 +702,7 @@ export async function POST(req: NextRequest) {
         processadoPor = "sdr";
         topico        = `sdr_${etapaAtual}`;
         leadUpdates   = { ...leadUpdates, etapa: coleta.proximaEtapa, ...coleta.updates };
-        console.log("[CHATBOT] sdr coleta:", { etapa: etapaAtual, prox: coleta.proximaEtapa });
+        console.log("[CHATBOT] sdr coleta:");
       }
 
     } else {
@@ -712,7 +711,7 @@ export async function POST(req: NextRequest) {
         resposta      = match.resposta;
         processadoPor = "treinamento";
         topico        = "treinamento";
-        console.log("[CHATBOT] treinamento:", match.id.slice(0, 8));
+        console.log("[CHATBOT] treinamento:");
       } else {
         // IA Universal (Fase 1) — roda em paralelo ao sistema atual, nunca no
         // tenant de vendas do OrganizaPro (isolamento explícito: o funil
@@ -736,12 +735,12 @@ export async function POST(req: NextRequest) {
           resposta      = resultadoUniversal.resposta;
           topico        = resultadoUniversal.intencao;
           processadoPor = resultadoUniversal.modulo ? `ia_universal:${resultadoUniversal.modulo}` : "ia_universal";
-          console.log("[CHATBOT] ia_universal:", { intencao: resultadoUniversal.intencao, modulo: resultadoUniversal.modulo });
+          console.log("[CHATBOT] ia_universal:");
         } else {
           topico        = classificarTopico(mensagem);
           resposta      = montarResposta(topico as Topico, config as Config, ehTenantSdrOrganizaPro);
           processadoPor = "regras";
-          console.log("[CHATBOT] regras:", topico);
+          console.log("[CHATBOT] regras:");
         }
       }
 
@@ -758,11 +757,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log("[CHATBOT] resposta gerada:", {
-      processadoPor,
-      topico,
-      resposta: resposta.slice(0, 120),
-    });
+    console.log("[CHATBOT] resposta gerada:");
 
     await salvarLead(clinica_id, telefone, leadUpdates);
 
@@ -780,42 +775,34 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${internalServiceSecret}`,
         },
-        body:    JSON.stringify({ clinica_id, telefone, mensagem: resposta }),
+        body:    JSON.stringify({ clinica_id, telefone, mensagem: resposta, operacao: body.operacao }),
       });
-      let rBody: unknown = null;
-      try { rBody = await r.json(); } catch { rBody = null; }
+
       if (r.ok) {
-        console.log("[CHATBOT] resposta enviada com sucesso:", {
-          status:  r.status,
-          sucesso: (rBody as Record<string, unknown>)?.sucesso ?? null,
-        });
+        console.log("[CHATBOT] resposta enviada com sucesso:");
       } else {
-        console.error("[CHATBOT] /api/whatsapp retornou erro:", {
-          status:  r.status,
-          error:   (rBody as Record<string, unknown>)?.error,
-          detalhe: (rBody as Record<string, unknown>)?.detalhe ?? null,
-        });
+        console.error("[CHATBOT] /api/whatsapp retornou erro:");
       }
-    } catch (waErr) {
-      console.error("[CHATBOT] /api/whatsapp exception:", waErr instanceof Error ? waErr.message : waErr);
+    } catch {
+      console.error("[CHATBOT] /api/whatsapp exception:");
     }
 
     // ── Log ───────────────────────────────────────────────────────────────────
     const { error: logErr } = await supabase.from("chatbot_logs").insert({
       clinica_id,
       telefone,
-      nome_paciente:     nome_paciente || null,
-      mensagem_paciente: mensagem,
-      resposta_bot:      resposta,
+      nome_paciente: null,
+      mensagem_paciente: "[conteúdo omitido]",
+      resposta_bot: "[conteúdo omitido]",
       processado_por:    processadoPor,
     });
-    if (logErr) console.error("[CHATBOT] log:", logErr.message);
+    if (logErr) console.error("[CHATBOT] log:");
 
     return NextResponse.json({ sucesso: true, topico, processado_por: processadoPor, resposta });
 
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[CHATBOT] erro inesperado:", message);
-    return NextResponse.json({ sucesso: false, error: message }, { status: 500 });
+  } catch {
+
+    console.error("[CHATBOT] erro inesperado:");
+    return NextResponse.json({ sucesso: false, error: "Falha operacional" }, { status: 500 });
   }
 }

@@ -35,13 +35,13 @@ test("DashboardView só renderiza a Central quando há dado real (temDados && ce
   assert.match(codigo, /temDados && central && \(central\.alta\.length \+ central\.media\.length \+ central\.baixa\.length > 0\)/);
 });
 
-test("dashboard/page.tsx e dashboard-demo/page.tsx passam o dado completo (central=), não só a contagem", () => {
-  for (const p of ["app/dashboard/page.tsx", "app/dashboard-demo/page.tsx"]) {
-    const codigo = ler(p);
-    assert.match(codigo, /central={centralOportunidades}/, `${p} deveria passar central={centralOportunidades}`);
-  }
+test("Casa mantém todas as prioridades canônicas acessíveis e demo preserva a Central", () => {
+  const pagina=ler("app/dashboard/page.tsx");
+  assert.match(pagina,/missaoDoDia=\{missaoDoDia\}/);
+  assert.match(pagina,/outrasPrioridades=\{estadoComercial.sinais.slice\(missaoDoDia.length\)\}/);
+  assert.match(ler("app/components/CasaDashboard.tsx"),/<details/);
+  assert.match(ler("app/dashboard-demo/page.tsx"),/central=\{/);
 });
-
 // ── 2. Previsor de Faturamento 30 Dias — ganha consumidor cruzado real ───
 
 test("Copiloto importa e chama gerarPrevisorFaturamento (antes: zero consumidor fora da própria página)", () => {

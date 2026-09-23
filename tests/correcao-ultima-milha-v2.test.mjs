@@ -91,14 +91,14 @@ test("lib/oportunidades-clientes.ts: 'sem_proximo_compromisso' é o único sinal
 
 // ── #16 — Botões Rápidos: reutilizam o modal de criação já existente ────
 
-test("Dashboard: botões 'Novo Cliente'/'Novo Agendamento' levam a ?novo=1 (dashboard real e demo)", () => {
-  for (const p of ["app/dashboard/page.tsx", "app/dashboard-demo/page.tsx"]) {
-    const codigo = ler(p);
-    assert.match(codigo, /destino: "\/clientes\?novo=1"/, `${p} deveria apontar Novo Cliente para ?novo=1`);
-    assert.match(codigo, /destino: "\/agendamentos\?novo=1"/, `${p} deveria apontar Novo Agendamento para ?novo=1`);
+test("Casa e demo mantêm atalhos para os modais reais via novo=1", () => {
+  const casa=ler("app/components/CasaDashboard.tsx");
+  const demo=ler("app/dashboard-demo/page.tsx");
+  for (const destino of ["/clientes?novo=1","/agendamentos?novo=1"]) {
+    assert.ok(casa.includes('href="'+destino+'"'));
+    assert.ok(demo.includes('destino: "'+destino+'"'));
   }
 });
-
 test("app/clientes/page.tsx e app/agendamentos/page.tsx: ?novo=1 chama abrirNovo() real (mesmo modal do botão '+', nenhum formulário novo)", () => {
   for (const p of ["app/clientes/page.tsx", "app/agendamentos/page.tsx"]) {
     const codigo = ler(p);

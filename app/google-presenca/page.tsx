@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { CheckCircle2, ExternalLink, ShieldCheck, XCircle } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { montarPromptRespostaAvaliacao } from "../../lib/google-business-profile";
+import { montarPromptRespostaAvaliacao } from "../../lib/google-business-profile-shared";
+import type { EstadoConexaoGoogle } from "../../lib/google-business-profile-resources";
 import AdminShell from "../components/AdminShell";
 
-type Status = { conectado: boolean; conexao?: { conta: string | null; local: string | null; conectadoEm: string } | null; error?: string };
+type Status = { conectado: boolean; estado?: EstadoConexaoGoogle; codigo?: string; conexao?: { conta: string | null; local: string | null; conectadoEm: string } | null; error?: string };
 type Avaliacao = {
   reviewId: string; name: string; nota: number; comentario: string | null; autor: string | null; criadoEm: string;
   estado: "sem_resposta" | "resposta_preparada" | "respondida"; respostaGoogle: string | null; rascunhoLocal: string | null;
@@ -30,7 +31,7 @@ export default function GooglePresencaPage() {
   const [rascunhosEmEdicao, setRascunhosEmEdicao] = useState<Record<string, string>>({});
   const [gerandoRascunho, setGerandoRascunho] = useState<string | null>(null);
   const [publicando, setPublicando] = useState<string | null>(null);
-  const idempotencyRefs = useRef<Record<string, string>>({});
+  const idempotencyRefs = useRef<Record<string, { key: string; texto: string; incerta: boolean }>>({});
   const resultado = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("status") : null;
 
   const carregarAvaliacoes = useCallback(async (cid: string, token: string) => {
@@ -38,7 +39,10 @@ export default function GooglePresencaPage() {
     try {
       const response = await fetch(`/api/google-business-profile/avaliacoes?clinica_id=${encodeURIComponent(cid)}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await response.json();
-      if (data.indisponivel) { setAvaliacoesIndisponiveis(data.motivo || "Avaliações indisponíveis no momento."); setAvaliacoes([]); }
+      if (!response.ok || data.indisponivel || data.estado === "desconectado") {
+        setAvaliacoesIndisponiveis(data.error || data.motivo || "Avaliações indisponíveis no momento."); setAvaliacoes([]);
+        if (data.estado === "renovacao_necessaria") { setStatus({ conectado: false, estado: data.estado }); setIndisponivel(true); }
+      }
       else { setAvaliacoesIndisponiveis(null); setAvaliacoes(data.avaliacoes ?? []); }
     } catch {
       setAvaliacoesIndisponiveis("Não foi possível carregar as avaliações.");
@@ -59,6 +63,7 @@ export default function GooglePresencaPage() {
       setNomeEmpresa(clinica.nome || "");
       const response = await fetch(`/api/google-business-profile?clinica_id=${encodeURIComponent(clinica.clinica_id)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
       const data = await response.json() as Status;
+      setStatus({ ...data, conectado: data.conectado === true });
       if (!response.ok) { setErro(data.error ?? "Não foi possível consultar a conexão."); setIndisponivel(true); }
       else {
         setStatus(data);
@@ -66,26 +71,37 @@ export default function GooglePresencaPage() {
       }
       setCarregando(false);
     }
-    void carregar();
+    void carregar().catch(() => { setErro("Não foi possível consultar a conexão. Tente novamente."); setIndisponivel(true); setCarregando(false); });
   }, [carregarAvaliacoes]);
 
   async function conectar() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !clinicaId) { setErro("Sessão ou negócio não disponível."); return; }
-    window.location.href = `/api/google-business-profile/oauth/start?clinica_id=${encodeURIComponent(clinicaId)}`;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !clinicaId) { setErro("Sessão ou negócio não disponível."); return; }
+      const res = await fetch("/api/google-business-profile/oauth/start", { method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ clinica_id: clinicaId }) });
+      const data = await res.json();
+      if (!res.ok) { setErro(data.error || "Não foi possível iniciar a conexão."); return; }
+      const url = new URL(data.url);
+      if (url.origin !== "https://accounts.google.com") throw new Error();
+      window.location.href = url.toString();
+    } catch { setErro("Não foi possível iniciar a conexão. Tente novamente."); }
   }
 
   async function desconectar() {
     if (!clinicaId || !accessToken) return;
     if (!window.confirm("Desconectar o Google Business Profile desta empresa?")) return;
     const response = await fetch(`/api/google-business-profile?clinica_id=${encodeURIComponent(clinicaId)}`, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } });
-    if (response.ok) { setStatus({ conectado: false }); setAvaliacoes([]); }
+    if (response.ok) { setStatus({ conectado: false, estado: "desconectado" }); setIndisponivel(false); setAvaliacoes([]); }
     else setErro("Não foi possível desconectar.");
   }
 
-  function idempotencyKeyPara(chave: string): string {
-    if (!idempotencyRefs.current[chave]) idempotencyRefs.current[chave] = crypto.randomUUID();
-    return idempotencyRefs.current[chave];
+  function idempotencyKeyPara(chave: string, texto: string): string {
+    const atual = idempotencyRefs.current[chave];
+    if (atual && atual.texto !== texto && atual.incerta) throw new Error("Operação anterior sem confirmação. Reenvie o mesmo texto para consultar seu resultado.");
+    if (!atual || atual.texto !== texto) idempotencyRefs.current[chave] = { key: crypto.randomUUID(), texto, incerta: true };
+    return idempotencyRefs.current[chave].key;
   }
 
   async function gerarRascunho(av: Avaliacao) {
@@ -107,16 +123,19 @@ export default function GooglePresencaPage() {
   }
 
   async function salvarRascunho(reviewId: string) {
+    try {
     const texto = rascunhosEmEdicao[reviewId];
     if (!texto?.trim()) return;
     const res = await fetch(`/api/google-business-profile/avaliacoes/${encodeURIComponent(reviewId)}/rascunho`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ clinica_id: clinicaId, texto, idempotency_key: idempotencyKeyPara(`rascunho-${reviewId}`) }),
+      body: JSON.stringify({ clinica_id: clinicaId, texto, idempotency_key: idempotencyKeyPara(`rascunho-${reviewId}`, texto.trim()) }),
     });
     const data = await res.json();
+    if (res.ok || !data.manterChave) delete idempotencyRefs.current[`rascunho-${reviewId}`];
     if (!res.ok) { setErro(data.error || "Não foi possível salvar o rascunho."); return; }
     void carregarAvaliacoes(clinicaId, accessToken);
+    } catch { setErro("Rascunho sem confirmação. Tente novamente com o mesmo texto antes de editar."); }
   }
 
   async function aprovarEPublicar(av: Avaliacao) {
@@ -129,11 +148,13 @@ export default function GooglePresencaPage() {
       const res = await fetch(`/api/google-business-profile/avaliacoes/${encodeURIComponent(av.reviewId)}/publicar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ clinica_id: clinicaId, texto, review_name: av.name, idempotency_key: idempotencyKeyPara(`publicar-${av.reviewId}`) }),
+        body: JSON.stringify({ clinica_id: clinicaId, texto, review_name: av.name, idempotency_key: idempotencyKeyPara(`publicar-${av.reviewId}`, texto.trim()) }),
       });
       const data = await res.json();
+      if (res.ok || !data.manterChave) delete idempotencyRefs.current[`publicar-${av.reviewId}`];
       if (!res.ok) { setErro(data.error || "Não foi possível publicar no Google."); return; }
       void carregarAvaliacoes(clinicaId, accessToken);
+    } catch { setErro("Publicação sem confirmação. Não crie outra tentativa: reenvie o mesmo texto para consultar o resultado.");
     } finally {
       setPublicando(null);
     }
@@ -149,6 +170,7 @@ export default function GooglePresencaPage() {
       {resultado && resultado !== "connected" && <p style={{ color: "#9a6700", display: "flex", gap: 7, alignItems: "center" }}><XCircle size={18} /> Não foi possível concluir a conexão Google.</p>}
       {carregando && <p style={{ color: "#53645d" }}>Consultando conexão...</p>}
       {erro && <p role="alert" style={{ color: "#a12b25" }}>{erro}</p>}
+      {(status?.estado === "renovacao_necessaria" || status?.codigo === "SEM_LOCAL") && <button type="button" onClick={conectar}>Reconectar com Google</button>}
       {!carregando && status?.conectado && (
         <div style={{ background: "#edf8f2", padding: 14, borderRadius: 6, color: "#245c45", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <div><strong>{status.conexao?.local ?? "Local autorizado"}</strong><br /><span style={{ fontSize: 14 }}>Conta: {status.conexao?.conta ?? "não informada"}</span></div>

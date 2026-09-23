@@ -1,3 +1,4 @@
+import { produtoOrganizaPro } from "../../../../lib/seguranca-operacoes";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
   const detalhes: string[] = [];
 
   for (const clinica of clinicas) {
+    if (!await produtoOrganizaPro(supabase, clinica.clinica_id)) continue;
     const { data: agendamentos } = await supabase
       .from("agendamentos")
       .select("id, paciente_nome, telefone, data, hora")
@@ -99,6 +101,7 @@ export async function GET(request: Request) {
             "Authorization": `Bearer ${process.env.INTERNAL_SERVICE_SECRET}`,
           },
           body: JSON.stringify({
+            operacao: `lembrete:${ag.id}:${dataAmanha}`,
             telefone: ag.telefone,
             mensagem,
             clinica_id: clinica.clinica_id,

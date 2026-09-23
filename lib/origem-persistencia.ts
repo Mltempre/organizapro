@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { podeVincularOrigem, type TipoOrigem } from "./atribuicao-origem";
+import type { IdentificadoresAds } from './ads-contratos';
 
 // ── Persistência de origem — I/O real, fail-closed ──────────────────────────
 // Único lugar do produto que efetivamente lê/escreve `origem_captacoes`.
@@ -27,6 +28,7 @@ export type OrigemParaPersistir = {
   classificacao:  TipoOrigem;
   codigoRastreio: string;
   capturadoEm:    string;
+  identificadoresAds?: IdentificadoresAds;
 };
 
 /**
@@ -51,12 +53,13 @@ export async function persistirOrigemCaptada(
       classificacao:   origem.classificacao,
       codigo_rastreio: origem.codigoRastreio,
       capturado_em:    origem.capturadoEm,
+      identificadores_ads: origem.identificadoresAds || null,
     });
     if (error) {
-      console.warn("[origem] persistirOrigemCaptada — não persistiu (esperado até a migration rodar):", error.message);
+      console.warn("[origem] persistirOrigemCaptada — não persistiu (esperado até a migration rodar):");
     }
-  } catch (e) {
-    console.warn("[origem] persistirOrigemCaptada exception:", e instanceof Error ? e.message : e);
+  } catch {
+    console.warn("[origem] persistirOrigemCaptada exception:");
   }
 }
 
@@ -82,7 +85,7 @@ export async function vincularOrigemPorCodigo(
       .maybeSingle();
 
     if (error) {
-      console.warn("[origem] vincularOrigemPorCodigo — busca falhou (esperado até a migration rodar):", error.message);
+      console.warn("[origem] vincularOrigemPorCodigo — busca falhou (esperado até a migration rodar):");
       return;
     }
     if (!data) return; // código inexistente ou de outro tenant — nunca inferido, só ignorado
@@ -97,9 +100,9 @@ export async function vincularOrigemPorCodigo(
       .is("vinculado_em", null);
 
     if (updateError) {
-      console.warn("[origem] vincularOrigemPorCodigo — update falhou:", updateError.message);
+      console.warn("[origem] vincularOrigemPorCodigo — update falhou:");
     }
-  } catch (e) {
-    console.warn("[origem] vincularOrigemPorCodigo exception:", e instanceof Error ? e.message : e);
+  } catch {
+    console.warn("[origem] vincularOrigemPorCodigo exception:");
   }
 }

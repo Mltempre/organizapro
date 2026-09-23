@@ -6,6 +6,7 @@ import SiteEmpresaClient from "./SiteEmpresaClient";
 import { normalizarEspecialidade } from "./_lib/helpers";
 import { capturarOrigem, classificarOrigem, gerarCodigoOrigem } from "../../../lib/atribuicao-origem";
 import { persistirOrigemCaptada } from "../../../lib/origem-persistencia";
+import { capturarIdentificadoresAds } from '../../../lib/ads-contratos';
 
 // Fase 1.1 (hardening) — client de service_role, só para a escrita de
 // origem_captacoes. Mesmo padrão canônico já usado em app/r/[codigo]/route.ts
@@ -127,6 +128,10 @@ async function capturarEPersistirOrigem(
     const origem = capturarOrigem(searchParams, referer, new Date().toISOString());
     const classificacao = classificarOrigem(origem);
     const codigoRastreio = gerarCodigoOrigem();
+    const adsParams = new URLSearchParams();
+    for (const [chave, valor] of Object.entries(searchParams)) {
+      if (valor) adsParams.set(chave, Array.isArray(valor) ? valor[0] : valor);
+    }
 
     await persistirOrigemCaptada(supabaseServiceRole, {
       clinicaId,
@@ -140,11 +145,12 @@ async function capturarEPersistirOrigem(
       classificacao,
       codigoRastreio,
       capturadoEm:    origem.capturadoEm,
+      identificadoresAds: capturarIdentificadoresAds(adsParams),
     });
 
     return codigoRastreio;
-  } catch (e) {
-    console.warn("[origem] captura na entrada do site falhou, seguindo sem código de rastreio:", e instanceof Error ? e.message : e);
+  } catch {
+    console.warn("[origem] captura na entrada do site falhou, seguindo sem código de rastreio.");
     return undefined;
   }
 }

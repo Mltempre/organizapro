@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizarTelefone, validarNovaOportunidade, type NovaOportunidade } from "../../../../lib/oportunidades-demanda";
 import { logOperacao } from "../../../../lib/log-estruturado";
+import { vincularOrigemPublica } from '../../../../lib/atribuicao-vinculos';
 
 // ── Captura pública de interesse — E-commerce IA V1 ──────────────────────
 //
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
     mensagem?: unknown;
     servico_nome?: unknown;
     idempotency_key?: unknown;
+    codigo_rastreio?: unknown;
   };
 
   try {
@@ -142,5 +144,6 @@ export async function POST(req: NextRequest) {
   }
 
   logOperacao({ operacao: "interesse.publico.criar", clinica_id: clinicaId, entidade_id: oportunidade.id, resultado: "sucesso" });
+  await vincularOrigemPublica(admin, clinicaId, body.codigo_rastreio, 'oportunidade', oportunidade.id);
   return NextResponse.json({ sucesso: true, id: oportunidade.id }, { status: 201 });
 }

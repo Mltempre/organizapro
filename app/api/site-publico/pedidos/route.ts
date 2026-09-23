@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { capturarValorItem, type ItemCatalogo } from "../../../../lib/motor-pedidos";
 import { logOperacao } from "../../../../lib/log-estruturado";
+import { vincularOrigemPublica } from '../../../../lib/atribuicao-vinculos';
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
     observacao?: unknown;
     itens?: unknown;
     idempotency_key?: unknown;
+    codigo_rastreio?: unknown;
   };
 
   try {
@@ -85,7 +87,10 @@ export async function POST(req: NextRequest) {
       .eq("id", eventoExistente.entidade_id)
       .eq("clinica_id", clinicaId)
       .maybeSingle();
-    if (pedidoExistente) return NextResponse.json({ sucesso: true, idempotente: true, pedido: pedidoExistente });
+    if (pedidoExistente) {
+      await vincularOrigemPublica(admin, clinicaId, body.codigo_rastreio, 'pedido', pedidoExistente.id);
+      return NextResponse.json({ sucesso: true, idempotente: true, pedido: pedidoExistente });
+    }
   }
 
   const { data: catalogo, error: erroCatalogo } = await admin
@@ -155,5 +160,6 @@ export async function POST(req: NextRequest) {
   }
 
   logOperacao({ operacao: "pedido.publico.criar", clinica_id: clinicaId, entidade_id: pedido.id, resultado: "sucesso" });
+  await vincularOrigemPublica(admin, clinicaId, body.codigo_rastreio, 'pedido', pedido.id);
   return NextResponse.json({ sucesso: true, idempotente: false, pedido: { ...pedido, pedido_itens: itensGravados } }, { status: 201 });
 }

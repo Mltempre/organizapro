@@ -1,3 +1,4 @@
+import { produtoOrganizaPro } from "../../../../lib/seguranca-operacoes";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { gerarCodigoRastreio } from "../../../../lib/motor-reputacao";
@@ -52,6 +53,7 @@ export async function GET(req: NextRequest) {
     }
 
     for (const config of configs) {
+      if (!await produtoOrganizaPro(supabase, config.clinica_id)) continue;
       if (!config.link_google) continue;
 
       // ── Proteção contra disparo em massa na primeira ativação ──────────────
@@ -126,6 +128,7 @@ export async function GET(req: NextRequest) {
             },
             body: JSON.stringify({
               clinica_id: config.clinica_id,
+              operacao: `avaliacao:${ag.id}`,
               telefone:   ag.telefone,
               mensagem,
             }),

@@ -158,91 +158,19 @@ test("determinismo: mesma entrada sempre produz o mesmo resultado em todas as fu
   assert.equal(gbp.chaveIdempotenciaRascunhoAvaliacao("r1", "k1"), gbp.chaveIdempotenciaRascunhoAvaliacao("r1", "k1"));
 });
 
-// ── Wiring: rotas ─────────────────────────────────────────────────────
-
-const root = path.join(path.dirname(fileURLToPathSafe(import.meta.url)), "..");
-function fileURLToPathSafe(u) { return new URL(u).pathname.replace(/^\/([A-Za-z]):/, "$1:"); }
-const ler = (p) => fs.readFileSync(path.join(root, p), "utf8").replace(/\r\n/g, "\n");
-
-const rotaBase = ler("app/api/google-business-profile/route.ts");
-const rotaAvaliacoes = ler("app/api/google-business-profile/avaliacoes/route.ts");
-const rotaRascunho = ler("app/api/google-business-profile/avaliacoes/[reviewId]/rascunho/route.ts");
-const rotaPublicar = ler("app/api/google-business-profile/avaliacoes/[reviewId]/publicar/route.ts");
-const rotaMetricas = ler("app/api/google-business-profile/metricas/route.ts");
-const rotaPosts = ler("app/api/google-business-profile/posts/route.ts");
-const rotaLocations = ler("app/api/google-business-profile/locations/route.ts");
-
-test("tenant: TODAS as rotas GBP exigem clinica_id e chamam autorizarUsuarioNaClinica antes de qualquer leitura de conexão", () => {
-  for (const [nome, rota] of [["base", rotaBase], ["avaliacoes", rotaAvaliacoes], ["rascunho", rotaRascunho], ["publicar", rotaPublicar], ["metricas", rotaMetricas], ["locations", rotaLocations]]) {
-    assert.match(rota, /autorizarUsuarioNaClinica/, `${nome} deveria chamar autorizarUsuarioNaClinica`);
-    assert.match(rota, /\.eq\("clinica_id", clinica/, `${nome} deveria escopar por clinica_id`);
+// Os cenários de autorização, publicação, retry, erros e persistência antes
+// verificados por regex nas rotas agora executam os handlers reais em
+// google-business-profile-coordenada.test.mjs, com I/O estritamente simulado.
+test("rotas delegam aos handlers GBP que mantêm a fronteira server-only", () => {
+  const routes = {
+    "route.ts": 'lerGoogle(req, "status")',
+    "avaliacoes/route.ts": 'lerGoogle(req, "avaliacoes")',
+    "locations/route.ts": 'lerGoogle(req, "locations")',
+    "metricas/route.ts": 'lerGoogle(req, "metricas")',
+    "posts/route.ts": 'escreverGoogle(req, "post")',
+  };
+  for (const [file, call] of Object.entries(routes)) {
+    const code = fs.readFileSync(new URL("../app/api/google-business-profile/" + file, import.meta.url), "utf8");
+    assert.ok(code.includes(call));
   }
-});
-
-test("tenant: DELETE (desconectar) também escopado por clinica_id — nunca remove vínculo de outro tenant", () => {
-  const idxDelete = rotaBase.indexOf("export async function DELETE");
-  const trecho = rotaBase.slice(idxDelete);
-  assert.match(trecho, /\.eq\("clinica_id", clinicaId\)/);
-});
-
-test("token não vaza: nenhuma rota loga refresh_token/access_token em texto (nem via console.log nem no corpo da resposta)", () => {
-  for (const [nome, rota] of [["callback (já existente)", ler("app/api/google-business-profile/oauth/callback/route.ts")], ["avaliacoes", rotaAvaliacoes], ["rascunho", rotaRascunho], ["publicar", rotaPublicar], ["metricas", rotaMetricas]]) {
-    assert.doesNotMatch(rota, /console\.log\([^)]*access_token/i, `${nome} não deveria logar access_token`);
-    assert.doesNotMatch(rota, /NextResponse\.json\([^}]*refresh_token[^}]*access_token/i, `${nome} não deveria devolver tokens na resposta`);
-  }
-});
-
-test("avaliação sem resposta pode gerar rascunho: rota de rascunho relê a avaliação real antes de aceitar (fail-closed)", () => {
-  assert.match(rotaRascunho, /buscarAvaliacoesGoogle\(/);
-  assert.match(rotaRascunho, /temRespostaGoogle/);
-});
-
-test("publicação exige aprovação explícita: rota de publicar exige texto e review_name no body — nunca publica sem os dois", () => {
-  assert.match(rotaPublicar, /!clinica_id \|\| !texto\?\.trim\(\) \|\| !idempotency_key \|\| !review_name/);
-});
-
-test("clique/retry não gera resposta duplicada: rota de publicar checa chave_idempotencia ANTES de qualquer chamada ao Google", () => {
-  const idxCheck = rotaPublicar.indexOf("jaPublicado");
-  const idxPublicarChamada = rotaPublicar.indexOf("await publicarRespostaGoogle(");
-  assert.ok(idxCheck > -1 && idxPublicarChamada > -1);
-  assert.ok(idxCheck < idxPublicarChamada);
-});
-
-test("falha Google nunca vira sucesso: no catch da chamada de publicação, a rota SEMPRE registra 'falhou' e retorna sucesso:false", () => {
-  const idxTry = rotaPublicar.indexOf("await publicarRespostaGoogle(accessToken, review_name, texto.trim());");
-  const idxCatch = rotaPublicar.indexOf("catch (e)", idxTry);
-  const idxFimCatch = rotaPublicar.indexOf("status: 502 });", idxCatch);
-  const trechoCatch = rotaPublicar.slice(idxCatch, idxFimCatch + 20);
-  assert.match(trechoCatch, /resultado: "falhou"/);
-  assert.match(trechoCatch, /sucesso: false/);
-  assert.doesNotMatch(trechoCatch, /sucesso: true/);
-});
-
-test("resposta publicada atualiza estado: rota de publicar SÓ retorna sucesso:true e estado 'respondida' depois de publicarRespostaGoogle ter sido chamada sem lançar", () => {
-  const idxPublicar = rotaPublicar.indexOf("await publicarRespostaGoogle(");
-  const idxRetornoSucesso = rotaPublicar.lastIndexOf('estado: "respondida"');
-  assert.ok(idxPublicar > -1 && idxRetornoSucesso > -1);
-  assert.ok(idxPublicar < idxRetornoSucesso);
-});
-
-test("ausência de IA externa não quebra GBP: nenhuma rota do módulo GBP chama OpenAI diretamente — o rascunho é sempre gerado pelo client via /api/ia já existente", () => {
-  for (const [nome, rota] of [["avaliacoes", rotaAvaliacoes], ["rascunho", rotaRascunho], ["publicar", rotaPublicar]]) {
-    assert.doesNotMatch(rota, /openai\.com/i, `${nome} não deveria chamar OpenAI diretamente`);
-  }
-});
-
-test("ausência de credenciais Google retorna estado controlado: rotas de leitura (avaliacoes/metricas/locations) nunca lançam quando assertGoogleEnv falha — sempre devolvem indisponivel:true", () => {
-  for (const [nome, rota] of [["avaliacoes", rotaAvaliacoes], ["metricas", rotaMetricas], ["locations", rotaLocations]]) {
-    assert.match(rota, /catch \(e\)/, `${nome} deveria capturar falha de configuração`);
-    assert.match(rota, /indisponivel: true/, `${nome} deveria devolver indisponivel:true`);
-  }
-});
-
-test("posts: exige aprovação explícita (texto do body) e nunca publica automaticamente — mesma idempotência do Bloco 5", () => {
-  assert.match(rotaPosts, /!clinica_id \|\| !texto\?\.trim\(\) \|\| !idempotency_key/);
-  assert.match(rotaPosts, /jaPublicado/);
-});
-
-test("avaliação não duplica em nova sincronização: a lista usa reviewId (identificador estável do Google) como chave para juntar com rascunhos locais, nunca um índice de posição", () => {
-  assert.match(rotaAvaliacoes, /rascunhoPorReview\.get\(av\.reviewId\)/);
 });

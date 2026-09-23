@@ -220,10 +220,10 @@ test("SUGERIR nunca envia: as rotas .../tentativa continuam sem nenhuma chamada 
 
 // ── Falha do provider nunca vira sucesso ─────────────────────────────────
 
-test("falha do provider nunca vira sucesso: catch/erro de /api/whatsapp sempre grava resultado 'falhou' e retorna sucesso:false", () => {
+test("falha do provider nunca vira sucesso: rejeição pré-envio grava 'falhou', resultado desconhecido grava 'incerto' e retorna sucesso:false", () => {
   for (const rota of [rotaCobrancaAprovar, rotaFollowUpAprovar]) {
     assert.match(rota, /zapiOk = false/);
-    assert.match(rota, /resultado: zapiOk \? "sucesso" : "falhou"/);
+    assert.match(rota, /resultado: zapiOk \? "sucesso" : rejeitadoAntesDoEnvio \? "falhou" : "incerto"/);
     assert.match(rota, /if \(!zapiOk\) \{[\s\S]{0,300}sucesso: false/);
   }
 });
@@ -275,7 +275,7 @@ test("nenhuma rota nova loga ou devolve token/secret em texto puro", () => {
 });
 
 test("webhook: nunca loga a URL completa (que pode conter ?token=<segredo>) — só o pathname", () => {
-  assert.match(rotaWebhook, /new URL\(req\.url\)\.pathname/);
+  assert.doesNotMatch(rotaWebhook, /console\.[a-z]+\([^;]*req\.url/);
   // Toda ocorrência de req.url em código real (linhas não-comentário) está
   // sempre envolvida por new URL(...) — nunca usada bruta/isolada como
   // valor de log (o que vazaria ?token=<segredo> na query string).
@@ -332,8 +332,11 @@ test("bug pré-existente corrigido: follow-up/tentativa e follow-up/aprovar-envi
   }
 });
 
-// ── /api/whatsapp (adaptador real) permanece inalterado nesta missão ────
+// ── Fronteira final de envio — regressão da correção P1 ────
 
-test("/api/whatsapp (adaptador Z-API real) não foi tocado por esta missão — nenhuma dependência nova de whatsapp-governado nele", () => {
-  assert.doesNotMatch(rotaWhatsapp, /whatsapp-governado/);
+test("/api/whatsapp aplica consentimento e reserva antes do provedor", () => {
+  const envio = rotaWhatsapp.indexOf('res = await fetch(');
+  assert.ok(rotaWhatsapp.indexOf('await consentimentoEnvio(') < envio);
+  assert.ok(rotaWhatsapp.indexOf('await reservarOperacao(') < envio);
+  assert.match(rotaWhatsapp, /Use o fluxo de aprovação do envio/);
 });

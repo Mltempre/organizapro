@@ -46,10 +46,11 @@ test("zero fabricação: page.tsx só calcula indicadoresCobranca quando existe 
   assert.match(paginaDashboard, /dash\.todasCobrancasRows\.length > 0 \? calcularIndicadoresCobranca\(dash\.todasCobrancasRows, agoraIso\) : null/);
 });
 
-test("zero fabricação: cobrancasAbertasCount só é numérico quando há cobrança real registrada, senão null", () => {
-  assert.match(paginaDashboard, /cobrancasAbertasCount=\{dash\.todasCobrancasRows\.length > 0 \? dash\.cobrancasAbertasRows\.length : null\}/);
+test("Casa apresenta valores com origem cobranças, sem contagem ambígua A receber", () => {
+  const casa=ler("app/components/CasaDashboard.tsx");
+  assert.match(casa,/A receber · cobranças/);
+  assert.match(casa,/moeda\(indicadoresCobranca.valorEmAberto\)/);
 });
-
 test("zero fabricação: OrganizaProTrabalhandoCard nunca lista item com quantidade zero (delegado a calcularAtividadeRecente, que já filtra)", () => {
   assert.doesNotMatch(atividadeCard, /quantidade:\s*0|Math\.random/);
 });
@@ -68,10 +69,11 @@ test("erro não vira zero: OrganizaProTrabalhandoCard distingue 'indisponível' 
   assert.match(atividadeCard, /Nenhuma ação automática registrada/);
 });
 
-test("erro não vira zero: page.tsx trata falha de rede/HTTP de /api/atividade-recente como indisponivel:true, nunca como lista vazia silenciosa", () => {
-  assert.match(paginaDashboard, /indisponivel: true \}\)\);/);
+test("Casa distingue falha comercial de vazio e permite tentar novamente", () => {
+  assert.match(paginaDashboard,/if \(erroCarga\) return/);
+  assert.match(paginaDashboard,/Tentar novamente/);
+  assert.doesNotMatch(paginaDashboard,/fetch\(.*atividade-recente/);
 });
-
 // ── 4. Oportunidade não vira receita ─────────────────────────────────────
 
 test("DinheiroCard nunca lê oportunidades/orçamentos — só IndicadoresCobranca (pagamento real)", () => {
@@ -89,11 +91,11 @@ test("Diretor Digital (MissaoDoDiaCard) só renderiza sinais recebidos via prop 
   assert.doesNotMatch(missaoDoDiaCard, /Math\.random|Math\.floor\(Math\.random/);
 });
 
-test("narrativaDiretor continua vindo de gerarNarrativaDiretor (lib/ia-comercial.ts) — nenhuma segunda fonte de narrativa criada nesta missão", () => {
-  assert.match(paginaDashboard, /gerarNarrativaDiretor\(/);
-  assert.match(paginaDashboardDemo, /gerarNarrativaDiretor\(/);
+test("Casa usa a prioridade canônica; narrativa legada permanece na demonstração", () => {
+  assert.match(paginaDashboard,/gerarEstadoComercialCanonico\(sinaisCanonicos\)/);
+  assert.match(paginaDashboardDemo,/gerarNarrativaDiretor\(/);
+  assert.doesNotMatch(ler("app/components/CasaDashboard.tsx"),/gerarNarrativa|gerarRecomendacoes/);
 });
-
 // ── 6. CTA aponta para rota real ─────────────────────────────────────────
 
 // Atualizado — Correção da Última Milha (Achado #1): o tile "Oportunidades"
@@ -107,13 +109,11 @@ test("FaixaExecutiva: todos os destinos são rotas reais do produto", () => {
   }
 });
 
-test("Botões Rápidos (Bloco H): Orçamentos e Reputação apontam para páginas reais existentes", () => {
-  assert.ok(fs.existsSync(path.join(root, "app/orcamentos/page.tsx")));
-  assert.ok(fs.existsSync(path.join(root, "app/reputacao/page.tsx")));
-  assert.match(paginaDashboard, /destino: "\/orcamentos"/);
-  assert.match(paginaDashboard, /destino: "\/reputacao"/);
+test("Casa mantém acesso real a Orçamentos e Reputação", () => {
+  const casa=ler("app/components/CasaDashboard.tsx");
+  assert.match(casa,/href="\/orcamentos"/);
+  assert.match(casa,/href="\/reputacao"/);
 });
-
 // ── 7. Orçamento apresentado/parado aparece corretamente quando aplicável ──
 
 test("orcamentosParadosCount vem de dash.orcamentosParadosRows.length — mesma fonte real já usada pelo Radar, nenhuma segunda consulta", () => {
@@ -209,7 +209,8 @@ test("nenhum motor foi apagado — lib/recomendacoes.ts (Central) e o componente
   assert.ok(fs.existsSync(path.join(root, "app/components/CentralDeOportunidades.tsx")));
 });
 
-test("página real (app/dashboard/page.tsx) e página demo (app/dashboard-demo/page.tsx) continuam usando a MESMA DashboardView — nenhum Dashboard V2 paralelo criado", () => {
-  assert.match(paginaDashboard, /<DashboardView/);
-  assert.match(paginaDashboardDemo, /<DashboardView/);
+test("Casa autenticada está ligada à apresentação final; demonstração fica isolada", () => {
+  assert.match(paginaDashboard,/<CasaDashboard/);
+  assert.match(paginaDashboardDemo,/<DashboardView/);
+  assert.doesNotMatch(paginaDashboard,/dados-demonstracao/);
 });

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { DBServico } from "../_lib/types";
 
-type Props = { slug: string; servicos: DBServico[] };
+type Props = { slug: string; servicos: DBServico[]; codigoRastreio?: string };
 
 // ── Interesse Público — E-commerce IA V1 ─────────────────────────────────
 //
@@ -16,7 +16,8 @@ type Props = { slug: string; servicos: DBServico[] };
 // sinal rastreável em public.oportunidades_demanda (canal "site"), sem
 // nenhuma alteração em Servicos.tsx ou qualquer seção já homologada do
 // Site Premium.
-export default function InteressePublico({ slug, servicos }: Props) {
+export default function InteressePublico({ slug, servicos, codigoRastreio }: Props) {
+  const tentativa = useRef<{ corpo: string; chave: string } | null>(null);
   const semPreco = servicos.filter((s) => s.disponivel !== false && !(typeof s.preco_centavos === "number" && s.preco_centavos > 0));
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -32,20 +33,24 @@ export default function InteressePublico({ slug, servicos }: Props) {
     if (!telefone.trim()) { setFeedback({ tipo: "erro", texto: "Informe um telefone para contato." }); return; }
     setEnviando(true); setFeedback(null);
     try {
+      const corpo = JSON.stringify({ slug, nome, telefone, servicoNome, mensagem, codigoRastreio });
+      if (tentativa.current?.corpo !== corpo) tentativa.current = { corpo, chave: crypto.randomUUID() };
       const resposta = await fetch("/api/site-publico/interesse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug,
+          codigo_rastreio: codigoRastreio,
           nome: nome || null,
           telefone,
           servico_nome: servicoNome || null,
           mensagem: mensagem || null,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: tentativa.current!.chave,
         }),
       });
       const dados = await resposta.json() as { sucesso?: boolean; error?: string };
       if (!resposta.ok || !dados.sucesso) throw new Error(dados.error || "Não foi possível registrar seu interesse.");
+      tentativa.current = null;
       setFeedback({ tipo: "sucesso", texto: "Recebemos seu contato — a empresa vai falar com você em breve." });
       setNome(""); setTelefone(""); setServicoNome(""); setMensagemTexto("");
     } catch (error) {

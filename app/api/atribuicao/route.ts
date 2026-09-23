@@ -1,36 +1,22 @@
-// GET /api/atribuicao — P1.3: Google/Meta Ads + Atribuição.
-// Lê public.origem_captacoes (fase 1 já capturada em produção via
-// app/empresa/[slug]/page.tsx + app/api/chatbot/message/route.ts — ver
-// sql/atribuicao-origem-fase1.sql para o porquê a tabela ainda não
-// existe). Mesmo padrão de app/api/atividade-recente/route.ts: erro de
-// "tabela não existe" nunca vira 500 nem fabrica dado — devolve
-// indisponivel:true com o motivo real, para a tela distinguir "ainda não
-// ativado" de "zero captura real".
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { autorizarUsuarioNaClinica } from "../../../lib/auth-clinica";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { autorizarUsuarioNaClinica } from '../../../lib/auth-clinica';
+import { carregarRelatorioAtribuicao } from '../../../lib/atribuicao-dados';
+import { CONEXOES_ADS_V1 } from '../../../lib/ads-contratos';
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-
 export async function GET(req: NextRequest) {
-  const clinicaId = req.nextUrl.searchParams.get("clinica_id");
-  if (!clinicaId) return NextResponse.json({ sucesso: false, error: "clinica_id é obrigatório" }, { status: 400 });
-
-  const autorizacao = await autorizarUsuarioNaClinica(req, clinicaId);
-  if (!autorizacao.ok) return NextResponse.json({ sucesso: false, error: autorizacao.error }, { status: autorizacao.status });
-
-  const { data, error } = await admin
-    .from("origem_captacoes")
-    .select("classificacao, paciente_id")
-    .eq("clinica_id", clinicaId);
-
-  if (error) {
-    return NextResponse.json({ sucesso: true, indisponivel: true, motivo: error.message, origens: [] });
+  const clinicaId = req.nextUrl.searchParams.get('clinica_id');
+  if (!clinicaId) return NextResponse.json({ error: 'Negócio obrigatório' }, { status: 400 });
+  const auth = await autorizarUsuarioNaClinica(req, clinicaId);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  try {
+    const dados = await carregarRelatorioAtribuicao(admin, clinicaId);
+    return NextResponse.json({ ...dados, conexoes: CONEXOES_ADS_V1 }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (erro) {
+    const schemaPendente = erro instanceof Error && erro.message === 'ATRIBUICAO_SCHEMA_PENDENTE';
+    return NextResponse.json({ indisponivel: true, schemaPendente,
+      error: schemaPendente ? 'Estrutura de atribuição ainda não disponível. Homologação de banco necessária.' : 'Não foi possível obter todas as fontes. Nenhum total parcial foi apresentado.',
+    }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
-
-  return NextResponse.json({
-    sucesso: true,
-    indisponivel: false,
-    origens: (data ?? []).map((o) => ({ classificacao: o.classificacao, pacienteId: o.paciente_id })),
-  });
 }

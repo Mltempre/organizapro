@@ -16,6 +16,8 @@ import { agregarReceitaPerdida, type ResumoReceitaPerdida } from '../../lib/rece
 import { gerarPrevisorFaturamento, type ResumoPrevisorFaturamento } from '../../lib/previsor-faturamento';
 import { adaptarOportunidadesClientes, adaptarOportunidadesDemanda, organizarSinaisCanonicos, type SinalCanonico } from '../../lib/nucleo-inteligente';
 import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
+import { coordenarGerenteComercial, type AtencaoComercial } from '../../lib/gerente-comercial';
+import { cancelamentosSemReagendamento, gerarCasosAgendaAutonoma } from '../../lib/agenda-autonoma';
 
 // ── Copiloto Administrativo AI V1 (P1.2) ─────────────────────────────────
 // "O que precisa da minha atenção agora?" — nenhum motor novo, nenhuma
@@ -48,6 +50,7 @@ function formatarValor(v: number) { return v.toLocaleString('pt-BR', { style: 'c
 
 type Estado = {
   sinais: SinalCanonico[];
+  atencoes: AtencaoComercial[];
   followUpsPendentes: CasoFollowUp[];
   atrasados: AgItem[];
   pendentesConfirmacao: AgItem[];
@@ -66,7 +69,7 @@ export default function CopilotoPage() {
 
   const carregar = useCallback(async () => {
     try {
-      setCarregando(true); setErro('');
+      setCarregando(true); setErro(''); setEstado(null);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) { router.push('/login'); return; }
@@ -100,7 +103,8 @@ export default function CopilotoPage() {
         supabase.from('agendamentos').select('id, paciente_nome, telefone, data').eq('clinica_id', cid).eq('status', 'cancelado').gte('data', trintaDiasAtras).order('data', { ascending: false }).limit(50),
       ]);
       const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, tratamentosRes = tratamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
-      const falhaParcial = [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR].some(r => r.falhou);
+      const falhaParcial = [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR].some(r => r.falhou)
+        || !!agHojeRes.error || !!semProximoRes.error || !!canceladosRes.error;
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
@@ -118,16 +122,17 @@ export default function CopilotoPage() {
       const telefonesCancelados = Array.from(new Set(canceladosComTelefone.map(a => a.telefone)));
       let telefonesComReagendamento = new Set<string>();
       if (telefonesCancelados.length > 0) {
-        const { data: futuros } = await supabase.from('agendamentos').select('telefone').eq('clinica_id', cid).in('telefone', telefonesCancelados).gte('data', hoje).not('status', 'in', '("cancelado","faltou")');
+        const { data: futuros, error: erroFuturos } = await supabase.from('agendamentos').select('telefone').eq('clinica_id', cid).in('telefone', telefonesCancelados).gte('data', hoje).not('status', 'in', '("cancelado","faltou")');
+        if (erroFuturos) throw erroFuturos; // não recomendar reagendamento sem verificar o futuro
         telefonesComReagendamento = new Set((futuros || []).map(f => f.telefone));
       }
-      const cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[] = [];
-      const telefonesJaIncluidos = new Set<string>();
-      for (const a of canceladosComTelefone) {
-        if (telefonesComReagendamento.has(a.telefone!) || telefonesJaIncluidos.has(a.telefone!)) continue;
-        telefonesJaIncluidos.add(a.telefone!);
-        cancelamentosSemReagendamentoRows.push({ id: a.id, nome: a.paciente_nome, telefone: a.telefone, data: a.data });
-      }
+      const cancelamentosRecentes = canceladosComTelefone.map(a => ({ id: a.id, nome: a.paciente_nome, telefone: a.telefone!, data: a.data }));
+      const cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[] = cancelamentosSemReagendamento(cancelamentosRecentes, telefonesComReagendamento);
+      const casosAgenda = gerarCasosAgendaAutonoma({
+        hoje, cancelamentosRecentes, telefonesComReagendamentoFuturo: telefonesComReagendamento,
+        agendaHoje: agendaHoje.map(a => ({ id: a.id, nome: a.paciente_nome, telefone: a.telefone || null, status: a.status })),
+        clientesAtivos: semProximoData.map(c => ({ id: c.id, nome: c.nome, telefone: c.telefone, whatsapp: c.whatsapp, proximaConsulta: c.proxima_consulta })),
+      });
 
       const recomprasPossiveis = agregarClientesElegiveisRecompra(
         todosPedidos.map(p => ({ pacienteId: p.paciente_id, telefone: p.telefone, nomeCliente: p.nome_cliente, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado', criadoEm: p.criado_em, pagamentoConfirmadoEm: p.pagamento_confirmado_em }))
@@ -197,6 +202,7 @@ export default function CopilotoPage() {
 
       setEstado({
         sinais,
+        atencoes: coordenarGerenteComercial(sinais, receitaPerdida, casosAgenda),
         followUpsPendentes,
         atrasados: agendaHoje.filter(a => a.data < hoje && a.status === 'agendado'),
         pendentesConfirmacao: agendaHoje.filter(a => a.status === 'agendado' && a.data === hoje),
@@ -224,10 +230,11 @@ export default function CopilotoPage() {
       {carregando && <PageLoader title="Consolidando o que precisa da sua atenção..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
       {!carregando && estado && estado.falhaParcial && (
-        <Feedback type="aviso" message="Alguns dados podem estar incompletos — houve falha ao carregar uma ou mais fontes (oportunidades, orçamentos, tratamentos, pedidos ou cobranças). O que aparece abaixo é real, mas pode não ser tudo." />
+        <Feedback type="aviso" message="Visão parcial: houve falha ao carregar fontes comerciais, clientes ou agenda. As prioridades e os valores exibidos podem estar incompletos." />
       )}
+      {!carregando && (erro || estado?.falhaParcial) && <button onClick={carregar}>Tentar novamente</button>}
 
-      {!carregando && estado && totalItens === 0 && (
+      {!carregando && estado && !estado.falhaParcial && totalItens === 0 && (
         <EmptyState icon="✅" title="Nada pedindo atenção agora." description="Nenhum atraso de agenda, oportunidade parada, orçamento parado, cobrança atrasada, pedido pendente ou follow-up em aberto identificado." />
       )}
 
@@ -256,10 +263,11 @@ export default function CopilotoPage() {
 
           {/* ── PRIORIDADES COMERCIAIS (Radar + Smart Commerce, uncapped) ── */}
           {estado.sinais.length > 0 && (
-            <section style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎯 Prioridades comerciais ({estado.sinais.length})</div>
+            <section id="gerente-comercial" aria-label="Gerente Comercial AI" style={{ marginBottom: 24 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>Gerente Comercial AI ({estado.atencoes.length})</h2>
+              <p>Prioridades do Radar e do núcleo comercial, dentro dos dados carregados. A execução e o registro continuam no fluxo indicado.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {estado.sinais.map(sinal => {
+                {estado.atencoes.map(({ sinal, impacto, destinoAcao }) => {
                   const cor = stTom[stTierOportunidade[sinal.prioridade].tom];
                   return (
                     <div key={sinal.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)', border: `1px solid ${cor.border}`, borderRadius: 10, padding: '10px 16px' }}>
@@ -267,8 +275,14 @@ export default function CopilotoPage() {
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 3 }}>{sinal.titulo}</div>
                         <div style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 2 }}>{sinal.motivo}</div>
                         <div style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>Evidência: {sinal.evidencia}</div>
+                        <div>Prioridade: {sinal.prioridade}</div>
+                        <div>Cliente: {sinal.contexto?.nome || 'Visão agregada'}{sinal.contexto?.telefone ? ` · ${sinal.contexto.telefone}` : ''}</div>
+                        {sinal.entidadeId && <div>Referência: {sinal.entidadeTipo} · {sinal.entidadeId}</div>}
+                        <div>Próxima ação: {sinal.acaoSugerida}</div>
+                        <div>Impacto: {impacto.valor === null ? 'Valor não informado' : formatarValor(impacto.valor)} — {impacto.descricao}</div>
                       </div>
-                      {sinal.destino && (
+                      {destinoAcao && <button onClick={() => router.push(destinoAcao)}>Abrir ação recomendada →</button>}
+                      {sinal.destino && sinal.destino !== destinoAcao && (
                         <button onClick={() => router.push(sinal.destino!)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(74,155,176,0.35)', background: 'rgba(74,155,176,0.1)', color: '#4a9bb0', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           {sinal.destinoLabel || 'Ver'} →
                         </button>
@@ -283,7 +297,8 @@ export default function CopilotoPage() {
           {/* ── FOLLOW-UPS PENDENTES ── */}
           {estado.followUpsPendentes.length > 0 && (
             <section style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔁 Follow-ups pendentes ({estado.followUpsPendentes.length})</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔁 Acompanhamentos identificados ({estado.followUpsPendentes.length})</div>
+              <p>O fluxo de Follow-up verifica a elegibilidade e as tentativas já registradas antes de executar a ação.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {estado.followUpsPendentes.map(caso => (
                   <div key={`${caso.entidadeTipo}-${caso.entidadeId}`} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid #2d3148', borderRadius: 10, padding: '10px 16px', flexWrap: 'wrap' }}>

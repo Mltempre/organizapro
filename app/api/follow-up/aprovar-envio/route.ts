@@ -1,3 +1,4 @@
+import { reservarOperacao, finalizarOperacao } from "../../../../lib/seguranca-operacoes";
 // POST /api/follow-up/aprovar-envio — Bloco APROVAR do WhatsApp Governado
 // V1 para os 5 tipos próprios do Follow-up Comercial Inteligente V1 (que
 // só prepara via POST /api/follow-up/tentativa, nunca envia). Mesmo
@@ -115,6 +116,10 @@ export async function POST(req: NextRequest) {
 
   const mensagem = prepararMensagemFollowUp(tipoTyped, caso.pacienteNome, caso.motivo);
 
+  const operacao = `followup:${tipoTyped}:${entidadeIdEvento}:${hoje}`;
+  const reserva = await reservarOperacao(admin, clinica_id, operacao, JSON.stringify([caso.telefone, mensagem.texto]), true);
+  if (!reserva) return NextResponse.json({ sucesso: false, error: "Envio reservado ou persistência indisponível; verifique antes de repetir" }, { status: 409 });
+  let rejeitadoAntesDoEnvio = false;
   const baseUrl = new URL(req.url).origin;
   let zapiOk = false;
   let motivoFalha: string | null = null;
@@ -122,31 +127,32 @@ export async function POST(req: NextRequest) {
     const r = await fetch(`${baseUrl}/api/whatsapp`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${internalServiceSecret}` },
-      body: JSON.stringify({ clinica_id, telefone: caso.telefone, mensagem: mensagem.texto }),
+      body: JSON.stringify({ clinica_id, telefone: caso.telefone, mensagem: mensagem.texto, operacao }),
     });
     zapiOk = r.ok;
     if (!zapiOk) {
       const j = await r.json().catch(() => null);
-      motivoFalha = (j as { error?: string } | null)?.error ?? `Z-API retornou status ${r.status}`;
+      rejeitadoAntesDoEnvio = (j as { nao_enviado?: boolean } | null)?.nao_enviado === true;
+      motivoFalha = "Serviço de envio recusou a operação";
     }
-  } catch (e) {
+  } catch {
     zapiOk = false;
-    motivoFalha = e instanceof Error ? e.message : "falha de rede ao chamar /api/whatsapp";
+    motivoFalha = "Resultado desconhecido após falha de comunicação";
   }
 
+  const finalizado = await finalizarOperacao(admin, reserva, zapiOk ? "sucesso" : rejeitadoAntesDoEnvio ? "rejeitado" : "incerto");
+  if (!finalizado) return NextResponse.json({ sucesso: false, error: "Resultado não persistido; não repita sem verificar" }, { status: 503 });
   const { error: erroEvento } = await admin.from("eventos_dominio").insert({
     clinica_id, tipo: "followup.envio", entidade_tipo: caso.entidadeTipo, entidade_id: entidadeIdEvento,
     chave_idempotencia: chaveEnvio,
-    payload: { dia: hoje, tipo_followup: tipoTyped, telefone: caso.telefone, mensagem: mensagem.texto, resultado: zapiOk ? "sucesso" : "falhou", motivo: zapiOk ? null : motivoFalha },
+    payload: { dia: hoje, tipo_followup: tipoTyped, telefone: caso.telefone, mensagem: mensagem.texto, resultado: zapiOk ? "sucesso" : rejeitadoAntesDoEnvio ? "falhou" : "incerto", motivo: zapiOk ? null : motivoFalha },
     criado_em: agora,
   });
-  if (erroEvento && !/duplicate|unique/i.test(erroEvento.message ?? "")) {
-    logOperacao({ operacao: "followup.aprovar_envio", clinica_id, entidade_id, resultado: "erro", motivo: `evento nao gravado: ${erroEvento.message}` });
-  }
+  if (erroEvento) return NextResponse.json({ sucesso: false, error: "Registro do resultado indisponível; verifique antes de repetir" }, { status: 503 });
 
   if (!zapiOk) {
     logOperacao({ operacao: "followup.aprovar_envio", clinica_id, entidade_id, resultado: "erro", motivo: motivoFalha ?? "falha ao enviar" });
-    return NextResponse.json({ sucesso: false, error: "Falha ao enviar pelo WhatsApp — tente novamente." }, { status: 502 });
+    return NextResponse.json({ sucesso: false, error: "Envio não confirmado — verifique o resultado antes de repetir." }, { status: 502 });
   }
 
   logOperacao({ operacao: "followup.aprovar_envio", clinica_id, entidade_id, resultado: "sucesso", motivo: `envio de ${tipoTyped} aprovado e realizado` });

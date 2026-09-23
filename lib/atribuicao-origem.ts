@@ -20,14 +20,14 @@ export type OrigemCaptada = {
   utmCampaign:  string | null;
   utmContent:   string | null;
   gclid:        string | null; // presente só quando o Google efetivamente anexou (auto-tagging de um clique em anúncio)
-  fbclid:       string | null; // idem, para Meta
+  fbclid:       string | null; // referência capturada; sozinha não comprova mídia paga
   referrerHost: string | null; // host do Referer, quando o navegador o envia (nem sempre envia)
   capturadoEm:  string;        // ISO — momento da captura, nunca reconstruído depois
 };
 
 export type TipoOrigem =
   | "google_ads"     // gclid presente — sinal forte de clique em anúncio Google
-  | "meta_ads"        // fbclid presente — idem para Meta
+  | "meta_ads"        // marcação explícita de mídia paga Meta; fbclid sozinho não basta
   | "campanha_utm"    // algum utm_* presente, sem click id reconhecido (campanha marcada manualmente)
   | "busca_organica"  // referrer de um motor de busca conhecido, sem utm/click id
   | "referencia"      // outro site encaminhou o visitante, sem utm/click id
@@ -81,15 +81,27 @@ export function capturarOrigem(params: EntradaParams, referrer: string | null, a
 }
 
 /**
- * Classificação por precedência: click id reconhecido > UTM manual >
- * referrer de busca > referrer qualquer > nada. Um click id sempre vence
- * um UTM textual porque é o sinal mais difícil de forjar por acidente
- * (o próprio Google/Meta que anexa, não o operador da campanha).
+ * Classificação conservadora da marcação capturada, sem autenticar um clique
+ * perante plataformas. Conflitos não escolhem um vencedor. FBCLID isolado
+ * é referência, e UTM de mídia paga deve estar explícito.
  */
+export function origemTemConflito(o: OrigemCaptada): boolean {
+  const source = o.utmSource?.toLowerCase();
+  return !!((o.gclid && (o.fbclid || ['facebook', 'instagram', 'meta', 'fb', 'ig'].includes(source || '')))
+    || (o.fbclid && source === 'google'));
+}
+
 export function classificarOrigem(o: OrigemCaptada): TipoOrigem {
+  const source = o.utmSource?.toLowerCase();
+  const pago = ['cpc', 'ppc', 'paid', 'paid_social', 'paid_search'].includes(o.utmMedium?.toLowerCase() || '');
+  const meta = ['facebook', 'instagram', 'meta', 'fb', 'ig'].includes(source || '');
+  // Identificadores/UTMs são evidência capturada, não validação da plataforma.
+  if (origemTemConflito(o)) return 'campanha_utm';
   if (o.gclid) return "google_ads";
-  if (o.fbclid) return "meta_ads";
+  if (pago && meta) return 'meta_ads';
+  if (pago && source === 'google') return 'google_ads';
   if (o.utmSource || o.utmMedium || o.utmCampaign || o.utmContent) return "campanha_utm";
+  if (o.fbclid) return 'referencia';
   if (o.referrerHost && MOTORES_BUSCA_CONHECIDOS.some(m => o.referrerHost!.includes(m))) return "busca_organica";
   if (o.referrerHost) return "referencia";
   return "direto";
@@ -170,7 +182,7 @@ export function calcularROAS(custoCentavos: number | null, receitaAtribuidaCenta
  * Código curto de rastreio de ORIGEM (distinto do código de rastreio de
  * avaliação em motor-reputacao.ts). Mesmo alfabeto sem ambiguidade visual.
  */
-export function gerarCodigoOrigem(random: () => number = Math.random): string {
+export function gerarCodigoOrigem(random: () => number = () => globalThis.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296): string {
   const alfabeto = "23456789abcdefghjkmnpqrstuvwxyz";
   let codigo = "";
   for (let i = 0; i < 10; i++) {
