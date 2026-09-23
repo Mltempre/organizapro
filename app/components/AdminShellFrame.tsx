@@ -71,6 +71,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Atribuição",            h: "/atribuicao",            i: "🎯" },
       { l: "Pesquisa de Preços",    h: "/pesquisa-precos",       i: "💲" },
       { l: "NotaFácil",             h: "/notafacil",             i: "📄" },
+      { l: "Fechamento Contábil",   h: "/fechamento-contabil",   i: "🧮" },
     ],
   },
 ];
