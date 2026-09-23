@@ -22,6 +22,7 @@ import {
   elegivelParaTentativaCobranca, prepararMensagemCobranca, diasAtraso,
   type Cobranca,
 } from "../../../../../lib/motor-cobranca";
+import { prepararRegistroAuditoria } from "../../../../../lib/auditoria-decisoes";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -103,6 +104,42 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const dias = diasAtraso(cobranca.vencimento, hoje);
   const mensagem = prepararMensagemCobranca(cobranca, dias);
   const agora = new Date().toISOString();
+
+  // Auditoria das Decisões da IA V1 — mesmo padrão já instrumentado em
+  // app/api/follow-up/tentativa/route.ts (motor "cobrador-digital" já
+  // fazia parte do vocabulário conhecido em lib/auditoria-decisoes.ts,
+  // mas nunca tinha sido de fato instrumentado). Evidência estruturada
+  // real (dias de atraso + status), nunca a mensagem/narrativa. Best-
+  // effort: falha aqui nunca bloqueia a tentativa real do usuário.
+  const registroAuditoria = prepararRegistroAuditoria({
+    clinicaId: clinica_id,
+    motor: "cobrador-digital",
+    versaoRegra: "motor-cobranca-v1",
+    tipoDecisao: "cobranca_atrasada",
+    entidadeTipo: "cobranca",
+    entidadeId: id,
+    clienteId: cobranca.paciente_id || (cobranca.paciente_telefone ? cobranca.paciente_telefone.replace(/\D/g, "") : null),
+    sinaisUtilizados: [
+      { campo: "dias_atraso", valor: dias },
+      { campo: "status_cobranca", valor: cobranca.status },
+    ],
+    decisao: "registrar_contato",
+    observadoEm: agora,
+  });
+  if (registroAuditoria) {
+    const { error: erroAuditoria } = await admin.from("eventos_dominio").insert({
+      clinica_id,
+      tipo: registroAuditoria.tipoEvento,
+      entidade_tipo: registroAuditoria.entidadeTipo,
+      entidade_id: registroAuditoria.entidadeId,
+      chave_idempotencia: registroAuditoria.chaveIdempotencia,
+      payload: registroAuditoria.payload,
+      criado_em: agora,
+    });
+    if (erroAuditoria && !/duplicate|unique/i.test(erroAuditoria.message ?? "")) {
+      logOperacao({ operacao: "auditoria.decisao", clinica_id, entidade_id: id, resultado: "erro", motivo: `evidencia nao gravada: ${erroAuditoria.message}` });
+    }
+  }
 
   const { error: erroEvento } = await admin.from("eventos_dominio").insert({
     clinica_id,

@@ -99,7 +99,7 @@ export default function Cliente360Page() {
         fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { tratamentos: [] }).catch(() => ({ tratamentos: [] })),
         fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { cobrancas: [] }).catch(() => ({ cobrancas: [] })),
         fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { pedidos: [] }).catch(() => ({ pedidos: [] })),
-        fetch(`/api/memoria?clinica_id=${cid}&paciente_id=${params.id}`, { headers: auth }).then(r => r.ok ? r.json() : { fatos: [], decisoes: [] }).catch(() => ({ fatos: [], decisoes: [] })),
+        fetch(`/api/memoria?clinica_id=${cid}&paciente_id=${params.id}${paciente.telefone ? `&telefone=${encodeURIComponent(paciente.telefone)}` : ''}`, { headers: auth }).then(r => r.ok ? r.json() : { fatos: [], decisoes: [] }).catch(() => ({ fatos: [], decisoes: [] })),
       ]);
 
       const agendamentos: AgendamentoRow[] = (agendamentosRes.data ?? []) as AgendamentoRow[];

@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../lib/auth-clinica";
 import { prepararRegistroMemoria, type FatoMemoria } from "../../../lib/memoria-proveniencia";
+import { normalizarTelefone } from "../../../lib/oportunidades-demanda";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,12 +32,32 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const clinica_id = url.searchParams.get("clinica_id");
   const paciente_id = url.searchParams.get("paciente_id");
+  const telefoneParam = url.searchParams.get("telefone");
   if (!clinica_id || !paciente_id) {
     return NextResponse.json({ error: "clinica_id e paciente_id são obrigatórios" }, { status: 400 });
   }
 
   const autorizacao = await autorizarUsuarioNaClinica(req, clinica_id);
   if (!autorizacao.ok) return NextResponse.json({ error: autorizacao.error }, { status: autorizacao.status });
+
+  // auditoria.decisao nem sempre tem paciente_id disponível na origem: o
+  // Gerente Comercial/Follow-up (lib/follow-up-comercial.ts, CasoFollowUp)
+  // identifica o caso por telefone, nunca por cadastro — mesmo quando o
+  // telefone já pertence a um paciente cadastrado. `cliente_id` no payload
+  // é documentado em lib/auditoria-decisoes.ts como "paciente_id OU
+  // telefone normalizado, quando disponível" — por isso a consulta aqui
+  // precisa casar com QUALQUER um dos dois, nunca só paciente_id, senão
+  // toda decisão hoje instrumentada (follow-up/tentativa) fica invisível
+  // nesta tela. memoria.fato não tem esse problema: /api/memoria POST
+  // sempre grava paciente_id real quando a tela envia (única origem hoje).
+  const telefoneNormalizado = telefoneParam ? normalizarTelefone(telefoneParam) : "";
+  let decisoesQuery = admin.from("eventos_dominio")
+    .select("id, tipo, entidade_tipo, payload, criado_em, chave_idempotencia")
+    .eq("clinica_id", clinica_id)
+    .eq("tipo", "auditoria.decisao");
+  decisoesQuery = telefoneNormalizado
+    ? decisoesQuery.or(`payload->>cliente_id.eq.${paciente_id},payload->>cliente_id.eq.${telefoneNormalizado}`)
+    : decisoesQuery.eq("payload->>cliente_id", paciente_id);
 
   const [{ data: fatos, error: erroFatos }, { data: decisoes, error: erroDecisoes }] = await Promise.all([
     admin.from("eventos_dominio")
@@ -45,12 +66,7 @@ export async function GET(req: NextRequest) {
       .eq("tipo", "memoria.fato")
       .eq("payload->cliente->>pacienteId", paciente_id)
       .order("criado_em", { ascending: false }),
-    admin.from("eventos_dominio")
-      .select("id, tipo, entidade_tipo, payload, criado_em, chave_idempotencia")
-      .eq("clinica_id", clinica_id)
-      .eq("tipo", "auditoria.decisao")
-      .eq("payload->>cliente_id", paciente_id)
-      .order("criado_em", { ascending: false }),
+    decisoesQuery.order("criado_em", { ascending: false }),
   ]);
   if (erroFatos || erroDecisoes) {
     return NextResponse.json({ error: "Não foi possível consultar memória/auditoria" }, { status: 500 });
