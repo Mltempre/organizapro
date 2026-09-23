@@ -24,7 +24,7 @@ import {
   type SinalCanonico,
   type OportunidadeDemandaSinal,
 } from "../../lib/nucleo-inteligente";
-import CasaDashboard from "../components/CasaDashboard";
+import CasaDashboard, { type CasaDashboardProps } from "../components/CasaDashboard";
 import { agregarReceitaPerdida } from "../../lib/receita-perdida";
 import type { AgItem } from "../components/DashboardView";
 import AdminShell from "../components/AdminShell";
@@ -79,6 +79,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [erroCarga, setErroCarga] = useState("");
+  const [fechamento, setFechamento] = useState<CasaDashboardProps["fechamento"]>(null);
   const [clinicaId, setClinicaId] = useState("");
   const [dash, setDash] = useState<DashData>({
     compromissosHoje: 0, pendentes: 0, atrasados: 0,
@@ -99,6 +100,7 @@ export default function Dashboard() {
   const carregarDados = useCallback(async () => {
     setLoading(true);
     setErroCarga("");
+    setFechamento(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
@@ -113,6 +115,29 @@ export default function Dashboard() {
       setClinicaId(cid);
 
       const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      const competencia = hoje.slice(0, 7);
+      // Configuração existente determina a presença da vertical; totais vêm prontos da API.
+      // Falha desta leitura opcional não bloqueia os demais domínios da Casa.
+      const fechamentoPromise = (async (): Promise<CasaDashboardProps["fechamento"]> => {
+        try {
+          const headers = { Authorization: `Bearer ${session.access_token}` };
+          const tiposRes = await fetch(`/api/fechamento/tipos?clinica_id=${encodeURIComponent(cid)}`, { headers });
+          const tipos = tiposRes.ok ? await tiposRes.json() : null;
+          if (!tipos?.sucesso || !Array.isArray(tipos.tipos)) throw new Error("Configuração indisponível");
+          if (!tipos.tipos.some((tipo: { ativo: boolean }) => tipo.ativo === true)) return null;
+          const resposta = await fetch(`/api/fechamento?clinica_id=${encodeURIComponent(cid)}&competencia=${competencia}`, { headers });
+          const dados = resposta.ok ? await resposta.json() : null;
+          const resumo = dados?.resumo;
+          if (!dados?.sucesso || resumo?.competencia !== competencia || !Array.isArray(resumo.clientes)
+            || !resumo.clientes.every((cliente: { checklist?: unknown }) => Array.isArray(cliente?.checklist))
+            || ![resumo.prontos, resumo.pendentes, resumo.bloqueados, resumo.emRevisao].every(n => Number.isInteger(n) && n >= 0)) {
+            throw new Error("Resumo indisponível");
+          }
+          return { competencia, resumo };
+        } catch {
+          return { competencia, resumo: null };
+        }
+      })();
       const [ano, mes, dia] = hoje.split("-").map(Number);
       const amanha  = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split("T")[0];
       const fimSete = new Date(Date.UTC(ano, mes - 1, dia + 6)).toISOString().split("T")[0];
@@ -292,6 +317,7 @@ export default function Dashboard() {
       const cancelamentosHoje = lista.filter(a => a.status === "cancelado").length;
       const horariosVagosHoje = obterHorariosVagos(lista, cfg?.horario_funcionamento).length;
 
+      setFechamento(await fechamentoPromise);
       setDash({
         compromissosHoje: ativos.length,
         pendentes:        pendentesHoje.length,
@@ -494,6 +520,7 @@ export default function Dashboard() {
 
   return (
     <CasaDashboard
+      fechamento={fechamento}
       outrasPrioridades={estadoComercial.sinais.slice(missaoDoDia.length)}
       agendaHoje={dash.agendaHoje}
       receitaPerdida={receitaPerdida}

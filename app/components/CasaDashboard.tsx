@@ -4,12 +4,14 @@ import Link from "next/link";
 import AdminShell from "./AdminShell";
 import type { AgItem, DashboardViewProps } from "./DashboardView";
 import type { ResumoReceitaPerdida } from "../../lib/receita-perdida";
+import type { ResumoFechamento } from "../../lib/fechamento-contabil";
 import styles from "./CasaDashboard.module.css";
 
 export type CasaDashboardProps = Pick<DashboardViewProps, "clinicaId" | "dataStr" | "saudacaoCard" | "temDados" | "missaoDoDia" | "indicadores" | "indicadoresCobranca" | "orcamentosParadosCount" | "onboarding"> & {
   outrasPrioridades: DashboardViewProps["missaoDoDia"];
   agendaHoje: AgItem[];
   receitaPerdida: ResumoReceitaPerdida;
+  fechamento?: { competencia: string; resumo: ResumoFechamento | null } | null;
 };
 
 const moeda = (valor: number | null) => valor === null ? "Valor não informado" : valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -86,6 +88,22 @@ export default function CasaDashboard(props: CasaDashboardProps) {
             </nav>
           </div>
         </section>
+
+        {props.fechamento && (props.fechamento.resumo ? (
+          <section className={styles.card} aria-labelledby="casa-fechamento">
+            <div className={styles.titulo}><h2 id="casa-fechamento">Fechamento contábil</h2><Link href="/fechamento-contabil">Ver fechamentos →</Link></div>
+            <p className={styles.muted}>Competência {props.fechamento.competencia.split("-").reverse().join("/")}</p>
+            {props.fechamento.resumo.clientes.length === 0 ? <p className={styles.muted}>Nenhum cliente ativo para acompanhar nesta competência.</p> :
+              props.fechamento.resumo.clientes.every(cliente => cliente.checklist.length === 0) ? <p className={styles.muted}>Nenhum documento obrigatório definido para os clientes. Revise a configuração em Ver fechamentos.</p> : (
+                <dl className={`${styles.numeros} ${styles.fechamentoNumeros}`}>
+                  <div><dt>Prontos</dt><dd>{props.fechamento.resumo.prontos}</dd></div>
+                  <div><dt>Pendentes</dt><dd>{props.fechamento.resumo.pendentes}</dd></div>
+                  <div><dt>Bloqueados</dt><dd>{props.fechamento.resumo.bloqueados}</dd></div>
+                  {props.fechamento.resumo.emRevisao > 0 && <div><dt>Em revisão</dt><dd>{props.fechamento.resumo.emRevisao}</dd></div>}
+                </dl>
+              )}
+          </section>
+        ) : <p role="status" className={styles.muted}>Resumo do fechamento contábil indisponível. <Link href="/fechamento-contabil">Ver fechamentos →</Link></p>)}
 
         <div className={styles.duasColunas}>
           <section className={styles.card} aria-labelledby="casa-agenda">
