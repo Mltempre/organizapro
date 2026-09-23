@@ -49,12 +49,12 @@
 export type MotorConhecido =
   | "radar" | "nucleo-inteligente" | "recomendacoes" | "follow-up-comercial"
   | "cobrador-digital" | "agenda-autonoma" | "receita-perdida" | "previsor-faturamento"
-  | "linha-economica" | "memoria-proveniencia";
+  | "linha-economica" | "memoria-proveniencia" | "fechamento-contabil";
 
 const MOTORES_CONHECIDOS: readonly MotorConhecido[] = [
   "radar", "nucleo-inteligente", "recomendacoes", "follow-up-comercial",
   "cobrador-digital", "agenda-autonoma", "receita-perdida", "previsor-faturamento",
-  "linha-economica", "memoria-proveniencia",
+  "linha-economica", "memoria-proveniencia", "fechamento-contabil",
 ];
 
 export type SinalUtilizado = {

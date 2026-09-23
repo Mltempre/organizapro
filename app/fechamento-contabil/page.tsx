@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
@@ -12,20 +12,22 @@ import type { ResumoFechamento, StatusDocumento, StatusFechamento } from '../../
 // ── Contador IA · Fechamento Inteligente V1 ──────────────────────────────
 // "Quais clientes ainda não estão prontos para o fechamento do mês,
 // exatamente o que falta de cada um, e quem já está pronto?" Esta tela só
-// busca (via /api/fechamento e /api/fechamento/tipos) e apresenta — todo
-// o cálculo de prontidão vem de lib/fechamento-contabil.ts. Zero número
-// fabricado: sem tipo de documento configurado, a tela mostra isso
+// busca e apresenta — todo o cálculo de prontidão/identificação vem de
+// lib/fechamento-contabil.ts e lib/fechamento-identificacao.ts. Zero
+// número fabricado: sem tipo de documento configurado, a tela mostra isso
 // explicitamente, nunca inventa um checklist.
 
 type TipoDocumento = { id: string; nome: string; obrigatorio: boolean; ativo: boolean };
+type ArquivoRevisao = { id: string; cliente_id: string; nome_original: string; tipo_documento_sugerido: string | null; confianca: string; motivo_classificacao: string; criado_em: string };
 
 const STATUS_LABEL: Record<StatusFechamento, { texto: string; cor: string }> = {
-  pronto:    { texto: 'PRONTO',    cor: '#4ade80' },
-  pendente:  { texto: 'PENDENTE',  cor: '#fbbf24' },
-  bloqueado: { texto: 'BLOQUEADO', cor: '#f87171' },
+  pronto:             { texto: 'PRONTO',           cor: '#4ade80' },
+  pendente:           { texto: 'PENDENTE',         cor: '#fbbf24' },
+  bloqueado:          { texto: 'BLOQUEADO',        cor: '#f87171' },
+  revisao_necessaria: { texto: 'REVISÃO NECESSÁRIA', cor: '#60a5fa' },
 };
 
-const DOC_STATUS_ICON: Record<StatusDocumento, string> = { recebido: '✅', pendente: '❌', invalido: '⚠️' };
+const DOC_STATUS_ICON: Record<StatusDocumento, string> = { recebido: '✅', pendente: '❌', invalido: '⚠️', revisao_necessaria: '🔎' };
 
 function competenciaAtual(): string {
   const d = new Date();
@@ -39,6 +41,12 @@ function formatarCompetencia(c: string): string {
   return idx >= 0 && idx < 12 ? `${nomes[idx]} de ${ano}` : c;
 }
 
+function formatarData(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function FechamentoContabilPage() {
   const router = useRouter();
   const [clinicaId, setClinicaId] = useState('');
@@ -46,21 +54,29 @@ export default function FechamentoContabilPage() {
   const [competencia, setCompetencia] = useState(competenciaAtual());
   const [resumo, setResumo] = useState<ResumoFechamento | null>(null);
   const [tipos, setTipos] = useState<TipoDocumento[]>([]);
+  const [arquivosEmRevisao, setArquivosEmRevisao] = useState<ArquivoRevisao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
   const [clienteAberto, setClienteAberto] = useState<string | null>(null);
   const [mostrarConfig, setMostrarConfig] = useState(false);
   const [novoTipoNome, setNovoTipoNome] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [cobrancaPreparada, setCobrancaPreparada] = useState<{ clienteId: string; mensagem: string; pendencias: string[] } | null>(null);
+  const [excecaoTipoSelecionado, setExcecaoTipoSelecionado] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadAlvo = useRef<{ clienteId: string } | null>(null);
 
   const carregarChecklist = useCallback(async (cid: string, headers: { Authorization: string }, comp: string) => {
-    const [resumoRes, tiposRes] = await Promise.all([
+    const [resumoRes, tiposRes, arquivosRes] = await Promise.all([
       fetch(`/api/fechamento?clinica_id=${cid}&competencia=${comp}`, { headers }).then(r => r.json()),
       fetch(`/api/fechamento/tipos?clinica_id=${cid}`, { headers }).then(r => r.json()),
+      fetch(`/api/fechamento/documento/arquivo?clinica_id=${cid}&competencia=${comp}&status=pendente_confirmacao`, { headers }).then(r => r.json()).catch(() => ({ sucesso: false })),
     ]);
     if (!resumoRes.sucesso || !tiposRes.sucesso) { setErro(MSG_ERRO_PADRAO); return; }
     setResumo(resumoRes.resumo);
     setTipos(tiposRes.tipos ?? []);
+    setArquivosEmRevisao(arquivosRes.sucesso ? (arquivosRes.arquivos ?? []) : []);
   }, []);
 
   const carregar = useCallback(async () => {
@@ -142,10 +158,123 @@ export default function FechamentoContabilPage() {
     }
   }, [auth, clinicaId, competencia, carregarChecklist]);
 
+  const acionarUpload = useCallback((clienteId: string) => {
+    uploadAlvo.current = { clienteId };
+    fileInputRef.current?.click();
+  }, []);
+
+  const enviarArquivo = useCallback(async (file: File) => {
+    if (!auth || !clinicaId || !uploadAlvo.current) return;
+    setSalvando(true); setAviso('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('clinica_id', clinicaId);
+      form.append('cliente_id', uploadAlvo.current.clienteId);
+      form.append('competencia', competencia);
+      const res = await fetch('/api/fechamento/documento/upload', { method: 'POST', headers: auth, body: form });
+      const json = await res.json();
+      if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
+      setAviso(
+        json.arquivo.classificacao_status === 'auto_confirmado'
+          ? `"${file.name}" identificado como "${json.classificacao.tipoDocumentoSugerido}" e baixado automaticamente.`
+          : `"${file.name}" recebido, mas precisa de revisão: ${json.classificacao.motivo}`
+      );
+      await carregarChecklist(clinicaId, auth, competencia);
+    } catch {
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setSalvando(false);
+    }
+  }, [auth, clinicaId, competencia, carregarChecklist]);
+
+  const confirmarArquivo = useCallback(async (arquivoId: string, tipoDocumento: string) => {
+    if (!auth || !clinicaId) return;
+    setSalvando(true);
+    try {
+      const res = await fetch('/api/fechamento/documento/confirmar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ clinica_id: clinicaId, arquivo_id: arquivoId, tipo_documento: tipoDocumento }),
+      });
+      if (!res.ok) { setErro(MSG_ERRO_PADRAO); return; }
+      await carregarChecklist(clinicaId, auth, competencia);
+    } catch {
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setSalvando(false);
+    }
+  }, [auth, clinicaId, competencia, carregarChecklist]);
+
+  const prepararCobranca = useCallback(async (clienteId: string) => {
+    if (!auth || !clinicaId) return;
+    setSalvando(true); setErro(''); setCobrancaPreparada(null);
+    try {
+      const res = await fetch('/api/fechamento/cobranca/tentativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ clinica_id: clinicaId, cliente_id: clienteId, competencia }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
+      setCobrancaPreparada({ clienteId, mensagem: json.mensagem, pendencias: json.pendencias });
+    } catch {
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setSalvando(false);
+    }
+  }, [auth, clinicaId, competencia]);
+
+  const aprovarCobranca = useCallback(async (clienteId: string) => {
+    if (!auth || !clinicaId) return;
+    setSalvando(true);
+    try {
+      const res = await fetch('/api/fechamento/cobranca/aprovar-envio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ clinica_id: clinicaId, cliente_id: clienteId, competencia, idempotency_key: crypto.randomUUID() }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
+      setAviso('Cobrança enviada.');
+      setCobrancaPreparada(null);
+    } catch {
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setSalvando(false);
+    }
+  }, [auth, clinicaId, competencia]);
+
+  const salvarExcecao = useCallback(async (clienteId: string, tipoDocumento: string, incluido: boolean) => {
+    if (!auth || !clinicaId || !tipoDocumento) return;
+    setSalvando(true);
+    try {
+      const res = await fetch('/api/fechamento/excecoes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ clinica_id: clinicaId, cliente_id: clienteId, tipo_documento: tipoDocumento, incluido }),
+      });
+      if (!res.ok) { setErro(MSG_ERRO_PADRAO); return; }
+      await carregarChecklist(clinicaId, auth, competencia);
+    } catch {
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setSalvando(false);
+    }
+  }, [auth, clinicaId, competencia, carregarChecklist]);
+
   const tiposAtivos = tipos.filter(t => t.ativo && t.obrigatorio);
 
   return (
     <AdminShell title="Fechamento Contábil" subtitle="Quem está pronto para o fechamento do mês, e o que falta de quem não está">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf,image/jpeg,image/png,image/webp"
+        style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarArquivo(f); e.target.value = ''; }}
+      />
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <label style={{ fontSize: 12, color: '#94a3b8' }}>
           Competência:{' '}
@@ -167,7 +296,7 @@ export default function FechamentoContabilPage() {
 
       {mostrarConfig && (
         <section style={{ marginBottom: 24, background: 'rgba(255,255,255,0.03)', border: '1px solid #2d3148', borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos obrigatórios desta clínica</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos obrigatórios desta clínica (padrão)</div>
           {tipos.length === 0 && <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 10 }}>Nenhum tipo de documento configurado ainda — cadastre abaixo (ex.: Extrato bancário, Notas fiscais, Folha, Comprovantes).</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
             {tipos.map(t => (
@@ -203,6 +332,7 @@ export default function FechamentoContabilPage() {
 
       {carregando && <PageLoader title="Consolidando o fechamento..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && !erro && aviso && <Feedback type="aviso" message={aviso} onClose={() => setAviso('')} />}
 
       {!carregando && !erro && resumo && tiposAtivos.length === 0 && (
         <EmptyState icon="🧮" title="Nenhum documento obrigatório configurado" description="Configure ao menos um tipo de documento acima para começar a acompanhar a prontidão dos clientes." />
@@ -215,46 +345,112 @@ export default function FechamentoContabilPage() {
       {!carregando && !erro && resumo && tiposAtivos.length > 0 && resumo.clientes.length > 0 && (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-            {(['pronto', 'pendente', 'bloqueado'] as const).map(s => (
+            {(['pronto', 'pendente', 'bloqueado', 'revisao_necessaria'] as const).map(s => (
               <div key={s} style={{ flex: '1 1 140px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${STATUS_LABEL[s].cor}33`, borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: STATUS_LABEL[s].cor }}>{s === 'pronto' ? resumo.prontos : s === 'pendente' ? resumo.pendentes : resumo.bloqueados}</div>
-                <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s === 'pronto' ? 'Prontos' : s === 'pendente' ? 'Pendentes' : 'Bloqueados'}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: STATUS_LABEL[s].cor }}>
+                  {s === 'pronto' ? resumo.prontos : s === 'pendente' ? resumo.pendentes : s === 'bloqueado' ? resumo.bloqueados : resumo.emRevisao}
+                </div>
+                <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {s === 'pronto' ? 'Prontos' : s === 'pendente' ? 'Pendentes' : s === 'bloqueado' ? 'Bloqueados' : 'Em revisão'}
+                </div>
               </div>
             ))}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {resumo.clientes.map(c => (
-              <div key={c.clienteId} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${STATUS_LABEL[c.status].cor}33`, borderRadius: 10, overflow: 'hidden' }}>
-                <button
-                  onClick={() => setClienteAberto(clienteAberto === c.clienteId ? null : c.clienteId)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'inherit', font: 'inherit' }}
-                >
-                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: '#f1f5f9' }}>{c.nome}</span>
-                  <span style={{ fontSize: 12.5, color: '#94a3b8', minWidth: 40 }}>{c.percentual}%</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_LABEL[c.status].cor, minWidth: 90, textAlign: 'right' }}>{STATUS_LABEL[c.status].texto}</span>
-                </button>
-                {clienteAberto === c.clienteId && (
-                  <div style={{ padding: '4px 16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {c.checklist.map(item => (
-                      <div key={item.tipoDocumento} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                        <span>{DOC_STATUS_ICON[item.status]}</span>
-                        <span style={{ flex: 1, color: '#cbd5e1' }}>{item.tipoDocumento}</span>
-                        {item.status !== 'recebido' && (
-                          <button disabled={salvando} onClick={() => atualizarDocumento(c.clienteId, item.tipoDocumento, 'recebido')} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.08)', color: '#4ade80', fontSize: 11, cursor: 'pointer' }}>Marcar recebido</button>
-                        )}
-                        {item.status !== 'invalido' && (
-                          <button disabled={salvando} onClick={() => atualizarDocumento(c.clienteId, item.tipoDocumento, 'invalido')} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 11, cursor: 'pointer' }}>Inválido</button>
-                        )}
-                        {item.status !== 'pendente' && (
-                          <button disabled={salvando} onClick={() => atualizarDocumento(c.clienteId, item.tipoDocumento, 'pendente')} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 11, cursor: 'pointer' }}>Reabrir</button>
+            {resumo.clientes.map(c => {
+              const arquivosDoCliente = arquivosEmRevisao.filter(a => a.cliente_id === c.clienteId);
+              return (
+                <div key={c.clienteId} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${STATUS_LABEL[c.status].cor}33`, borderRadius: 10, overflow: 'hidden' }}>
+                  <button
+                    onClick={() => setClienteAberto(clienteAberto === c.clienteId ? null : c.clienteId)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'inherit', font: 'inherit' }}
+                  >
+                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: '#f1f5f9' }}>{c.nome}</span>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>{c.proximaAcao}</span>
+                    <span style={{ fontSize: 12.5, color: '#94a3b8', minWidth: 40, textAlign: 'right' }}>{c.percentual}%</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_LABEL[c.status].cor, minWidth: 130, textAlign: 'right' }}>{STATUS_LABEL[c.status].texto}</span>
+                  </button>
+                  {clienteAberto === c.clienteId && (
+                    <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>Última atualização: {formatarData(c.ultimaAtualizacao)}</div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {c.checklist.map(item => (
+                          <div key={item.tipoDocumento} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, flexWrap: 'wrap' }}>
+                            <span>{DOC_STATUS_ICON[item.status]}</span>
+                            <span style={{ flex: 1, color: '#cbd5e1' }}>{item.tipoDocumento}</span>
+                            <button disabled={salvando} onClick={() => acionarUpload(c.clienteId)} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>📎 Enviar</button>
+                            {item.status !== 'recebido' && (
+                              <button disabled={salvando} onClick={() => atualizarDocumento(c.clienteId, item.tipoDocumento, 'recebido')} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.08)', color: '#4ade80', fontSize: 11, cursor: 'pointer' }}>Marcar recebido</button>
+                            )}
+                            {item.status !== 'invalido' && (
+                              <button disabled={salvando} onClick={() => atualizarDocumento(c.clienteId, item.tipoDocumento, 'invalido')} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 11, cursor: 'pointer' }}>Inválido</button>
+                            )}
+                            {item.status !== 'pendente' && (
+                              <button disabled={salvando} onClick={() => atualizarDocumento(c.clienteId, item.tipoDocumento, 'pendente')} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 11, cursor: 'pointer' }}>Reabrir</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {arquivosDoCliente.length > 0 && (
+                        <div style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.25)', borderRadius: 8, padding: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🔎 Arquivos em revisão</div>
+                          {arquivosDoCliente.map(a => (
+                            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 4, flexWrap: 'wrap' }}>
+                              <span style={{ color: '#cbd5e1' }}>{a.nome_original}</span>
+                              <span style={{ color: '#64748b', fontSize: 11 }}>{a.motivo_classificacao}</span>
+                              <select
+                                value={excecaoTipoSelecionado[a.id] ?? a.tipo_documento_sugerido ?? ''}
+                                onChange={(e) => setExcecaoTipoSelecionado(v => ({ ...v, [a.id]: e.target.value }))}
+                                style={{ padding: '2px 6px', borderRadius: 6, border: '1px solid #2d3148', background: 'rgba(255,255,255,0.03)', color: '#f1f5f9', fontSize: 11 }}
+                              >
+                                <option value="">Confirmar como...</option>
+                                {c.checklist.map(i => <option key={i.tipoDocumento} value={i.tipoDocumento}>{i.tipoDocumento}</option>)}
+                              </select>
+                              <button
+                                disabled={salvando || !excecaoTipoSelecionado[a.id]}
+                                onClick={() => confirmarArquivo(a.id, excecaoTipoSelecionado[a.id])}
+                                style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.08)', color: '#4ade80', fontSize: 11, cursor: 'pointer' }}
+                              >
+                                Confirmar
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select
+                          value={excecaoTipoSelecionado[`exc-${c.clienteId}`] ?? ''}
+                          onChange={(e) => setExcecaoTipoSelecionado(v => ({ ...v, [`exc-${c.clienteId}`]: e.target.value }))}
+                          style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #2d3148', background: 'rgba(255,255,255,0.03)', color: '#f1f5f9', fontSize: 11 }}
+                        >
+                          <option value="">Exceção deste cliente...</option>
+                          {tipos.map(t => <option key={t.id} value={t.nome}>{t.nome}</option>)}
+                        </select>
+                        <button disabled={salvando || !excecaoTipoSelecionado[`exc-${c.clienteId}`]} onClick={() => salvarExcecao(c.clienteId, excecaoTipoSelecionado[`exc-${c.clienteId}`], true)} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #2d3148', background: 'transparent', color: '#4ade80', fontSize: 11, cursor: 'pointer' }}>Incluir para este cliente</button>
+                        <button disabled={salvando || !excecaoTipoSelecionado[`exc-${c.clienteId}`]} onClick={() => salvarExcecao(c.clienteId, excecaoTipoSelecionado[`exc-${c.clienteId}`], false)} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #2d3148', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer' }}>Excluir deste cliente</button>
+                      </div>
+
+                      <div>
+                        {cobrancaPreparada?.clienteId === c.clienteId ? (
+                          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #2d3148', borderRadius: 8, padding: 10 }}>
+                            <div style={{ fontSize: 12.5, color: '#cbd5e1', marginBottom: 8 }}>{cobrancaPreparada.mensagem}</div>
+                            <button disabled={salvando} onClick={() => aprovarCobranca(c.clienteId)} style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid rgba(74,155,176,0.35)', background: 'rgba(74,155,176,0.1)', color: '#4a9bb0', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>Aprovar e enviar</button>
+                          </div>
+                        ) : (
+                          c.faltando.length + c.invalidos.length > 0 && (
+                            <button disabled={salvando} onClick={() => prepararCobranca(c.clienteId)} style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11.5, cursor: 'pointer' }}>Cobrar pendências</button>
+                          )
                         )}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

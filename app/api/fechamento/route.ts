@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../lib/auth-clinica";
 import { logOperacao } from "../../../lib/log-estruturado";
-import { competenciaValida, gerarResumoFechamento, type DocumentoRegistrado } from "../../../lib/fechamento-contabil";
+import { competenciaValida, gerarResumoFechamento, type DocumentoRegistrado, type ExcecaoClienteConfig } from "../../../lib/fechamento-contabil";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,21 +34,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: autorizacao.error }, { status: autorizacao.status });
   }
 
-  const [{ data: clientesRows, error: erroClientes }, { data: tiposRows, error: erroTipos }, { data: documentosRows, error: erroDocumentos }] =
-    await Promise.all([
+  const [
+    { data: clientesRows, error: erroClientes },
+    { data: tiposRows, error: erroTipos },
+    { data: documentosRows, error: erroDocumentos },
+    { data: excecoesRows, error: erroExcecoes },
+  ] = await Promise.all([
       admin.from("pacientes").select("id, nome").eq("clinica_id", clinica_id).eq("status", "ativo").order("nome"),
       admin.from("fechamento_tipos_documento").select("nome, obrigatorio, ativo").eq("clinica_id", clinica_id),
       admin
         .from("fechamento_documentos")
-        .select("cliente_id, tipo_documento, status")
+        .select("cliente_id, tipo_documento, status, updated_at")
         .eq("clinica_id", clinica_id)
         .eq("competencia", competencia),
+      admin.from("fechamento_excecoes_cliente").select("cliente_id, tipo_documento, incluido").eq("clinica_id", clinica_id),
     ]);
 
-  if (erroClientes || erroTipos || erroDocumentos) {
+  if (erroClientes || erroTipos || erroDocumentos || erroExcecoes) {
     logOperacao({
       operacao: "fechamento.resumo", clinica_id, resultado: "erro",
-      motivo: erroClientes?.message || erroTipos?.message || erroDocumentos?.message,
+      motivo: erroClientes?.message || erroTipos?.message || erroDocumentos?.message || erroExcecoes?.message,
     });
     return NextResponse.json({ sucesso: false, error: "Não foi possível consultar o fechamento" }, { status: 500 });
   }
@@ -57,13 +62,18 @@ export async function GET(req: NextRequest) {
     clienteId: d.cliente_id,
     tipoDocumento: d.tipo_documento,
     status: d.status,
+    atualizadoEm: d.updated_at,
+  }));
+  const excecoes: ExcecaoClienteConfig[] = (excecoesRows ?? []).map((e) => ({
+    clienteId: e.cliente_id, tipoDocumento: e.tipo_documento, incluido: e.incluido,
   }));
 
   const resumo = gerarResumoFechamento(
     competencia,
     (clientesRows ?? []).map((c) => ({ id: c.id, nome: c.nome })),
     (tiposRows ?? []).map((t) => ({ nome: t.nome, obrigatorio: t.obrigatorio, ativo: t.ativo })),
-    documentos
+    documentos,
+    excecoes
   );
 
   return NextResponse.json({ sucesso: true, resumo });
