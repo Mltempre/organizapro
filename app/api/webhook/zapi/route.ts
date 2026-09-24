@@ -74,9 +74,9 @@ function interpolar(
 // negócio seja criada (fora do escopo desta correção emergencial).
 // Reversão: remover o clinica_id deste Set. Evolução futura: substituir por
 // uma coluna clinica_config.chatbot_ativo (requer migração aprovada).
-const TENANTS_COM_AUTOMACAO_PAUSADA = new Set<string>([
-  "9b21a735-4bbb-4cbc-8666-7d941be9d35c", // OrganizaPro Oficial — número pessoal do dono
-]);
+// 2026-09-24: OrganizaPro Oficial liberado — instância Z-API dedicada
+// (número exclusivo do negócio) validada em produção com entrada e saída reais.
+const TENANTS_COM_AUTOMACAO_PAUSADA = new Set<string>([]);
 
 function automacaoPausada(clinicaId: string | null | undefined): boolean {
   return !!clinicaId && TENANTS_COM_AUTOMACAO_PAUSADA.has(clinicaId);
