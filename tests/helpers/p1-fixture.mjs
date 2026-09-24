@@ -23,6 +23,7 @@ export function fixture(options = {}) {
   const chain={select(){return chain;},eq(k,v){q.filters.push([k,v]);return chain;},ilike(k,v){q.filters.push([k,v]);return chain;},
    not(){return chain;},or(){return chain;},gte(){return chain;},lt(){return chain;},order(){return chain;},limit(){return chain;},
    insert(v){q.action='insert';q.value=v;return chain;},update(v){q.action='update';q.value=v;return chain;},upsert(v){q.action='upsert';q.value=v;return chain;},
+   delete(){q.action='delete';return chain;},
    maybeSingle(){q.single=true;return run();},single(){q.single=true;return run();},then(a,b){return run().then(a,b);}};
   const get=k=>q.filters.find(f=>f[0]===k)?.[1];
   const matches=r=>q.filters.every(([k,v])=>(k.startsWith('payload->>')?r.payload?.[k.slice(10)]:r[k])===v);
@@ -49,15 +50,13 @@ export function fixture(options = {}) {
    if(table==='eventos_dominio'){
     if(q.action==='insert'){
      if(settings.insertError)return {error:{code:'XX000',message:'SENSITIVE_SENTINEL'}};
+     if(settings.finishError&&q.value.tipo==='seguranca.operacao_resultado')return {error:{code:'XX000'}};
      const id=q.value.id??crypto.randomUUID();
      if(rows.has(id))return {error:{code:'23505'}};
      rows.set(id,{...q.value,id});return {data:null,error:null};
     }
-    if(q.action==='update'){
-     if(settings.finishError)return {error:{code:'XX000'}};
-     const r=[...rows.values()].find(matches);
-     if(r){Object.assign(r,q.value);return {data:{id:r.id},error:null};}return {data:null,error:null};
-    }
+    // Espelha o trigger real append-only (BEFORE UPDATE/DELETE, inclusive service role).
+    if(['update','delete','upsert'].includes(q.action))return {data:null,error:{code:'P0001',message:'eventos_dominio é append-only'}};
     if(get('tipo')==='whatsapp.consentimento')return settings.consentError?{error:{}}:{data:settings.blocked?[{payload:{estado:'bloqueado'},criado_em:new Date().toISOString()}]:[]};
     if(get('chave_idempotencia')?.includes('.tentativa:'))return {data:{id:'prepared'}};
     const result=[...rows.values()].filter(matches);return {data:q.single?result[0]??null:result,error:null};

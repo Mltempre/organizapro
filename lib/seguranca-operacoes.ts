@@ -19,35 +19,64 @@ export async function consentimentoEnvio(db: SupabaseClient, clinicaId: string, 
 export type Reserva = { id: string; clinicaId: string; ticket: string; hash: string };
 export type EstadoOperacao = "sucesso" | "incerto" | "rejeitado";
 
-// INSERT com PK determinística: exclusão mútua entre processos, sem depender
-// de UNIQUE parcial/chave_idempotencia de uma migration ainda não aplicada.
+// eventos_dominio é append-only no banco: trigger BEFORE UPDATE/DELETE rejeita
+// qualquer alteração, inclusive via service role (schema compartilhado com o
+// ClínicaFlow). Toda transição de estado aqui é um INSERT novo com PK
+// determinística — a PK é a exclusão mútua entre processos. Nunca UPDATE/DELETE.
 // Pendente/incerto nunca expira automaticamente: timeout não prova não envio.
-export async function reservarOperacao(db: SupabaseClient, clinicaId: string, chave: string, conteudo: string,
-  permitirRetry = false): Promise<Reserva | null> {
-  const id = entidadeIdDeterministico("seguranca.p1", JSON.stringify([clinicaId, chave]));
-  const hash = createHash("sha256").update(conteudo).digest("hex");
-  const ticket = randomUUID();
-  const payload = { estado: "pendente", ticket, hash };
-  const { error } = await db.from("eventos_dominio").insert({ id, clinica_id: clinicaId,
-    tipo: "seguranca.operacao", entidade_tipo: "operacao", entidade_id: id,
-    chave_idempotencia: `seguranca:${id}`, payload, criado_em: new Date().toISOString() });
-  if (!error) return { id, clinicaId, ticket, hash };
-  if (error.code !== "23505" || !permitirRetry) return null;
-  // Somente rejeição comprovada antes do efeito permite nova tentativa.
-  // CAS: um único processo pode trocar rejeitado por pendente.
-  const { data, error: retryError } = await db.from("eventos_dominio").update({ payload })
-    .eq("id", id).eq("clinica_id", clinicaId).eq("payload->>estado", "rejeitado")
-    .eq("payload->>hash", hash).select("id").maybeSingle();
-  return !retryError && data ? { id, clinicaId, ticket, hash } : null;
+const MAX_TENTATIVAS = 20;
+
+// Tentativa 0 mantém o ID original (reservas já gravadas e o dedup do webhook).
+function idReserva(clinicaId: string, chave: string, tentativa: number): string {
+  return tentativa === 0
+    ? entidadeIdDeterministico("seguranca.p1", JSON.stringify([clinicaId, chave]))
+    : entidadeIdDeterministico("seguranca.p1.tentativa", JSON.stringify([clinicaId, chave, tentativa]));
 }
 
+export function idResultadoOperacao(clinicaId: string, reservaId: string): string {
+  return entidadeIdDeterministico("seguranca.p1.resultado", JSON.stringify([clinicaId, reservaId]));
+}
+
+type ResultadoOperacao = { estado?: string; ticket?: string; hash?: string };
+
+// Erro de leitura equivale a "sem resultado": fecha o gate, nunca libera retry.
+async function lerResultado(db: SupabaseClient, clinicaId: string, reservaId: string): Promise<ResultadoOperacao | null> {
+  const { data, error } = await db.from("eventos_dominio").select("payload")
+    .eq("id", idResultadoOperacao(clinicaId, reservaId)).eq("clinica_id", clinicaId)
+    .eq("tipo", "seguranca.operacao_resultado").maybeSingle();
+  return error || !data ? null : (data.payload as ResultadoOperacao);
+}
+
+export async function reservarOperacao(db: SupabaseClient, clinicaId: string, chave: string, conteudo: string,
+  permitirRetry = false): Promise<Reserva | null> {
+  const hash = createHash("sha256").update(conteudo).digest("hex");
+  const ticket = randomUUID();
+  for (let tentativa = 0; tentativa < MAX_TENTATIVAS; tentativa++) {
+    const id = idReserva(clinicaId, chave, tentativa);
+    const { error } = await db.from("eventos_dominio").insert({ id, clinica_id: clinicaId,
+      tipo: "seguranca.operacao", entidade_tipo: "operacao", entidade_id: id,
+      chave_idempotencia: `seguranca:${id}`, payload: { estado: "pendente", ticket, hash }, criado_em: new Date().toISOString() });
+    if (!error) return { id, clinicaId, ticket, hash };
+    if (error.code !== "23505" || !permitirRetry) return null;
+    // Somente rejeição comprovada antes do efeito, com o mesmo conteúdo, abre
+    // a próxima tentativa; o INSERT dela serializa retries concorrentes.
+    const anterior = await lerResultado(db, clinicaId, id);
+    if (anterior?.estado !== "rejeitado" || anterior.hash !== hash) return null;
+  }
+  return null;
+}
+
+// Um único resultado por reserva (PK determinística). Conflito só é aceito
+// quando o resultado existente é desta mesma reserva/ticket e do mesmo estado.
 export async function finalizarOperacao(db: SupabaseClient, reserva: Reserva, estado: EstadoOperacao): Promise<boolean> {
-  const { data, error } = await db.from("eventos_dominio")
-    .update({ payload: { estado, ticket: reserva.ticket, hash: reserva.hash } })
-    .eq("id", reserva.id).eq("clinica_id", reserva.clinicaId)
-    .eq("payload->>ticket", reserva.ticket).eq("payload->>estado", "pendente")
-    .select("id").maybeSingle();
-  return !error && !!data;
+  const { error } = await db.from("eventos_dominio").insert({ id: idResultadoOperacao(reserva.clinicaId, reserva.id),
+    clinica_id: reserva.clinicaId, tipo: "seguranca.operacao_resultado", entidade_tipo: "operacao", entidade_id: reserva.id,
+    chave_idempotencia: `seguranca-resultado:${reserva.id}`, payload: { estado, ticket: reserva.ticket, hash: reserva.hash },
+    criado_em: new Date().toISOString() });
+  if (!error) return true;
+  if (error.code !== "23505") return false;
+  const existente = await lerResultado(db, reserva.clinicaId, reserva.id);
+  return existente?.estado === estado && existente.ticket === reserva.ticket && existente.hash === reserva.hash;
 }
 
 // Cota durável por hora; inserir slots por PK limita o total mesmo em workers
