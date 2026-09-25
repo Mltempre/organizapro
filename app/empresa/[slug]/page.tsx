@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabase";
 import SiteEmpresaClient from "./SiteEmpresaClient";
@@ -48,10 +49,14 @@ type ResumoEmpresa = {
 // body ou qualquer input do cliente. site_publico_por_slug_v2 já filtra por
 // produto internamente; slug de outro produto ou clinicas.produto IS NULL
 // devolvem 0 linhas por design (ver sql/isolamento-produto-clinicas-clinica-usuarios.sql).
-async function buscarResumoEmpresa(slug: string): Promise<ResumoEmpresa | null> {
-  const { data } = await supabase
+// null = site inexistente (resposta válida, sem negócio); undefined = consulta
+// indisponível — nunca tratada como inexistente, para uma falha transitória
+// não virar 404.
+async function buscarResumoEmpresa(slug: string): Promise<ResumoEmpresa | null | undefined> {
+  const { data, error } = await supabase
     .rpc("site_publico_por_slug_v2", { p_slug: slug, p_produto: "organizapro" })
     .maybeSingle<ResumoEmpresa>();
+  if (error) return undefined;
   if (!data?.nome) return null;
 
   return {
@@ -160,6 +165,8 @@ export default async function Page({ params, searchParams }: Props) {
   const sp = await searchParams;
 
   const resumo = await buscarResumoEmpresa(slug);
+  // Slug inexistente: 404 real (não uma página 200 "Site não encontrado").
+  if (resumo === null) notFound();
   const codigoRastreio = resumo?.clinica_id
     ? await capturarEPersistirOrigem(resumo.clinica_id, sp)
     : undefined;
