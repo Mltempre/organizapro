@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { autorizarUsuarioNaClinica } from "./auth-clinica";
 import { assertGoogleEnv, criarEstadoGoogle, validarEstadoGoogle, redirectUri, urlAutorizacaoGoogle, cifrarRefreshToken, decifrarRefreshToken } from "./google-business-profile";
 import { trocarCodigoGoogle, listarContasGoogle, listarLocalizacoesGoogle } from "./google-business-profile-api";
-import { ErroGoogle, erroGoogle } from "./google-business-profile-errors";
+import { ErroGoogle, erroGoogle, classificarDiagnosticoGoogle } from "./google-business-profile-errors";
 import { adminGoogle, falhaGoogle } from "./google-business-profile-context";
 import { executarOperacaoGoogle } from "./google-business-profile-operations";
 
@@ -77,7 +77,13 @@ export async function concluirGoogle(req: NextRequest) {
     return voltar("connected");
   } catch (error) {
     const e = erroGoogle(error);
-    console.error("[GBP OAuth]", { codigo: e.codigo, httpGoogle: e.httpGoogle ?? null });
+    // Único ponto em que a CONECTIVIDADE é diagnosticada: aqui (e só aqui) o
+    // texto do Google é registrado, já redigido de credenciais por
+    // diagnosticoGoogle. As rotas de produto continuam sem mensagem externa
+    // (ver diagnosticoSeguro em google-business-profile-errors.ts).
+    const causa = classificarDiagnosticoGoogle(e.diagnostico);
+    console.error("[GBP OAuth]", { codigo: e.codigo, httpGoogle: e.httpGoogle ?? null,
+      ...(e.diagnostico ? { diagnostico: e.diagnostico } : {}), ...(causa ? { causa } : {}) });
     return voltar(e.codigo.toLowerCase());
   }
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { ErroGoogle } from "./google-business-profile-errors";
+import { ErroGoogle, diagnosticoGoogle } from "./google-business-profile-errors";
 import { recursoGoogle, recursoAvaliacao } from "./google-business-profile-resources";
 
 export type GoogleAccountResumo = { name: string; accountName: string | null };
@@ -7,7 +7,14 @@ export type GoogleLocationResumo = { name: string; title: string | null };
 export type GoogleReview = { reviewId: string; name: string; nota: number; comentario: string | null; autor: string | null;
   criadoEm: string; temRespostaGoogle: boolean; respostaGoogleTexto: string | null };
 
+// Host do endpoint que o próprio código chamou (nunca inclui query string,
+// que pode carregar pageToken): é o que prova QUAL API Google recusou.
+function hostSeguro(url: string): string | null {
+  try { return new URL(url).hostname; } catch { return null; }
+}
+
 async function request<T>(url: string, init: RequestInit, oauth = false): Promise<T> {
+  const servico = hostSeguro(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
@@ -19,13 +26,15 @@ async function request<T>(url: string, init: RequestInit, oauth = false): Promis
         : oauth && (body?.error === "invalid_client" || body?.error === "unauthorized_client") ? "CONFIGURACAO"
         : response.status === 401 ? "RENOVACAO"
         : response.status === 429 || response.status >= 500 ? "INDISPONIVEL" : "GOOGLE";
-      throw new ErroGoogle(code, response.status >= 500, response.status);
+      throw new ErroGoogle(code, response.status >= 500, response.status, diagnosticoGoogle(body, servico));
     }
     if (!body) throw new ErroGoogle("RESPOSTA", true);
     return body as T;
   } catch (error) {
     if (error instanceof ErroGoogle) throw error;
-    throw new ErroGoogle("INDISPONIVEL", true);
+    // Rede/timeout: sem corpo do Google, mas o endpoint recusado continua
+    // registrado — nunca confundir "não houve resposta" com "Google recusou".
+    throw new ErroGoogle("INDISPONIVEL", true, undefined, diagnosticoGoogle(null, servico));
   } finally { clearTimeout(timeout); }
 }
 function googleFetch<T>(url: string, token: string, init: RequestInit = {}) {

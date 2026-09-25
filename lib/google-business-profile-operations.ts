@@ -36,6 +36,6 @@ export async function executarOperacaoGoogle(admin: SupabaseClient, op: Operacao
     if (confirmado) throw new ErroGoogle("PERSISTENCIA", true);
     const incerto = escritaIniciada && e.resultadoIncerto;
     await finalizar(incerto ? "incerto" : "falhou", { codigo: e.codigo });
-    throw incerto ? new ErroGoogle("PENDENTE", true, e.httpGoogle) : e;
+    throw incerto ? new ErroGoogle("PENDENTE", true, e.httpGoogle, e.diagnostico) : e;
   }
 }
