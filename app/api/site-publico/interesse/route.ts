@@ -107,7 +107,12 @@ export async function POST(req: NextRequest) {
 
   const novaOportunidade: NovaOportunidade = {
     canal: "site",
-    identificador_canal: servicoNome ? `servico:${servicoNome}` : null,
+    // Formulário público não tem identificador determinístico de evento de
+    // origem (o índice único clinica_id+canal+identificador_canal existe
+    // para isso, ex.: messageId de webhook). Usar o serviço aqui fazia a
+    // 2ª pessoa interessada no mesmo serviço colidir (500). Idempotência
+    // vem de chave_idempotencia; o serviço segue em contexto_classificacao.
+    identificador_canal: null,
     telefone,
     nome_informado: nome,
     confianca_classificacao: CONFIANCA_INTERESSE_PUBLICO,
