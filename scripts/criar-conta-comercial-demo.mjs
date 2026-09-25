@@ -9,8 +9,11 @@
  *
  * Idempotente: aborta sem escrever nada se o e-mail ou o slug já existirem.
  * A senha é gerada e exibida só no terminal — nunca gravada em arquivo.
+ * Opcional: CONTA_DEMO_SENHA no ambiente define a senha (mín. 12 caracteres);
+ * sem ela, uma senha aleatória forte é gerada. Nunca hardcoded no código.
  */
 import fs from "fs";
+import { randomBytes } from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
@@ -24,7 +27,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NOME_NEGOCIO = "Barbearia Black Crown";
 const EMAIL = "barbearia.demo@organizaprooficial.com.br";
 const SLUG = "barbearia-black-crown";
-const SENHA = "BlackCrown@2026Demo";
 
 function carregarEnv() {
   const envPath = path.resolve(__dirname, "..", ".env.local");
@@ -39,6 +41,11 @@ function carregarEnv() {
 
 async function main() {
   const env = carregarEnv();
+  const senha = process.env.CONTA_DEMO_SENHA || randomBytes(18).toString("base64url");
+  if (senha.length < 12) {
+    console.error("❌ CONTA_DEMO_SENHA deve ter pelo menos 12 caracteres.");
+    process.exit(1);
+  }
   const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -58,7 +65,7 @@ async function main() {
 
   console.log("⏳ Etapa 1/5: Criando usuário no Supabase Auth...");
   const { data: userData, error: eUser } = await admin.auth.admin.createUser({
-    email: EMAIL, password: SENHA, email_confirm: true,
+    email: EMAIL, password: senha, email_confirm: true,
   });
   if (eUser) { console.error("❌", eUser.message); process.exit(1); }
   const userId = userData.user.id;
@@ -145,7 +152,7 @@ async function main() {
   console.log("║   ✅ CONTA COMERCIAL DEMO CRIADA — Barbearia Black Crown ║");
   console.log("╠══════════════════════════════════════════════════════╣");
   console.log(`║  E-mail: ${EMAIL}`);
-  console.log(`║  Senha:  ${SENHA}`);
+  console.log(`║  Senha:  ${senha}`);
   console.log(`║  Slug:   ${SLUG}`);
   console.log(`║  user_id:    ${userId}`);
   console.log(`║  clinica_id: ${clinicaId}`);
