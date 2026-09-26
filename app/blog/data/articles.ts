@@ -2,9 +2,11 @@ import { ARTICLES_PART2 } from "./articles-part2";
 import { ARTICLES_PART3 } from "./articles-part3";
 export type { Category, ContentBlock, Article } from "./types";
 import type { Article, Category } from "./types";
+import { NUMERO_COMERCIAL } from "../../components/landing/whatsapp";
 
 export const BASE_URL = "https://organizaprooficial.com.br";
-export const WPP_NUMBER = "5541988379119";
+// Reexporta a fonte única do WhatsApp oficial (app/components/landing/whatsapp.ts).
+export const WPP_NUMBER = NUMERO_COMERCIAL;
 export const WPP_MESSAGE_BLOG = encodeURIComponent(
   "Olá, li um artigo no blog do OrganizaPro e quero agendar uma demonstração para o meu negócio."
 );

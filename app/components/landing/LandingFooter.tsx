@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Briefcase, MessageCircle } from "lucide-react";
 import { linkWhatsapp } from "./whatsapp";
+import { EMAIL_CONTATO } from "../legal/DocumentoLegal";
 
 export default function LandingFooter({ isMobile }: { isMobile: boolean }) {
   return (
@@ -24,7 +25,16 @@ export default function LandingFooter({ isMobile }: { isMobile: boolean }) {
         <span style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>OrganizaPro</span>
       </div>
       <div style={{ fontSize: 12, color: "#64748b" }}>© 2026 OrganizaPro. Todos os direitos reservados.</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px 20px", flexWrap: "wrap", justifyContent: "center" }}>
+        <Link href="/privacidade" style={{ fontSize: 12, color: "#64748b", textDecoration: "none" }}>
+          Política de Privacidade
+        </Link>
+        <Link href="/termos" style={{ fontSize: 12, color: "#64748b", textDecoration: "none" }}>
+          Termos de Uso
+        </Link>
+        <a href={`mailto:${EMAIL_CONTATO}`} style={{ fontSize: 12, color: "#64748b", textDecoration: "none", overflowWrap: "anywhere" }}>
+          {EMAIL_CONTATO}
+        </a>
         <Link href="/login" style={{ fontSize: 12, color: "#64748b", textDecoration: "none" }}>
           Entrar no sistema
         </Link>

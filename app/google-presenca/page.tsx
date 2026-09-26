@@ -13,6 +13,18 @@ type Avaliacao = {
   estado: "sem_resposta" | "resposta_preparada" | "respondida"; respostaGoogle: string | null; rascunhoLocal: string | null;
 };
 
+// Retorno do callback OAuth (?status=&causa=). A falta de liberação da GBP API
+// ao projeto (quota 0, causa=acesso_google_pendente) é dependência externa do
+// Google — nunca apresentada como falha de login, conta ou dados do cliente.
+function mensagemRetornoGoogle(status: string, causa: string | null): string {
+  if (causa === "acesso_google_pendente") return "Sua autorização foi recebida, mas o Google ainda não liberou o acesso do OrganizaPro às APIs do Perfil da Empresa. Não é um problema da sua conta nem do seu login, e nada foi gravado. A conexão poderá ser concluída assim que o Google finalizar essa liberação.";
+  if (status === "denied") return "A autorização foi cancelada no Google. Nenhuma conexão foi feita.";
+  if (status === "indisponivel") return "O Google não concluiu a leitura do seu perfil agora. Nada foi gravado. Tente conectar novamente mais tarde.";
+  if (status === "sem_local") return "Sua conta Google foi autorizada, mas nenhum perfil de empresa foi encontrado nela. Confirme que esta conta é proprietária ou gerente do perfil.";
+  if (status === "oauth") return "A conexão expirou ou não pôde ser validada. Inicie a conexão novamente.";
+  return "Não foi possível concluir a conexão Google.";
+}
+
 export default function GooglePresencaPage() {
   const [clinicaId, setClinicaId] = useState("");
   const [nomeEmpresa, setNomeEmpresa] = useState("");
@@ -33,6 +45,7 @@ export default function GooglePresencaPage() {
   const [publicando, setPublicando] = useState<string | null>(null);
   const idempotencyRefs = useRef<Record<string, { key: string; texto: string; incerta: boolean }>>({});
   const resultado = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("status") : null;
+  const causaRetorno = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("causa") : null;
 
   const carregarAvaliacoes = useCallback(async (cid: string, token: string) => {
     setCarregandoAvaliacoes(true);
@@ -167,7 +180,7 @@ export default function GooglePresencaPage() {
     <section style={{ background: "#fff", border: "1px solid #d9e2dd", borderRadius: 8, padding: 22, marginTop: 22 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}><ShieldCheck size={22} color="#176b52" /><div><strong>O que esta V1 faz</strong><p style={{ color: "#53645d", lineHeight: 1.6 }}>Solicita autorização Google, lê contas e locais disponíveis e registra a conexão com segurança. Lê avaliações reais, prepara uma resposta sugerida e só publica no Google depois de você aprovar explicitamente — nunca responde automaticamente.</p></div></div>
       {resultado === "connected" && <p style={{ color: "#176b52", display: "flex", gap: 7, alignItems: "center" }}><CheckCircle2 size={18} /> Google conectado e leitura inicial concluída.</p>}
-      {resultado && resultado !== "connected" && <p style={{ color: "#9a6700", display: "flex", gap: 7, alignItems: "center" }}><XCircle size={18} /> Não foi possível concluir a conexão Google.</p>}
+      {resultado && resultado !== "connected" && <p role="status" style={{ color: "#9a6700", display: "flex", gap: 7, alignItems: "flex-start" }}><XCircle size={18} style={{ flexShrink: 0, marginTop: 2 }} /> {mensagemRetornoGoogle(resultado, causaRetorno)}</p>}
       {carregando && <p style={{ color: "#53645d" }}>Consultando conexão...</p>}
       {erro && <p role="alert" style={{ color: "#a12b25" }}>{erro}</p>}
       {(status?.estado === "renovacao_necessaria" || status?.codigo === "SEM_LOCAL") && <button type="button" onClick={conectar}>Reconectar com Google</button>}

@@ -1,4 +1,5 @@
 import { produtoOrganizaPro } from "../../../../lib/seguranca-operacoes";
+import { NUMERO_COMERCIAL_EXIBICAO } from "../../../components/landing/whatsapp";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolverComCamadaUniversal, resolverModuloSegmento, type DadosEmpresaUniversal } from "../../../../lib/ia-universal";
@@ -284,7 +285,7 @@ function respostaPorDor(dor: string, lead: Lead): string {
     `${solucao}\n\n` +
     `Acredito que o OrganizaPro pode ajudar bastante o seu negócio.\n\n` +
     `Deseja agendar uma demonstração gratuita com nosso time?\n\n` +
-    `📱 WhatsApp: 41 98837-9119\n\n` +
+    `📱 WhatsApp: ${NUMERO_COMERCIAL_EXIBICAO}\n\n` +
     `Em 30 minutos você vê tudo funcionando na prática — sem compromisso!`
   );
 }
@@ -297,7 +298,7 @@ function respostaLeadQuente(lead: Lead | null): string {
     `Que ótimo${nome}! 🚀\n\n` +
     `Parece que você está pronto para dar o próximo passo!\n\n` +
     `Vamos agendar sua demonstração gratuita agora?\n\n` +
-    `📱 WhatsApp: 41 98837-9119\n\n` +
+    `📱 WhatsApp: ${NUMERO_COMERCIAL_EXIBICAO}\n\n` +
     `Em 30 minutos você vê tudo funcionando na prática — sem compromisso!`
   );
 }
@@ -381,7 +382,7 @@ function processarColetaSDR(etapa: Etapa, mensagem: string, lead: Lead): ColetaR
     default:
       return {
         updates:      {},
-        resposta:     `Para continuar, fale com nosso time:\n\n📱 WhatsApp: 41 98837-9119`,
+        resposta:     `Para continuar, fale com nosso time:\n\n📱 WhatsApp: ${NUMERO_COMERCIAL_EXIBICAO}`,
         proximaEtapa: "concluido",
       };
   }

@@ -33,8 +33,12 @@ export async function iniciarGoogle(req: NextRequest) {
 }
 
 export async function concluirGoogle(req: NextRequest) {
-  function voltar(status: string) {
-    const response = NextResponse.redirect(new URL("/google-presenca?status=" + status, req.nextUrl.origin));
+  function voltar(status: string, causa?: string) {
+    const destino = new URL("/google-presenca?status=" + status, req.nextUrl.origin);
+    // Enum fixo (nunca texto do Google): só distingue, na tela, a falta de
+    // liberação da GBP API ao projeto (quota 0) de uma falha do usuário/OAuth.
+    if (causa) destino.searchParams.set("causa", causa);
+    const response = NextResponse.redirect(destino);
     response.cookies.set(COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 0, path: "/api/google-business-profile/oauth" });
     response.headers.set("Cache-Control", "no-store");
     return response;
@@ -84,6 +88,6 @@ export async function concluirGoogle(req: NextRequest) {
     const causa = classificarDiagnosticoGoogle(e.diagnostico);
     console.error("[GBP OAuth]", { codigo: e.codigo, httpGoogle: e.httpGoogle ?? null,
       ...(e.diagnostico ? { diagnostico: e.diagnostico } : {}), ...(causa ? { causa } : {}) });
-    return voltar(e.codigo.toLowerCase());
+    return voltar(e.codigo.toLowerCase(), causa === "ACESSO_GBP_NAO_CONCEDIDO" ? "acesso_google_pendente" : undefined);
   }
 }
