@@ -37,7 +37,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Orçamentos",      h: "/orcamentos",       i: "💰" },
       { l: "Follow-up",       h: "/follow-up",        i: "🔁" },
       { l: "Cobranças",       h: "/cobrancas",        i: "🧾" },
-      { l: "Pedidos",         h: "/pedidos",          i: "🛒" },
+      { l: "E-commerce IA",   h: "/pedidos",          i: "🛒" },
       { l: "Tratamentos",     h: "/tratamentos",      i: "🩺" },
       { l: "Receita Perdida", h: "/receita-perdida",  i: "📉" },
     ],

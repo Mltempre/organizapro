@@ -1,4 +1,15 @@
-# GBP — SQL pendente, não executado
+# GBP — SQL JÁ APLICADO em produção (não aplicar a partir deste diretório)
+
+> **Status confirmado por preflight SOMENTE LEITURA em 2026-09-25:** a tabela
+> `public.google_business_profile_operacoes`, o índice parcial
+> `gbp_operacao_em_voo` e as funções `gbp_iniciar_operacao` /
+> `gbp_finalizar_operacao` **já existem em produção** (conexões = 0,
+> operações = 0, `eventos_dominio` = 868 linhas intactas; verificado por
+> REST/OpenAPI com `service_role` e por resolução de assinatura das RPCs).
+> **NÃO reaplicar:** o script não é idempotente (`create table`, `create index`
+> e `create function` sem `IF NOT EXISTS` → `42P07`/`42723`). Este diretório
+> permanece fora do runner de migrations e passa a valer como artefato
+> histórico/canônico do contrato.
 
 `gbp-operacoes-v1.sql` é indispensável para reservar uma operação de maneira
 atômica entre processos e persistir o resultado junto do evento de domínio.

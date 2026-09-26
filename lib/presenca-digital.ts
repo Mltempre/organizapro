@@ -9,9 +9,17 @@
 // `notaGoogle`/`numAvaliacoes` são campos de texto livre digitados pelo
 // dono do negócio (app/site/page.tsx) — nunca lidos de nenhuma API do
 // Google. Este módulo mede COMPLETUDE DE CADASTRO, não performance real no
-// Google. `integracaoGoogleAtiva` é sempre `false` nesta fase — vira `true`
-// só no dia em que existir OAuth + chamada real à Google Business Profile
-// API (gate externo, não implementado nesta sessão — ver seção 4.2 do
+// Google. ATUALIZAÇÃO 2026-09-25 — a integração real JÁ EXISTE no produto:
+// OAuth e chamadas reais à Google Business Profile API vivem em
+// lib/google-business-profile-oauth.ts e lib/google-business-profile-api.ts,
+// com tela própria em app/google-presenca; a persistência do provedor já
+// está implantada em produção (google_business_profile_connections,
+// google_business_profile_operacoes, RPCs gbp_iniciar_operacao/
+// gbp_finalizar_operacao) — preflight read-only confirmou.
+// `integracaoGoogleAtiva` continua literalmente `false` de propósito: este
+// módulo mede só COMPLETUDE DE CADASTRO sobre campos manuais de
+// clinica_config e não lê a conexão Google. Inverter esse valor exige
+// mudança de comportamento deliberada, em missão própria (ver seção 4.2 do
 // documento de arquitetura).
 
 export type ConfigPresenca = {
@@ -35,7 +43,7 @@ export type ItemPresenca = {
 export type DiagnosticoPresenca = {
   pontuacao:            number; // 0–100, arredondado
   itens:                ItemPresenca[];
-  integracaoGoogleAtiva: false; // literal — nunca lido de config, nunca true nesta fase
+  integracaoGoogleAtiva: false; // literal — nunca lido de config; este módulo não lê a conexão Google (ver cabeçalho)
   observacaoIntegracao:  string;
 };
 

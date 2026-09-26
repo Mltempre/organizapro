@@ -1,0 +1,23 @@
+.copiloto { color: #f1f5f9; line-height: 1.6; min-width: 0; }
+.copiloto section { margin-top: 28px; }
+.copiloto section > p { color: #94a3b8; font-size: 14px; margin: 8px 0 18px; }
+.copiloto h2 { font-size: 20px !important; }
+.copiloto-acessos, .copiloto-acoes { display: flex; flex-wrap: wrap; gap: 12px; }
+.copiloto-acessos { margin-bottom: 20px; }
+.copiloto button, .copiloto-acessos a { min-height: 44px; padding: 10px 16px !important; border-radius: 10px; border: 1px solid #477b89; background: #142f3a; color: #c8edf4; font: inherit; font-size: 14px !important; font-weight: 600; cursor: pointer; white-space: normal !important; text-decoration: none; }
+.copiloto button:focus-visible, .copiloto a:focus-visible { outline: 3px solid #8dd6e5; outline-offset: 3px; }
+.copiloto button:hover, .copiloto-acessos a:hover { filter: brightness(1.15); }
+.copiloto-card { padding: 22px; border: 1px solid; border-radius: 14px; background: #171e2b; margin-bottom: 8px; overflow-wrap: anywhere; }
+.copiloto-card-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.copiloto-card h3 { font-size: 18px; line-height: 1.4; margin: 0; flex: 1 1 220px; }
+.copiloto-prioridade { border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.copiloto-detalhes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 28px; margin: 22px 0 16px; }
+.copiloto-detalhes dt { color: #a5b4c8; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+.copiloto-detalhes dd { margin: 0; font-size: 15px; }
+.copiloto-detalhes small { display: block; color: #a5b4c8; font-size: 13px; margin-top: 4px; }
+.copiloto-evidencia { color: #94a3b8; font-size: 13px; margin: 0 0 18px; }
+@media (max-width: 600px) {
+  .copiloto-card { padding: 16px; }
+  .copiloto-detalhes { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .copiloto-acoes > button { width: 100%; }
+}

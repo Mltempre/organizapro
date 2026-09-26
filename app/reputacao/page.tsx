@@ -40,8 +40,10 @@ export default function ReputacaoPage() {
   const [erro, setErro] = useState('')
 
   // Presença Digital — completude de cadastro (lib/presenca-digital.ts),
-  // nunca performance real no Google (não há integração/OAuth com a Google
-  // Business Profile API nesta versão — ver diagnostico.observacaoIntegracao).
+  // nunca performance real no Google. A integração OAuth/Google Business
+  // Profile existe no produto (app/google-presenca + lib/google-business-
+  // profile-*), mas este painel NÃO a consulta: lê apenas os campos manuais
+  // de clinica_config — ver diagnostico.observacaoIntegracao.
   async function carregarPresenca(cid: string) {
     const { data } = await supabase
       .from('clinica_config')

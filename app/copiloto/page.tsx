@@ -1,5 +1,6 @@
 'use client';
 
+import './copiloto.css';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
@@ -56,7 +57,7 @@ type Estado = {
   pendentesConfirmacao: AgItem[];
   receitaPerdida: ResumoReceitaPerdida | null;
   previsor: ResumoPrevisorFaturamento | null;
-  /** true quando ao menos uma das 5 APIs falhou de verdade (não 404) —
+  /** true quando ao menos uma das 5 APIs falhou, inclusive com 404 —
    * distingue "nada pendente" real de "não deu para carregar tudo". */
   falhaParcial: boolean;
 };
@@ -226,7 +227,11 @@ export default function CopilotoPage() {
     : 0;
 
   return (
-    <AdminShell title="Copiloto Administrativo" subtitle="O que precisa da sua atenção agora — só dados reais, nada fabricado">
+    <AdminShell title="Copiloto Administrativo" subtitle="Prioridades e próximos passos para cuidar do seu negócio">
+      <div className="copiloto">
+      <nav className="copiloto-acessos" aria-label="Acessos comerciais">
+        <a href="/pedidos">🛒 E-commerce IA →</a>
+      </nav>
       {carregando && <PageLoader title="Consolidando o que precisa da sua atenção..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
       {!carregando && estado && estado.falhaParcial && (
@@ -265,29 +270,30 @@ export default function CopilotoPage() {
           {estado.sinais.length > 0 && (
             <section id="gerente-comercial" aria-label="Gerente Comercial AI" style={{ marginBottom: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>Gerente Comercial AI ({estado.atencoes.length})</h2>
-              <p>Prioridades do Radar e do núcleo comercial, dentro dos dados carregados. A execução e o registro continuam no fluxo indicado.</p>
+              <p>Veja o motivo de cada prioridade e abra o próximo passo para agir.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {estado.atencoes.map(({ sinal, impacto, destinoAcao }) => {
                   const cor = stTom[stTierOportunidade[sinal.prioridade].tom];
                   return (
-                    <div key={sinal.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)', border: `1px solid ${cor.border}`, borderRadius: 10, padding: '10px 16px' }}>
-                      <div style={{ flex: 1, minWidth: 220 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 3 }}>{sinal.titulo}</div>
-                        <div style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 2 }}>{sinal.motivo}</div>
-                        <div style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>Evidência: {sinal.evidencia}</div>
-                        <div>Prioridade: {sinal.prioridade}</div>
-                        <div>Cliente: {sinal.contexto?.nome || 'Visão agregada'}{sinal.contexto?.telefone ? ` · ${sinal.contexto.telefone}` : ''}</div>
-                        {sinal.entidadeId && <div>Referência: {sinal.entidadeTipo} · {sinal.entidadeId}</div>}
-                        <div>Próxima ação: {sinal.acaoSugerida}</div>
-                        <div>Impacto: {impacto.valor === null ? 'Valor não informado' : formatarValor(impacto.valor)} — {impacto.descricao}</div>
+                    <article key={sinal.id} className="copiloto-card" style={{ borderColor: cor.border }}>
+                      <div className="copiloto-card-topo">
+                        <h3>{sinal.titulo}</h3>
+                        <span className="copiloto-prioridade" style={{ color: cor.color, background: cor.bg }}>{stTierOportunidade[sinal.prioridade].label}</span>
                       </div>
-                      {destinoAcao && <button onClick={() => router.push(destinoAcao)}>Abrir ação recomendada →</button>}
-                      {sinal.destino && sinal.destino !== destinoAcao && (
-                        <button onClick={() => router.push(sinal.destino!)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(74,155,176,0.35)', background: 'rgba(74,155,176,0.1)', color: '#4a9bb0', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          {sinal.destinoLabel || 'Ver'} →
-                        </button>
-                      )}
-                    </div>
+                      <dl className="copiloto-detalhes">
+                        <div><dt>Cliente</dt><dd>{sinal.contexto?.nome || 'Visão agregada'}{sinal.contexto?.telefone && <small>{sinal.contexto.telefone}</small>}</dd></div>
+                        <div><dt>Motivo</dt><dd>{sinal.motivo}</dd></div>
+                        <div><dt>Próxima ação</dt><dd>{sinal.acaoSugerida}</dd></div>
+                        <div><dt>Impacto</dt><dd>{impacto.valor === null ? 'Valor não informado' : formatarValor(impacto.valor)}<small>{impacto.descricao}</small></dd></div>
+                      </dl>
+                      <p className="copiloto-evidencia">{sinal.evidencia}</p>
+                      <div className="copiloto-acoes">
+                        {destinoAcao && <button onClick={() => router.push(destinoAcao)}>Abrir ação recomendada →</button>}
+                        {sinal.destino && sinal.destino !== destinoAcao && (
+                          <button onClick={() => router.push(sinal.destino!)}>{sinal.destinoLabel || 'Ver'} →</button>
+                        )}
+                      </div>
+                    </article>
                   );
                 })}
               </div>
@@ -345,6 +351,7 @@ export default function CopilotoPage() {
           </button>
         </section>
       )}
+      </div>
     </AdminShell>
   );
 }

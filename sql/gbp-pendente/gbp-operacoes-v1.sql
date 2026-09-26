@@ -1,7 +1,13 @@
--- PENDENTE / REVISAO MANUAL. NAO EXECUTADO. Fora do runner de migrations.
--- Preflight autorizado: confirmar clinicas(id UUID), eventos_dominio e seus
--- campos abaixo, entidade_id UUID, grants/RLS e unicidade de idempotencia.
--- Nao aplicar junto de outros SQLs pendentes. Sem alteracao dos seis bloqueadores.
+-- JA APLICADO EM PRODUCAO - NAO REAPLICAR. Fora do runner de migrations.
+-- Status confirmado por preflight SOMENTE LEITURA em 2026-09-25: a tabela
+-- public.google_business_profile_operacoes, o indice parcial gbp_operacao_em_voo
+-- e as funcoes gbp_iniciar_operacao / gbp_finalizar_operacao JA EXISTEM em
+-- producao (conexoes = 0, operacoes = 0, eventos_dominio = 868 intactas).
+-- NAO reexecutar: este script nao e idempotente (create table, create index e
+-- create function sem IF NOT EXISTS falham com 42P07/42723). Mantido como
+-- artefato canonico historico e referencia de contrato.
+-- Preflight original: clinicas(id UUID) confirmado; eventos_dominio com
+-- clinica_id/entidade_id UUID confirmados. Sem alteracao dos seis bloqueadores.
 begin;
 create table public.google_business_profile_operacoes (
   clinica_id uuid not null references public.clinicas(id) on delete cascade,

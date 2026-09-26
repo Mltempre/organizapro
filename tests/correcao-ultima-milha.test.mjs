@@ -27,12 +27,12 @@ test("fetchJsonSeguro: resposta 200 devolve o dado real, falhou:false", async ()
   } finally { global.fetch = fetchOriginal; }
 });
 
-test("fetchJsonSeguro: 404 é tratado como vazio REAL (contrato de algumas rotas), nunca como falha", async () => {
+test("fetchJsonSeguro: 404 é falha de carregamento, nunca vazio confirmado", async () => {
   const fetchOriginal = global.fetch;
   global.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
   try {
     const r = await fetchJsonSeguro("/qualquer", {}, { itens: [] });
-    assert.deepEqual(r, { dado: { itens: [] }, falhou: false });
+    assert.deepEqual(r, { dado: { itens: [] }, falhou: true });
   } finally { global.fetch = fetchOriginal; }
 });
 
@@ -126,12 +126,11 @@ test("Follow-up: usa fetchJsonSeguro nas 5 APIs e mostra aviso quando falhaParci
   assert.match(codigo, /falhaParcial && \(/);
 });
 
-test("Orçamentos, Oportunidades, Cobranças, Pedidos, Tratamentos: falha real (status != 404) do GET principal chama setErro — nunca só console.error", () => {
+test("Orçamentos, Oportunidades, Cobranças, Tratamentos: falha real (status != 404) do GET principal chama setErro — nunca só console.error", () => {
   const paginas = [
     ["app/orcamentos/page.tsx", /if \(orcRes\.status !== 404\) \{ console\.error\('Erro ao carregar orçamentos:', orcRes\.status\); setErro\(MSG_ERRO_PADRAO\); \}/],
     ["app/oportunidades/page.tsx", /if \(opRes\.status !== 404\) \{ console\.error\('Erro ao carregar oportunidades:', opRes\.status\); setErro\(MSG_ERRO_PADRAO\); \}/],
     ["app/cobrancas/page.tsx", /if \(cobRes\.status !== 404\) \{ console\.error\('Erro ao carregar cobranças:', cobRes\.status\); setErro\(MSG_ERRO_PADRAO\); \}/],
-    ["app/pedidos/page.tsx", /if \(pedRes\.status !== 404\) \{ console\.error\('Erro ao carregar pedidos:', pedRes\.status\); setErro\(MSG_ERRO_PADRAO\); \}/],
     ["app/tratamentos/page.tsx", /if \(tratRes\.status !== 404\) \{ console\.error\('Erro ao carregar tratamentos:', tratRes\.status\); setErro\(MSG_ERRO_PADRAO\); \}/],
   ];
   for (const [arquivo, padrao] of paginas) {
@@ -139,12 +138,11 @@ test("Orçamentos, Oportunidades, Cobranças, Pedidos, Tratamentos: falha real (
   }
 });
 
-test("404 continua sendo tratado como vazio real (contrato de algumas rotas) nas 5 páginas — nunca vira aviso/erro", () => {
+test("404 continua sendo tratado como vazio real (contrato de algumas rotas) nas 4 páginas legadas — nunca vira aviso/erro", () => {
   for (const [arquivo, condicao] of [
     ["app/orcamentos/page.tsx", "orcRes.status !== 404"],
     ["app/oportunidades/page.tsx", "opRes.status !== 404"],
     ["app/cobrancas/page.tsx", "cobRes.status !== 404"],
-    ["app/pedidos/page.tsx", "pedRes.status !== 404"],
     ["app/tratamentos/page.tsx", "tratRes.status !== 404"],
   ]) {
     assert.match(ler(arquivo), new RegExp(condicao.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${arquivo} deveria seguir distinguindo 404 de outras falhas`);
@@ -175,4 +173,14 @@ test("nenhuma alteração desta correção tocou E-commerce/Financeiro/Pesquisa 
   for (const p of ["app/financeiro/page.tsx", "app/pesquisa-precos/page.tsx", "app/api/site-publico/interesse/route.ts"]) {
     assert.doesNotThrow(() => ler(p), `${p} deveria continuar existindo, intocado por esta missão`);
   }
+});
+
+
+test("Pedidos: falha HTTP inclusive 404 impede carga válida e mantém retry", () => {
+  const codigo = ler("app/pedidos/page.tsx");
+  assert.match(codigo, /!pedRes\.ok/);
+  assert.match(codigo, /setCargaValida\(false\)/);
+  assert.match(codigo, /setErro\(MSG_ERRO_PADRAO\)/);
+  assert.match(codigo, /Tentar novamente/);
+  assert.doesNotMatch(codigo, /pedRes\.status !== 404/);
 });

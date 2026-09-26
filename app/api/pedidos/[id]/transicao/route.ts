@@ -34,6 +34,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ sucesso: false, error: "Body inválido — JSON malformado" }, { status: 400 });
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body) || typeof body.clinica_id !== "string" || typeof body.evento !== "string") {
+    return NextResponse.json({ sucesso: false, error: "Dados da transição inválidos" }, { status: 400 });
+  }
   const { clinica_id, evento } = body;
 
   if (!clinica_id || !evento) {
@@ -59,7 +62,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq("clinica_id", clinica_id) // nunca confia no id sozinho — precisa pertencer à clínica autorizada
     .maybeSingle<Pedido & { status: PedidoStatus }>();
 
-  if (erroBusca || !pedido) {
+  if (erroBusca) return NextResponse.json({ sucesso: false, error: "Não foi possível consultar o pedido" }, { status: 503 });
+  if (!pedido) {
     logOperacao({ operacao: "pedido.transicao", clinica_id, entidade_id: id, resultado: "rejeitado", motivo: "pedido nao encontrado nesta clinica" });
     return NextResponse.json({ sucesso: false, error: "Pedido não encontrado" }, { status: 404 });
   }

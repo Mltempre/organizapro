@@ -61,6 +61,7 @@ export default function PedidosPage() {
   const [clinicaId, setClinicaId]     = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [carregando, setCarregando]   = useState(true);
+  const [cargaValida, setCargaValida] = useState(false);
   const [erro, setErro]               = useState('');
   const [sucesso, setSucesso]         = useState('');
   const [filtro, setFiltro]           = useState<'todos' | PedidoStatus>('todos');
@@ -77,7 +78,7 @@ export default function PedidosPage() {
 
   const carregar = useCallback(async () => {
     try {
-      setCarregando(true); setErro('');
+      setCarregando(true); setErro(''); setCargaValida(false); setPedidos([]); setPacientes([]); setCatalogo([]);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) { router.push('/login'); return; }
@@ -86,9 +87,10 @@ export default function PedidosPage() {
       setAccessToken(session.access_token);
 
       const cuRes = await fetch('/api/minha-clinica', { headers: { Authorization: `Bearer ${session.access_token}` } });
-      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
+      if (!cuRes.ok) throw new Error('Não foi possível identificar o negócio.');
+      const cid: string | undefined = (await cuRes.json()).clinica_id;
       setClinicaId(cid || '');
-      if (!cid) { setPedidos([]); setCarregando(false); return; }
+      if (!cid) throw new Error('Negócio não vinculado ao usuário.');
 
       const [pedRes, pacRes, catRes] = await Promise.all([
         fetch(`/api/pedidos?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
@@ -96,20 +98,13 @@ export default function PedidosPage() {
         supabase.from('clinica_servicos').select('id, nome, preco_centavos, disponivel').eq('clinica_id', cid).order('nome'),
       ]);
 
-      if (pedRes.ok) {
-        const json = await pedRes.json();
-        setPedidos(Array.isArray(json.pedidos) ? json.pedidos : []);
-      } else {
-        setPedidos([]);
-        // status != 404 é falha real (inclui a tabela ainda não existir em
-        // produção) — precisa ficar visível, nunca virar silenciosamente
-        // "nenhum pedido".
-        if (pedRes.status !== 404) { console.error('Erro ao carregar pedidos:', pedRes.status); setErro(MSG_ERRO_PADRAO); }
-      }
-      setPacientes((pacRes.data || []) as ClientePicker[]);
-      // preco_centavos/disponivel ainda não existem antes da migration rodar
-      // — undefined vira "sem preço"/"disponível", nunca quebra o picker.
-      setCatalogo(((catRes.data || []) as CatalogoPicker[]));
+      if (!pedRes.ok || pacRes.error || catRes.error) throw new Error(MSG_ERRO_PADRAO);
+      const json = await pedRes.json();
+      if (!Array.isArray(json.pedidos) || !Array.isArray(pacRes.data) || !Array.isArray(catRes.data)) throw new Error(MSG_ERRO_PADRAO);
+      setPedidos(json.pedidos);
+      setPacientes(pacRes.data as ClientePicker[]);
+      setCatalogo(catRes.data as CatalogoPicker[]);
+      setCargaValida(true);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') { router.push('/login'); return; }
       console.error(err);
@@ -122,6 +117,7 @@ export default function PedidosPage() {
   useEffect(() => { carregar(); }, [carregar]);
 
   function abrirNovo() {
+    if (!cargaValida) { setErro('Carregue os pedidos, clientes e catálogo antes de registrar um pedido.'); return; }
     setPacienteId(''); setNomeCliente(''); setTelefone(''); setLinhas([{ ...linhaVazia }]);
     idempotencyKeyRef.current = crypto.randomUUID();
     setErro(''); setModalNovo(true);
@@ -161,6 +157,7 @@ export default function PedidosPage() {
       : { descricao: l.descricaoManual.trim(), valor_unitario_centavos: parseReaisParaCentavos(l.valorManualReais), quantidade: Number(l.quantidade) }
     );
 
+    try {
     const res = await fetch('/api/pedidos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
@@ -171,12 +168,14 @@ export default function PedidosPage() {
       }),
     });
     const json = await res.json();
-    setSalvando(false);
     if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
     setModalNovo(false);
     carregar();
     setSucesso('Pedido registrado.');
     setTimeout(() => setSucesso(''), 3500);
+    } catch {
+      setErro('Não foi possível confirmar o registro. Tente novamente sem fechar o formulário.');
+    } finally { setSalvando(false); }
   }
 
   async function transicionar(pedido: Pedido, evento: string) {
@@ -220,6 +219,7 @@ export default function PedidosPage() {
 
       {carregando && <PageLoader title="Carregando pedidos..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && !cargaValida && <button onClick={carregar}>Tentar novamente</button>}
       {!carregando && sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />}
 
       {!carregando && pedidos.length > 0 && (
@@ -245,7 +245,7 @@ export default function PedidosPage() {
         </div>
       )}
 
-      {!carregando && pedidos.length === 0 && (
+      {!carregando && cargaValida && pedidos.length === 0 && (
         <EmptyState icon="🛒" title="Ainda não há pedidos registrados." description="Registre o primeiro pedido a partir do seu catálogo de serviços." actionLabel="➕ Registrar pedido" onAction={abrirNovo} />
       )}
       {!carregando && pedidos.length > 0 && filtrados.length === 0 && (

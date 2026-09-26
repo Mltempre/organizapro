@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { lerRespostaFinanceira } from '../../lib/resposta-financeira';
 import { supabase } from '../../lib/supabase';
 import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
@@ -45,7 +46,7 @@ export default function PrevisorFaturamentoPage() {
 
   const carregar = useCallback(async () => {
     try {
-      setCarregando(true); setErro('');
+      setCarregando(true); setErro(''); setResumo(null);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) { router.push('/login'); return; }
@@ -54,18 +55,19 @@ export default function PrevisorFaturamentoPage() {
       const auth = { Authorization: `Bearer ${session.access_token}` };
 
       const cuRes = await fetch('/api/minha-clinica', { headers: auth });
-      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
+      if (!cuRes.ok) throw new Error('Não foi possível identificar o negócio.');
+      const cid: string | undefined = (await cuRes.json()).clinica_id;
       if (!cid) { setResumo(null); setErro('Negócio não vinculado ao usuário.'); setCarregando(false); return; }
 
       // Mesmo padrão de fetch/filtro já usado em app/receita-perdida/page.tsx
       // — falha em qualquer domínio nunca fabrica dado, só resulta em lista
       // vazia (nunca derruba o resto da tela).
       const [orcamentosRes, cobrancasRes, tratamentosRes, pedidosRes, oportunidadesRes] = await Promise.all([
-        fetch(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }).then(r => r.ok ? r.json() : { orcamentos: [] }).catch(() => ({ orcamentos: [] })),
-        fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { cobrancas: [] }).catch(() => ({ cobrancas: [] })),
-        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { tratamentos: [] }).catch(() => ({ tratamentos: [] })),
-        fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { pedidos: [] }).catch(() => ({ pedidos: [] })),
-        fetch('/api/oportunidades', { headers: auth }).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+        fetch(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'orcamentos')),
+        fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'cobrancas')),
+        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'tratamentos')),
+        fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'pedidos')),
+        fetch('/api/oportunidades', { headers: auth }).then(r => lerRespostaFinanceira(r, 'data')),
       ]);
 
       const orcamentos: Orcamento[] = orcamentosRes.orcamentos ?? [];

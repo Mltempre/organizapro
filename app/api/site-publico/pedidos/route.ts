@@ -54,6 +54,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: "pedido precisa ter entre 1 e 50 itens" }, { status: 400 });
   }
 
+  if (body.itens.some(item => !item || typeof item !== "object" || Array.isArray(item))) {
+    return NextResponse.json({ sucesso: false, error: "Item inválido" }, { status: 400 });
+  }
   const itensEntrada = body.itens as ItemEntrada[];
   const ids = itensEntrada.map((item) => item.servico_id);
   if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids as string[]).size !== ids.length) {
@@ -74,12 +77,13 @@ export async function POST(req: NextRequest) {
   const clinicaId = empresa.clinica_id;
   const chaveIdempotencia = `criar-pedido-publico:${idempotencyKey}`;
 
-  const { data: eventoExistente } = await admin
+  const { data: eventoExistente, error: erroIdempotencia } = await admin
     .from("eventos_dominio")
     .select("entidade_id")
     .eq("clinica_id", clinicaId)
     .eq("chave_idempotencia", chaveIdempotencia)
     .maybeSingle();
+  if (erroIdempotencia) return NextResponse.json({ sucesso: false, error: "Não foi possível verificar a tentativa anterior" }, { status: 503 });
   if (eventoExistente?.entidade_id) {
     const { data: pedidoExistente } = await admin
       .from("pedidos")
@@ -92,6 +96,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ sucesso: true, idempotente: true, pedido: pedidoExistente });
     }
   }
+
+  if (eventoExistente) return NextResponse.json({ sucesso: false, error: "Registro anterior indisponível; não foi criado outro pedido" }, { status: 409 });
 
   const { data: catalogo, error: erroCatalogo } = await admin
     .from("clinica_servicos")
@@ -124,6 +130,9 @@ export async function POST(req: NextRequest) {
   }
 
   const valorTotal = itensResolvidos.reduce((total, item) => total + item.valor_total_centavos, 0);
+  if (!Number.isSafeInteger(valorTotal) || valorTotal <= 0 || valorTotal > 2147483647) {
+    return NextResponse.json({ sucesso: false, error: "Total do pedido inválido ou acima do limite suportado" }, { status: 400 });
+  }
   const agora = new Date().toISOString();
   const { data: pedido, error: erroPedido } = await admin.from("pedidos").insert({
     clinica_id: clinicaId,

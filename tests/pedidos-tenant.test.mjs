@@ -35,7 +35,7 @@ test("POST /api/pedidos: autoriza antes de qualquer escrita", () => {
 });
 
 test("POST /api/pedidos: item com servico_id sempre busca o preço real filtrado por clinica_id (nunca aceita preço do body)", () => {
-  assert.match(rotaListaCria, /\.from\("clinica_servicos"\)\s*\.select\("id, clinica_id, preco_centavos, disponivel"\)\s*\.eq\("clinica_id", clinica_id\)/);
+  assert.match(rotaListaCria, /\.from\("clinica_servicos"\)\s*\.select\("id, clinica_id, nome, preco_centavos, disponivel"\)\s*\.eq\("clinica_id", clinica_id\)/);
   assert.match(rotaListaCria, /capturarValorItem\(itemCatalogo, it\.quantidade\)/);
   // Nenhum branch do código usa um valor_unitario_centavos vindo do body
   // quando servico_id está presente — só no ramo do item avulso (else).

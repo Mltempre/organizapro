@@ -47,7 +47,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: "Body inválido — JSON malformado" }, { status: 400 });
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ sucesso: false, error: "Body inválido" }, { status: 400 });
+  }
   const { clinica_id, paciente_id, nome_cliente, telefone, observacao, itens, idempotency_key } = body;
+  if ([clinica_id, nome_cliente, idempotency_key].some(v => typeof v !== "string" || !v.trim())
+    || [paciente_id, telefone, observacao].some(v => v != null && typeof v !== "string")) {
+    return NextResponse.json({ sucesso: false, error: "Dados do pedido inválidos" }, { status: 400 });
+  }
   const origem = body.origem === "site_publico" ? "site_publico" : "manual";
 
   if (!clinica_id || !nome_cliente?.trim() || !idempotency_key) {
@@ -60,10 +67,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: "pedido precisa de pelo menos 1 item" }, { status: 400 });
   }
   for (const it of itens) {
+    if (!it || typeof it !== "object" || Array.isArray(it) || (it.servico_id != null && typeof it.servico_id !== "string") || (it.descricao != null && typeof it.descricao !== "string")) {
+      return NextResponse.json({ sucesso: false, error: "Item inválido" }, { status: 400 });
+    }
     if (!Number.isInteger(it.quantidade) || it.quantidade <= 0) {
       return NextResponse.json({ sucesso: false, error: "quantidade de cada item deve ser um inteiro positivo" }, { status: 400 });
     }
-    if (!it.servico_id && (!it.descricao?.trim() || !it.valor_unitario_centavos || it.valor_unitario_centavos <= 0)) {
+    if (!it.servico_id && (!it.descricao?.trim() || !Number.isInteger(it.valor_unitario_centavos) || !it.valor_unitario_centavos || it.valor_unitario_centavos <= 0)) {
       return NextResponse.json(
         { sucesso: false, error: "item sem servico_id precisa de descricao e valor_unitario_centavos positivo" },
         { status: 400 }
@@ -77,21 +87,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: autorizacao.error }, { status: autorizacao.status });
   }
 
+  if (paciente_id) {
+    const { data: paciente, error } = await admin.from("pacientes").select("id")
+      .eq("id", paciente_id).eq("clinica_id", clinica_id).maybeSingle();
+    if (error) return NextResponse.json({ sucesso: false, error: "Não foi possível validar o cliente" }, { status: 503 });
+    if (!paciente) return NextResponse.json({ sucesso: false, error: "Cliente não encontrado nesta empresa" }, { status: 400 });
+  }
+
   // Idempotência via eventos_dominio (constraint real UNIQUE(clinica_id,
   // chave_idempotencia)) — mesmo padrão já homologado nos outros 3 motores.
   const chaveIdempotencia = `criar-pedido:${idempotency_key}`;
-  const { data: eventoExistente } = await admin
+  const { data: eventoExistente, error: erroIdempotencia } = await admin
     .from("eventos_dominio")
     .select("entidade_id")
     .eq("clinica_id", clinica_id)
     .eq("chave_idempotencia", chaveIdempotencia)
     .maybeSingle();
 
+  if (erroIdempotencia) return NextResponse.json({ sucesso: false, error: "Não foi possível verificar a tentativa anterior" }, { status: 503 });
+
   if (eventoExistente) {
     const { data: pedidoExistente } = await admin
       .from("pedidos")
       .select("*, pedido_itens(*)")
       .eq("id", eventoExistente.entidade_id)
+      .eq("clinica_id", clinica_id)
       .maybeSingle();
     if (pedidoExistente) {
       logOperacao({ operacao: "pedido.criar", clinica_id, entidade_id: pedidoExistente.id, resultado: "sucesso", motivo: "replay idempotente" });
@@ -99,15 +119,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (eventoExistente) return NextResponse.json({ sucesso: false, error: "Registro anterior indisponível; não foi criado outro pedido" }, { status: 409 });
+
   // Resolve o preço real de cada item que referencia o catálogo — NUNCA
   // aceita valor do cliente para item com servico_id. Busca todos de uma
   // vez, sempre filtrado por clinica_id (nunca confia no id sozinho).
   const idsCatalogo = itens.map((it) => it.servico_id).filter((id): id is string => !!id);
-  let catalogoPorId = new Map<string, ItemCatalogo>();
+  let catalogoPorId = new Map<string, ItemCatalogo & { nome: string }>();
   if (idsCatalogo.length > 0) {
     const { data: catalogo, error: erroCatalogo } = await admin
       .from("clinica_servicos")
-      .select("id, clinica_id, preco_centavos, disponivel")
+      .select("id, clinica_id, nome, preco_centavos, disponivel")
       .eq("clinica_id", clinica_id)
       .in("id", idsCatalogo);
     if (erroCatalogo) {
@@ -115,7 +137,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ sucesso: false, error: "Não foi possível validar os itens do catálogo" }, { status: 500 });
     }
     catalogoPorId = new Map((catalogo ?? []).map((c) => [c.id as string, {
-      id: c.id as string, clinicaId: c.clinica_id as string,
+      id: c.id as string, nome: c.nome as string, clinicaId: c.clinica_id as string,
       precoCentavos: c.preco_centavos as number | null, disponivel: c.disponivel as boolean,
     }]));
   }
@@ -135,7 +157,7 @@ export async function POST(req: NextRequest) {
       }
       itensResolvidos.push({
         servico_id: it.servico_id,
-        descricao: it.descricao?.trim() || "Item de catálogo",
+        descricao: itemCatalogo.nome,
         quantidade: it.quantidade,
         valor_unitario_centavos: itemCatalogo.precoCentavos!,
         valor_total_centavos: valorTotal,
@@ -158,6 +180,9 @@ export async function POST(req: NextRequest) {
   }
 
   const valorTotalPedido = itensResolvidos.reduce((soma, it) => soma + it.valor_total_centavos, 0);
+  if (!Number.isSafeInteger(valorTotalPedido) || valorTotalPedido <= 0 || valorTotalPedido > 2147483647) {
+    return NextResponse.json({ sucesso: false, error: "Total do pedido inválido ou acima do limite suportado" }, { status: 400 });
+  }
   const agora = new Date().toISOString();
 
   const { data: novoPedido, error: erroInsertPedido } = await admin
@@ -190,7 +215,7 @@ export async function POST(req: NextRequest) {
   if (erroItens) {
     // Corrida ou item inválido pego só na escrita (trigger de tenant) —
     // desfaz o pedido órfão, nunca deixa um pedido sem itens.
-    await admin.from("pedidos").delete().eq("id", novoPedido.id);
+    await admin.from("pedidos").delete().eq("id", novoPedido.id).eq("clinica_id", clinica_id);
     logOperacao({ operacao: "pedido.criar", clinica_id, entidade_id: novoPedido.id, resultado: "erro", motivo: `itens nao gravados: ${erroItens.message}` });
     return NextResponse.json({ sucesso: false, error: "Não foi possível registrar os itens do pedido" }, { status: 500 });
   }
@@ -209,8 +234,8 @@ export async function POST(req: NextRequest) {
     // Corrida real (duas requisições com a mesma idempotency_key quase
     // simultâneas) — mesmo tratamento já homologado nos outros 3 motores:
     // desfaz o órfão (itens + pedido) e devolve quem realmente venceu.
-    await admin.from("pedido_itens").delete().eq("pedido_id", novoPedido.id);
-    await admin.from("pedidos").delete().eq("id", novoPedido.id);
+    await admin.from("pedido_itens").delete().eq("pedido_id", novoPedido.id).eq("clinica_id", clinica_id);
+    await admin.from("pedidos").delete().eq("id", novoPedido.id).eq("clinica_id", clinica_id);
     const { data: vencedor } = await admin
       .from("eventos_dominio")
       .select("entidade_id")
@@ -218,7 +243,7 @@ export async function POST(req: NextRequest) {
       .eq("chave_idempotencia", chaveIdempotencia)
       .maybeSingle();
     const { data: pedidoVencedor } = vencedor
-      ? await admin.from("pedidos").select("*, pedido_itens(*)").eq("id", vencedor.entidade_id).maybeSingle()
+      ? await admin.from("pedidos").select("*, pedido_itens(*)").eq("id", vencedor.entidade_id).eq("clinica_id", clinica_id).maybeSingle()
       : { data: null };
 
     logOperacao({ operacao: "pedido.criar", clinica_id, entidade_id: novoPedido.id, resultado: "rejeitado", motivo: "corrida de idempotência — outra requisição venceu" });
