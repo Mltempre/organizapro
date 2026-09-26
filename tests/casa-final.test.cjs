@@ -12,7 +12,7 @@ test('conta vazia: mensagem honesta, sem receita, sucesso fictício ou caixas de
   assert.doesNotMatch(html, /R\$|operando normalmente|Consultoria do Dia|Diretor Digital|SinalCanonico|100%|Recursos Incluídos/);
 });
 
-for (const api of ['/api/orcamentos','/api/pedidos','/api/tratamentos','/api/cobrancas','/api/oportunidades']) {
+for (const api of ['/api/configuracoes','/api/orcamentos','/api/pedidos','/api/tratamentos','/api/cobrancas','/api/oportunidades']) {
   test(`HTTP indisponível ${api} não vira zero nem lista vazia`, async () => {
     const { html } = await carregar({ apiError: api });
     assert.match(html, /role="alert"/); assert.match(html, /Tentar novamente/);

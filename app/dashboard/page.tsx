@@ -205,6 +205,12 @@ export default function Dashboard() {
         .then(async (r) => (r.ok ? ((await r.json()).data as OportunidadeDemandaSinal[]) ?? null : null))
         .catch(() => null);
 
+      const configRes = await fetch(`/api/configuracoes?clinica_id=${encodeURIComponent(cid)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!configRes.ok) throw new Error("Configuração indisponível");
+      const configSegura = await configRes.json();
+      if (typeof configSegura.zapi_configurado !== "boolean") throw new Error("Configuração inválida");
       const consultas = await Promise.all([
         supabase.from("agendamentos")
           .select("id, hora, paciente_nome, telefone, tipo_consulta, status, data")
@@ -240,7 +246,7 @@ export default function Dashboard() {
           .eq("clinica_id", cid)
           .eq("respondeu", false),
         supabase.from("clinica_config")
-          .select("logo_url, email, telefone, endereco, nome_clinica, zapi_instance, zapi_token, horario_funcionamento")
+          .select("logo_url, email, telefone, endereco, nome_clinica, horario_funcionamento")
           .eq("clinica_id", cid)
           .maybeSingle(),
         // Agenda Autônoma de Receita · sinal "sem próximo compromisso"
@@ -336,7 +342,7 @@ export default function Dashboard() {
         temEmail:         !!cfg?.email,
         temTelefone:      !!cfg?.telefone,
         temEndereco:      !!cfg?.endereco,
-        temWhatsapp:      !!cfg?.zapi_instance && !!cfg?.zapi_token,
+        temWhatsapp:      configSegura.zapi_configurado,
         clientesSemProximoRows: (semProximoData || []) as ClienteSemProximoRow[],
         cancelamentosSemReagendamentoRows,
         orcamentosParadosRows,

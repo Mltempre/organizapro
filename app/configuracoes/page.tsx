@@ -54,6 +54,7 @@ export default function ConfiguracoesPage() {
   const [erro, setErro]         = useState('');
   const [loading, setLoading]   = useState(true);
   const [clinicaId, setClinicaId] = useState('');
+  const [zapiConfigurado, setZapiConfigurado] = useState(false);
   const [testando, setTestando] = useState(false);
   const [testeMsg, setTesteMsg] = useState('');
   const [linkGoogleMsg, setLinkGoogleMsg] = useState('');
@@ -74,13 +75,18 @@ export default function ConfiguracoesPage() {
       const cuRes = await fetch('/api/minha-clinica', {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      setClinicaId(cuRes.ok ? ((await cuRes.json()).clinica_id || '') : '');
-
-      const { data } = await supabase
-        .from('clinica_config')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      if (!cuRes.ok) throw new Error('Negócio indisponível');
+      const cid = (await cuRes.json()).clinica_id;
+      if (!cid) throw new Error('Negócio indisponível');
+      setClinicaId(cid);
+      const res = await fetch('/api/configuracoes?clinica_id=' + encodeURIComponent(cid), {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error('Configuração indisponível');
+      const segura = await res.json();
+      const data = segura.config;
+      if (!data || typeof segura.zapi_configurado !== 'boolean') throw new Error('Configuração inválida');
+      setZapiConfigurado(segura.zapi_configurado);
       if (data) {
         setConfig({
           nome_clinica:          data.nome_clinica          || '',
@@ -95,8 +101,8 @@ export default function ConfiguracoesPage() {
           msg_reagendamento:     data.msg_reagendamento     || configInicial.msg_reagendamento,
           horario_funcionamento: data.horario_funcionamento || configInicial.horario_funcionamento,
           zapi_instance:         data.zapi_instance         || '',
-          zapi_token:            data.zapi_token            || '',
-          zapi_client_token:     data.zapi_client_token     || '',
+          zapi_token:            '',
+          zapi_client_token:     '',
         });
       }
     } catch (e) {
@@ -124,14 +130,19 @@ export default function ConfiguracoesPage() {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) { router.push('/login'); return; }
-        const { error } = await supabase
-          .from('clinica_config')
-          .upsert(
-            { ...config, user_id: user.id, clinica_id: clinicaId, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id' }
-          );
-        if (error) { console.error(error); setErro(MSG_ERRO_PADRAO); }
-        else { setSucesso('Configuração salva.'); setTimeout(() => setSucesso(''), 4000); }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token || !clinicaId) throw new Error('Sessão indisponível');
+        const res = await fetch('/api/configuracoes', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ ...config, clinica_id: clinicaId }),
+        });
+        if (!res.ok) throw new Error('Não foi possível salvar');
+        const segura = await res.json();
+        if (typeof segura.zapi_configurado !== 'boolean') throw new Error('Resposta inválida');
+        setZapiConfigurado(segura.zapi_configurado);
+        setConfig(p => ({ ...p, zapi_token: '', zapi_client_token: '' }));
+        setSucesso('Configuração salva.'); setTimeout(() => setSucesso(''), 4000);
       } catch (e) {
         console.error(e);
         setErro(MSG_ERRO_PADRAO);
@@ -371,12 +382,12 @@ export default function ConfiguracoesPage() {
             </div>
             <div>
               <label style={lbl}>Z-API Token da Instância</label>
-              <input type="password" placeholder="Token da instância" value={config.zapi_token} onChange={e => setConfig(p => ({ ...p, zapi_token: e.target.value }))} style={inp} />
+              <input type="password" placeholder={zapiConfigurado ? "Configurado — deixe vazio para manter" : "Novo token da instância"} value={config.zapi_token} onChange={e => setConfig(p => ({ ...p, zapi_token: e.target.value }))} style={inp} />
               <p style={{ fontSize: 11, color: '#475569', margin: '5px 0 0' }}>Aba &quot;Instância&quot; → campo Token — vai na URL da requisição</p>
             </div>
             <div>
               <label style={lbl}>Z-API Security Token (Client-Token)</label>
-              <input type="password" placeholder="Security Token da conta" value={config.zapi_client_token} onChange={e => setConfig(p => ({ ...p, zapi_client_token: e.target.value }))} style={inp} />
+              <input type="password" placeholder={zapiConfigurado ? "Configurado — deixe vazio para manter" : "Novo Security Token da conta"} value={config.zapi_client_token} onChange={e => setConfig(p => ({ ...p, zapi_client_token: e.target.value }))} style={inp} />
               <p style={{ fontSize: 11, color: '#475569', margin: '5px 0 0' }}>Aba &quot;Segurança&quot; → Security Token — vai no header Client-Token</p>
             </div>
           </div>
@@ -386,8 +397,8 @@ export default function ConfiguracoesPage() {
             <button
               className="cfg-btn-testar"
               onClick={testarWhatsapp}
-              disabled={testando || !config.zapi_instance || !config.zapi_token || !config.zapi_client_token}
-              style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #4f46e5', background: 'rgba(79,70,229,0.12)', color: '#a78bfa', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (testando || !config.zapi_instance || !config.zapi_token || !config.zapi_client_token) ? 0.5 : 1, transition: 'background 0.15s' }}
+              disabled={testando || !zapiConfigurado}
+              style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #4f46e5', background: 'rgba(79,70,229,0.12)', color: '#a78bfa', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (testando || !zapiConfigurado) ? 0.5 : 1, transition: 'background 0.15s' }}
             >
               {testando ? '⏳ Enviando...' : '🧪 Enviar mensagem de teste'}
             </button>

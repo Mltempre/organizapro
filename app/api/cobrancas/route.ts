@@ -21,7 +21,7 @@ const REGEX_DATA = /^\d{4}-\d{2}-\d{2}$/;
 export async function POST(req: NextRequest) {
   let body: {
     clinica_id?: string;
-    paciente_id?: string;
+    paciente_id?: string | null;
     paciente_nome?: string;
     paciente_telefone?: string;
     tratamento_origem_id?: string;
@@ -60,6 +60,16 @@ export async function POST(req: NextRequest) {
   if (!autorizacao.ok) {
     logOperacao({ operacao: "cobranca.criar", clinica_id, resultado: "rejeitado", motivo: autorizacao.error });
     return NextResponse.json({ sucesso: false, error: autorizacao.error }, { status: autorizacao.status });
+  }
+
+  if (paciente_id !== undefined && paciente_id !== null) {
+    if (typeof paciente_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paciente_id)) {
+      return NextResponse.json({ sucesso: false, error: "Paciente inválido para esta clínica" }, { status: 400 });
+    }
+    const { data: paciente, error: erroPaciente } = await admin.from("pacientes")
+      .select("id").eq("id", paciente_id).eq("clinica_id", clinica_id.toLowerCase()).maybeSingle();
+    if (erroPaciente) return NextResponse.json({ sucesso: false, error: "Não foi possível validar o paciente" }, { status: 503 });
+    if (!paciente) return NextResponse.json({ sucesso: false, error: "Paciente inválido para esta clínica" }, { status: 400 });
   }
 
   // Snapshot do valor do tratamento de origem — só na criação, nunca

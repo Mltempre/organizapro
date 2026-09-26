@@ -84,17 +84,9 @@ export async function POST(req: NextRequest) {
     .eq("chave_idempotencia", chaveIdempotencia)
     .maybeSingle();
   if (erroIdempotencia) return NextResponse.json({ sucesso: false, error: "Não foi possível verificar a tentativa anterior" }, { status: 503 });
+  // Idempotência impede duplicação; nunca autoriza leitura nem nova atribuição.
   if (eventoExistente?.entidade_id) {
-    const { data: pedidoExistente } = await admin
-      .from("pedidos")
-      .select("*, pedido_itens(*)")
-      .eq("id", eventoExistente.entidade_id)
-      .eq("clinica_id", clinicaId)
-      .maybeSingle();
-    if (pedidoExistente) {
-      await vincularOrigemPublica(admin, clinicaId, body.codigo_rastreio, 'pedido', pedidoExistente.id);
-      return NextResponse.json({ sucesso: true, idempotente: true, pedido: pedidoExistente });
-    }
+    return NextResponse.json({ sucesso: true, idempotente: true }, { headers: { "Cache-Control": "no-store" } });
   }
 
   if (eventoExistente) return NextResponse.json({ sucesso: false, error: "Registro anterior indisponível; não foi criado outro pedido" }, { status: 409 });
@@ -146,7 +138,7 @@ export async function POST(req: NextRequest) {
   }).select().single();
   if (erroPedido || !pedido) return NextResponse.json({ sucesso: false, error: "Não foi possível registrar o pedido" }, { status: 500 });
 
-  const { data: itensGravados, error: erroItens } = await admin.from("pedido_itens")
+  const { error: erroItens } = await admin.from("pedido_itens")
     .insert(itensResolvidos.map((item) => ({ ...item, pedido_id: pedido.id, clinica_id: clinicaId }))).select();
   if (erroItens) {
     await admin.from("pedidos").delete().eq("id", pedido.id).eq("clinica_id", clinicaId);
@@ -170,5 +162,5 @@ export async function POST(req: NextRequest) {
 
   logOperacao({ operacao: "pedido.publico.criar", clinica_id: clinicaId, entidade_id: pedido.id, resultado: "sucesso" });
   await vincularOrigemPublica(admin, clinicaId, body.codigo_rastreio, 'pedido', pedido.id);
-  return NextResponse.json({ sucesso: true, idempotente: false, pedido: { ...pedido, pedido_itens: itensGravados } }, { status: 201 });
+  return NextResponse.json({ sucesso: true, idempotente: false }, { status: 201, headers: { "Cache-Control": "no-store" } });
 }

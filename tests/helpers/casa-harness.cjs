@@ -45,6 +45,7 @@ async function carregar(options = {}) {
   const fetchLocal = async (url, init) => {
     calls.push({ url, init });
     const route = url.split('?')[0];
+    if (route === '/api/configuracoes') return { ok: options.apiError !== route, json: async () => options.invalidBody === route ? {} : { zapi_configurado: false } };
     if (options.networkError === route) throw Error('Falha de rede local');
     if (route === '/api/minha-clinica') return { ok: !options.semTenant, json: async () => ({ clinica_id: 'tenant-teste' }) };
     if (route === '/api/fechamento/tipos') return { ok: options.apiError !== route, json: async () => options.invalidBody === route ? {} : { sucesso:true, tipos:options.fechamentoTipos ?? [] } };
