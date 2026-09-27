@@ -1,5 +1,42 @@
 # Gerente Comercial AI V1 — auditoria e coordenação local
 
+## Revalidação final antes da KENSA (2026-09-27, HEAD `60955ff`)
+
+**Status: CONCLUÍDO por composição — nenhum motor, tela, rota, tabela ou migration novos.**
+
+A entrega da branch `feature/gerente-comercial-ai-v1` (`6bc2fd5`) já está em
+`convergencia/final-organizapro-v1`: `lib/gerente-comercial.ts` e este documento
+são idênticos byte a byte; `app/copiloto/page.tsx` e `tests/gerente-comercial.test.mjs`
+evoluíram depois (E-commerce/Pedidos e retomada do Copiloto) mantendo a integração.
+
+Jornada real no HEAD, sem peça paralela:
+
+| Etapa | Peça canônica |
+|---|---|
+| Sinal / oportunidade | `gerarOportunidadesClientes` (`lib/oportunidades-clientes.ts`): agenda, cancelamento sem reagendamento, confirmação pendente, orçamento parado, tratamento sem retorno, cobrança atrasada, **pedido não concluído**, **recompra**; `adaptarOportunidadesDemanda` (Central de Oportunidades) |
+| Prioridade | `organizarSinaisCanonicos` / `gerarEstadoComercialCanonico` (`lib/nucleo-inteligente.ts`) — mesma ordem e deduplicação do Dashboard/Radar |
+| Próxima melhor ação | `coordenarGerenteComercial` (`lib/gerente-comercial.ts`): `destinoAcao` do sinal > destino da Agenda Autônoma > destino do domínio; impacto só por `(origem, entidadeId)` na Receita Perdida — os 4 tipos monetários (`orcamento_parado`, `cobranca_atrasada`, `tratamento_sem_retorno`, `pedido_nao_concluido`) coincidem com `OrigemReceitaPerdida` |
+| Execução / follow-up | executores existentes: `/follow-up` (`app/api/follow-up/tentativa`, `aprovar-envio`), `/cobrancas`, `/agenda-autonoma`, `/oportunidades` → `gerar-orcamento`; idempotência e registro em `eventos_dominio` continuam nesses módulos |
+| Orçamento / pedido / tratamento | `/orcamentos`, `/pedidos` (E-commerce IA), `/tratamentos` — donos dos fluxos preservados |
+| Receita / resultado | Receita Perdida e Previsor de Faturamento no próprio Copiloto (mesmos motores das telas dedicadas); resultados executados (`followup.*`, `cobranca.*`, `gbp.resposta_publicada`) voltam à Casa por `lib/organizapro-trabalhando.ts` (card “OrganizaPro trabalhando”) e `/api/atividade-recente` |
+
+Entrada: menu Inteligência → Copiloto → seção `#gerente-comercial`.
+
+Validação desta revalidação: 14 suítes (Gerente, Cérebro Comercial, P1-2 Copiloto,
+Receita Perdida, Agenda Autônoma, Follow-up, Smart Commerce, Pedido→Radar→Diretor,
+Orçamento parado→Diretor, Venda→Receita→Diretor, Oportunidade→Orçamento,
+Oportunidades de demanda, Retomada do Copiloto, Previsor) — **159/159**.
+`copiloto-retomada.test.cjs` roda sem `--conditions=react-server` (harness de
+componente cliente); os demais com essa condição e `NODE_PATH` apontando para
+`node_modules/next/dist/compiled` (resolve `server-only`).
+
+Pendência não bloqueante (herdada, ver “Pendências e limites reais”): a lista
+“atrasados” do Copiloto filtra `data < hoje` sobre uma consulta restrita a
+`data = hoje` e por isso fica sempre vazia — nunca exibe dado incorreto; ajuste
+é mudança de escopo da consulta de agenda e fica fora da V1.
+
+---
+
 Base auditada: `convergencia/final-organizapro-v1`, commit `1f4a030`.
 Implementação isolada na branch `feature/gerente-comercial-ai-v1`.
 Entrada: menu Inteligência → Copiloto, seção **Gerente Comercial AI** (`/copiloto#gerente-comercial`).
