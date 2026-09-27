@@ -13,7 +13,7 @@ import { CONEXOES_ADS_V1 } from '../../lib/ads-contratos';
 
 type Dados = Awaited<ReturnType<typeof carregarRelatorioAtribuicao>>;
 const dinheiro = (v: number) => (v / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const labels: Record<string, string> = { google_ads: 'Google Ads', meta_ads: 'Meta Ads', campanha_utm: 'Campanha marcada / plataforma incerta', busca_organica: 'Busca orgânica', referencia: 'Referência', direto: 'Origem não identificada', cliente: 'Cliente', oportunidade: 'Oportunidade', orcamento: 'Orçamento', pedido: 'Pedido', agendamento: 'Agendamento', cobranca: 'Cobrança' };
+const labels: Record<string, string> = { google_ads: 'Google Ads', meta_ads: 'Meta Ads', campanha_utm: 'Campanha marcada / plataforma incerta', busca_organica: 'Busca orgânica', referencia: 'Referência', direto: 'Origem não identificada', cliente: 'Cliente', oportunidade: 'Oportunidade', orcamento: 'Orçamento', pedido: 'Pedido', agendamento: 'Agendamento', cobranca: 'Cobrança', tratamento: 'Tratamento' };
 
 export default function AtribuicaoPage() {
   const router = useRouter();
@@ -88,24 +88,24 @@ export default function AtribuicaoPage() {
       <section className="atr-section"><h2>Pagamentos e evidência</h2>
         {r.pagamentos.length === 0 && <p>Nenhum pagamento comprovado nos dados carregados.</p>}
         <ul>{r.pagamentos.map(p => <li key={`${p.tipo}:${p.id}`}>
-          {p.nome} · {labels[p.tipo]} {p.id} · {p.valorCentavos === null ? 'Valor inválido' : dinheiro(p.valorCentavos)} · {p.origemId ? origemLabel(p.origemId) : 'Não atribuído'}<br />
-          {p.motivo}. Trilha: {p.trilha.map(t => `${t.etapa} ${t.id}`).join(' → ')}
+          {p.nome} · {labels[p.tipo] ?? 'Pagamento'} · {p.valorCentavos === null ? 'Valor inválido' : dinheiro(p.valorCentavos)} · {p.origemId ? origemLabel(p.origemId) : 'Não atribuído'}<br />
+          {p.motivo}. Trilha: {p.trilha.map(t => labels[t.etapa] ?? t.etapa).join(' → ')}
         </li>)}</ul>
       </section>
       <section className="atr-section"><h2>Clientes e etapas comerciais</h2>
         <p>Vínculo de cliente não atribui automaticamente todos os seus pagamentos. Etapas sem evidência e conflitos permanecem explícitos.</p>
-        <details><summary>Ver {r.trilhas.length} registros, incluindo não atribuídos</summary><ul>{r.trilhas.map(t => <li key={`${t.tipo}:${t.id}`}>{labels[t.tipo]} · {t.nome} · {t.id} — {t.estado === 'vinculado' ? origemLabel(t.origens[0]) : t.estado === 'incerto' ? 'Incerto: origens conflitantes' : 'Não atribuído'}</li>)}</ul></details>
+        <details><summary>Ver {r.trilhas.length} registros, incluindo não atribuídos</summary><ul>{r.trilhas.map(t => <li key={`${t.tipo}:${t.id}`}>{labels[t.tipo]} · {t.nome} — {t.estado === 'vinculado' ? origemLabel(t.origens[0]) : t.estado === 'incerto' ? 'Incerto: origens conflitantes' : 'Não atribuído'}</li>)}</ul></details>
       </section>
       {dados.origens.length > 0 && <section className="atr-section"><h2>Registrar vínculo com evidência</h2>
         <p>Use somente uma referência verificável. O sistema preserva autoria e evidência; uma origem existente não será sobrescrita.</p>
         <form className="atr-form" onSubmit={registrar}>
           <label>Origem capturada<select required value={origemId} onChange={e => setOrigemId(e.target.value)}><option value="">Selecione</option>{dados.origens.map(o => <option key={o.id} value={o.id}>{origemLabel(o.id)} · {o.capturadoEm}</option>)}</select></label>
           <label>Etapa<select value={tipo} onChange={e => { setTipo(e.target.value as TipoVinculoAtribuicao); setEntidadeId(''); }}>{TIPOS_VINCULO_ATRIBUICAO.map(t => <option key={t} value={t}>{labels[t]}</option>)}</select></label>
-          <label>Registro do seu negócio<select required value={entidadeId} onChange={e => setEntidadeId(e.target.value)}><option value="">Selecione</option>{r.trilhas.filter(t => t.tipo === tipo).map(t => <option key={t.id} value={t.id}>{t.nome} · {t.id}</option>)}</select></label>
+          <label>Registro do seu negócio<select required value={entidadeId} onChange={e => setEntidadeId(e.target.value)}><option value="">Selecione</option>{r.trilhas.filter(t => t.tipo === tipo).map(t => <option key={t.id} value={t.id}>{t.nome} (ref. {t.id.slice(0, 8)})</option>)}</select></label>
           <label>Evidência / referência<textarea required minLength={10} maxLength={500} value={evidencia} onChange={e => setEvidencia(e.target.value)} placeholder="Referência verificável que relaciona esta origem ao registro" /></label>
           <button disabled={salvando}>{salvando ? 'Registrando...' : 'Registrar evidência'}</button>
         </form>
-        <details><summary>Evidências registradas ({dados.vinculos.length})</summary><ul>{dados.vinculos.map(v => <li key={`${v.entidadeTipo}:${v.entidadeId}:${v.origemId}`}>{labels[v.entidadeTipo]} {v.entidadeId} → {origemLabel(v.origemId)} · {v.metodo === 'codigo_site' ? 'Código retornado no site' : 'Declaração do operador'} · {v.evidencia}</li>)}</ul></details>
+        <details><summary>Evidências registradas ({dados.vinculos.length})</summary><ul>{dados.vinculos.map(v => <li key={`${v.entidadeTipo}:${v.entidadeId}:${v.origemId}`}>{labels[v.entidadeTipo]} · {r.trilhas.find(t => t.id === v.entidadeId)?.nome ?? 'registro do negócio'} → {origemLabel(v.origemId)} · {v.metodo === 'codigo_site' ? 'Código retornado no site' : 'Declaração do operador'} · {v.evidencia}</li>)}</ul></details>
       </section>}
     </>}
   </AdminShell>;

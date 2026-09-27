@@ -45,7 +45,7 @@ export default function DashboardDemo() {
   }, []);
 
   if (!cenario) return (
-    <AdminShell title="Painel Executivo">
+    <AdminShell title="Painel Executivo — Demonstração">
       <PageLoader title="Preparando seu painel..." />
     </AdminShell>
   );
@@ -117,6 +117,7 @@ export default function DashboardDemo() {
 
   return (
     <DashboardView
+      modoDemonstracao
       clinicaId="demo"
       dataStr={dataStr}
       saudacaoCard={saudacaoCard}

@@ -142,9 +142,10 @@ test("cada caso tem tipo, motivo e destino corretos, nunca misturado entre categ
     clientesAtivos: [{ id: "p1", nome: "Carla", telefone: "11999990003", whatsapp: null, proximaConsulta: null }],
   });
   const porTipo = Object.fromEntries(r.map(c => [c.tipo, c]));
-  assert.equal(porTipo.cancelamento_sem_reagendamento.destino, "/agendamentos");
+  // KENSA: cada destino abre onde o item está (cancelado → Histórico; sem compromisso → novo compromisso)
+  assert.equal(porTipo.cancelamento_sem_reagendamento.destino, "/agendamentos?filtro=historico");
   assert.equal(porTipo.confirmacao_pendente.destino, "/agendamentos");
-  assert.equal(porTipo.sem_proximo_compromisso.destino, "/agendamentos");
+  assert.equal(porTipo.sem_proximo_compromisso.destino, "/agendamentos?novo=1");
   assert.match(porTipo.cancelamento_sem_reagendamento.motivo, /cancelou/i);
   assert.match(porTipo.confirmacao_pendente.motivo, /confirmad[oa]/i);
   assert.match(porTipo.sem_proximo_compromisso.motivo, /próximo compromisso/i);

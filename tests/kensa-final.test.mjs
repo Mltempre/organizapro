@@ -104,3 +104,32 @@ test("Cliente 360: timeline sem enum cru (status/canal)", () => {
 test("Automação: cards não mostram 0 durante carregamento nem após falha (zero falso)", () => {
   assert.match(ler("app/automacao/page.tsx"), /\{carregando \|\| erro \? '—' : c\.valor\}/);
 });
+
+// ── Re-KENSA (2026-09-27, pós-gates de banco) ────────────────────────────────
+
+test("Agenda Autônoma: rótulo condiz com o destino (sem compromisso → agendar novo horário)", () => {
+  const p = ler("app/agenda-autonoma/page.tsx");
+  assert.match(p, /caso\.tipo === 'sem_proximo_compromisso' \? 'Agendar novo horário →' : 'Ver na Agenda →'/);
+  const lib = ler("lib/agenda-autonoma.ts");
+  assert.match(lib, /const DESTINO_AGENDA_HISTORICO = "\/agendamentos\?filtro=historico";/);
+  assert.match(lib, /const DESTINO_NOVO_COMPROMISSO = "\/agendamentos\?novo=1";/);
+});
+
+test("Atribuição: nenhum id técnico (UUID) exibido ao cliente; etapas por rótulo", () => {
+  const a = ler("app/atribuicao/page.tsx");
+  assert.doesNotMatch(a, /\{labels\[p\.tipo\]\} \{p\.id\}/);
+  assert.doesNotMatch(a, /\$\{t\.etapa\} \$\{t\.id\}/);
+  assert.doesNotMatch(a, /\{t\.nome\} · \{t\.id\} —/);
+  assert.doesNotMatch(a, /\{labels\[v\.entidadeTipo\]\} \{v\.entidadeId\}/);
+  assert.match(a, /Trilha: \{p\.trilha\.map\(t => labels\[t\.etapa\] \?\? t\.etapa\)\.join\(' → '\)\}/);
+  assert.match(a, /tratamento: 'Tratamento'/);
+});
+
+test("Modo demonstração se identifica (dados fictícios) sem alterar o Dashboard real", () => {
+  const view = ler("app/components/DashboardView.tsx");
+  assert.match(view, /modoDemonstracao\?: boolean;/);
+  assert.match(view, /props\.modoDemonstracao \? "Painel Executivo — Demonstração" : "Painel Executivo"/);
+  assert.match(view, /Modo demonstração: empresa e clientes fictícios/);
+  assert.match(ler("app/dashboard-demo/page.tsx"), /<DashboardView\n\s+modoDemonstracao\n/);
+  assert.doesNotMatch(ler("app/dashboard/page.tsx"), /modoDemonstracao/);
+});

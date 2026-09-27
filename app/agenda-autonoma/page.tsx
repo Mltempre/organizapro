@@ -208,7 +208,7 @@ export default function AgendaAutonomaPage() {
                     {confirmando === caso.id ? 'Confirmando...' : 'Confirmar'}
                   </button>
                 ) : (
-                  <button onClick={() => router.push(caso.destino)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>Ver na Agenda →</button>
+                  <button onClick={() => router.push(caso.destino)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>{caso.tipo === 'sem_proximo_compromisso' ? 'Agendar novo horário →' : 'Ver na Agenda →'}</button>
                 )}
               </div>
             );

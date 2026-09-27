@@ -291,6 +291,10 @@ export type DashboardViewProps = {
    * padrão (Dashboard real). /dashboard-demo passa uma narrativa de empresa já em
    * operação, para não terminar a página com um texto de primeiro acesso. */
   textoBemVindo?: { titulo: string; texto1: string; texto2: string };
+  /** Só /dashboard-demo: identifica a página como demonstração com dados fictícios —
+   * os textos compartilhados ("dados reais", "histórico real") são verdadeiros no
+   * Dashboard real, mas não no cenário sintético. Padrão false (Dashboard real inalterado). */
+  modoDemonstracao?: boolean;
 };
 
 export default function DashboardView(props: DashboardViewProps) {
@@ -414,7 +418,12 @@ export default function DashboardView(props: DashboardViewProps) {
   );
 
   return (
-    <AdminShell title="Painel Executivo">
+    <AdminShell title={props.modoDemonstracao ? "Painel Executivo — Demonstração" : "Painel Executivo"}>
+      {props.modoDemonstracao && (
+        <div role="note" style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.08)", color: "#fbbf24", fontSize: 13 }}>
+          Modo demonstração: empresa e clientes fictícios, gerados para apresentação. Nenhum dado real é consultado ou gravado.
+        </div>
+      )}
       {exibirWelcomeModal && clinicaId && <WelcomeModal clinicaId={clinicaId} />}
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }

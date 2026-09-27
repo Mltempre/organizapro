@@ -64,7 +64,8 @@ test('Agenda Autônoma fornece destino operacional do cliente sem compromisso', 
   const cliente = { id: 'cli-1', nome: 'Bia', telefone: null, whatsapp: null, proximaConsulta: null };
   const agenda = gerarCasosAgendaAutonoma({ hoje: entrada.hoje, cancelamentosRecentes: [], telefonesComReagendamentoFuturo: new Set(), agendaHoje: [], clientesAtivos: [cliente] });
   const s = adaptarOportunidadesClientes(gerarOportunidadesClientes({ ...entrada, orcamentosParados: [], clientesSemProximoCompromisso: [cliente] }));
-  assert.equal(coordenarGerenteComercial(s, null, agenda)[0].destinoAcao, '/agendamentos');
+  // KENSA: sem compromisso não há item a localizar — a ação abre o formulário de novo compromisso da Agenda.
+  assert.equal(coordenarGerenteComercial(s, null, agenda)[0].destinoAcao, '/agendamentos?novo=1');
 });
 
 test('oportunidade mantém origem real, confiança e rota do orçamento existente', () => {
@@ -92,4 +93,20 @@ test('integração da tela preserva proveniência e não oculta falha como vazio
   assert.match(codigo, /setEstado\(null\)/);
   assert.match(codigo, /coordenarGerenteComercial\(sinais, receitaPerdida, casosAgenda\)/);
   assert.match(codigo, /router.push\(destinoAcao\)/);
+});
+
+test('KENSA: "Ver cliente" abre o Cliente 360 só com id real de paciente; "Abrir ação" de novo horário abre o formulário da Agenda', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+  const base = { ...entrada, orcamentosParados: [] };
+  const real = adaptarOportunidadesClientes(gerarOportunidadesClientes({ ...base,
+    clientesSemProximoCompromisso: [{ id: uuid, nome: 'Bia', telefone: '11911113333', whatsapp: null, proximaConsulta: null }] }));
+  assert.equal(real[0].destino, `/clientes/${uuid}`);
+  assert.equal(real[0].destinoLabel, 'Ver cliente');
+  const sintetico = adaptarOportunidadesClientes(gerarOportunidadesClientes({ ...base,
+    clientesSemProximoCompromisso: [{ id: 'demo-cliente-carla', nome: 'Carla', telefone: '11911114444', whatsapp: null, proximaConsulta: null }] }));
+  assert.equal(sintetico[0].destino, '/clientes', 'sem identificação segura nunca inventa o 360');
+  const casos = gerarCasosAgendaAutonoma({ hoje: '2026-09-23', cancelamentosRecentes: [], telefonesComReagendamentoFuturo: new Set(), agendaHoje: [],
+    clientesAtivos: [{ id: uuid, nome: 'Bia', telefone: '11911113333', whatsapp: null, proximaConsulta: null }] });
+  const [atencao] = coordenarGerenteComercial(real, null, casos);
+  assert.equal(atencao.destinoAcao, '/agendamentos?novo=1');
 });

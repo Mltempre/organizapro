@@ -106,6 +106,10 @@ function formatarDataBr(iso: string): string {
 }
 
 const DESTINO_AGENDA = "/agendamentos";
+// Cada caso abre onde o item realmente está: cancelado só aparece no Histórico;
+// sem próximo compromisso não há item a localizar — abre o formulário de novo compromisso.
+const DESTINO_AGENDA_HISTORICO = "/agendamentos?filtro=historico";
+const DESTINO_NOVO_COMPROMISSO = "/agendamentos?novo=1";
 
 /**
  * Gera os casos operacionais da Agenda Autônoma — nenhuma consulta ao
@@ -125,7 +129,7 @@ export function gerarCasosAgendaAutonoma(input: EntradaAgendaAutonoma): CasoAgen
       telefone: c.telefone,
       motivo: `Cancelou o compromisso de ${formatarDataBr(c.data)} e ainda não tem um novo agendamento.`,
       proximaAcao: "Entrar em contato e reagendar",
-      destino: DESTINO_AGENDA,
+      destino: DESTINO_AGENDA_HISTORICO,
     });
   }
 
@@ -151,7 +155,7 @@ export function gerarCasosAgendaAutonoma(input: EntradaAgendaAutonoma): CasoAgen
       telefone: c.whatsapp || c.telefone,
       motivo: "Não tem nenhum próximo compromisso agendado.",
       proximaAcao: "Oferecer um novo horário",
-      destino: DESTINO_AGENDA,
+      destino: DESTINO_NOVO_COMPROMISSO,
     });
   }
 

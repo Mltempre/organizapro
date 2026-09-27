@@ -175,6 +175,13 @@ export type EntradaOportunidades = {
   recomprasPossiveis?:           RecompraPossivelInput[];
 };
 
+// Cliente 360 só com identificação segura: id real de paciente (UUID). Ids sintéticos
+// (ex.: /dashboard-demo) ou ausentes continuam levando à lista de clientes.
+const UUID_PACIENTE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function destinoCliente(id?: string | null): string {
+  return id && UUID_PACIENTE.test(id) ? `/clientes/${id}` : "/clientes";
+}
+
 function normalizarTelefone(t?: string | null): string {
   return (t || "").replace(/\D/g, "");
 }
@@ -262,7 +269,7 @@ export function gerarOportunidadesClientes(input: EntradaOportunidades): Oportun
       acaoSugerida:    "Oferecer um novo horário",
       entidadeTipo:    "cliente",
       entidadeId:      c.id,
-      destino:         "/clientes",
+      destino:         destinoCliente(c.id),
       diasDesdeEvento: dias,
       tempoDecorrido:  formatarTempoDecorrido(dias),
     });
