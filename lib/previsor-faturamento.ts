@@ -245,8 +245,6 @@ export function gerarPrevisorFaturamento(input: EntradaPrevisor): ResumoPrevisor
     });
   }
 
-  const oportunidadesSemValor = input.oportunidadesAbertas.length; // a contagem real (count-only) vem de agregarReceitaPerdida.oportunidades
-
   const totalComData = itensComData.reduce((soma, i) => soma + i.valor, 0);
   const totalSemData = itensSemData.reduce((soma, i) => soma + i.valor, 0);
 
@@ -274,6 +272,9 @@ export function gerarPrevisorFaturamento(input: EntradaPrevisor): ResumoPrevisor
     })),
     oportunidadesAbertas: input.oportunidadesAbertas,
   });
+  // Mesma contagem da Receita Perdida (aberta e sem orçamento vinculado) —
+  // nunca o total bruto recebido, que incluiria perdidas/convertidas/expiradas.
+  const oportunidadesSemValor = emRisco.oportunidadesSemComprovacao;
 
   return {
     hoje: input.hoje,

@@ -19,6 +19,7 @@ export default function Metricas() {
     concluidos: 0,
     cancelados: 0,
     pendentes: 0,
+    semDesfecho: 0,
   })
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,7 +55,7 @@ export default function Metricas() {
       }
       if (!clinicaId) {
         // Carregar métricas vazias mesmo sem clínica
-        setDados({ totalPacientes: 0, totalAgendamentos: 0, confirmados: 0, concluidos: 0, cancelados: 0, pendentes: 0 })
+        setDados({ totalPacientes: 0, totalAgendamentos: 0, confirmados: 0, concluidos: 0, cancelados: 0, pendentes: 0, semDesfecho: 0 })
         setLoading(false)
         return
       }
@@ -73,15 +74,16 @@ export default function Metricas() {
       if (agError)  throw new Error(`Erro ao carregar agendamentos: ${agError.message}`)
 
       const ags = agData || []
-      // agendado com data passada = vencido → entra em cancelados para fechar a soma
+      // Agendado com data passada = SEM DESFECHO (mesma definição dos "atrasados"
+      // da Casa e do Copiloto) — nunca contado como cancelado.
       const totalAgendamentos = ags.length
       const confirmados = ags.filter(a => a.status === 'confirmado').length
       const concluidos  = ags.filter(a => a.status === 'concluido').length
       const cancelados  = ags.filter(a =>
         a.status === 'cancelado' ||
-        a.status === 'faltou' ||
-        (a.status === 'agendado' && a.data < hoje)
+        a.status === 'faltou'
       ).length
+      const semDesfecho = ags.filter(a => a.status === 'agendado' && a.data < hoje).length
       const pendentes   = ags.filter(a =>
         (a.status === 'agendado' && a.data >= hoje) ||
         a.status === 'reagendar'
@@ -94,6 +96,7 @@ export default function Metricas() {
         concluidos,
         cancelados,
         pendentes,
+        semDesfecho,
       })
     } catch (err: unknown) {
       console.error("Erro ao carregar métricas:", err)
@@ -130,7 +133,8 @@ export default function Metricas() {
             { label: 'Confirmados', value: dados.confirmados, color: '#22c55e' },
             { label: 'Pendentes',   value: dados.pendentes,  color: '#f59e0b' },
             { label: 'Concluídos', value: dados.concluidos, color: '#7c3aed' },
-            { label: 'Cancelados', value: dados.cancelados, color: '#ef4444' },
+            { label: 'Cancelados e faltas', value: dados.cancelados, color: '#ef4444' },
+            { label: 'Sem desfecho (data passada)', value: dados.semDesfecho, color: '#f87171' },
           ].map((card) => (
             <div key={card.label} className="panel">
               <div style={{ color: card.color, fontSize: 36, fontWeight: 700, margin: '8px 0' }}>{card.value}</div>

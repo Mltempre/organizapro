@@ -177,6 +177,24 @@ test("oportunidade aberta sem orçamento vinculado é count-only — nunca soma 
   assert.equal(r.emRisco.oportunidades.length, 1);
 });
 
+test("KENSA: contagem de oportunidades sem valor = a da Receita Perdida (perdida/convertida/com orçamento fora)", () => {
+  // Antes: o Previsor usava oportunidadesAbertas.length e mostrava 5 onde a
+  // Receita Perdida (e a lista de Oportunidades) mostravam 3.
+  const r = gerarPrevisorFaturamento({
+    ...entradaVazia,
+    oportunidadesAbertas: [
+      { id: "a", pacienteNome: "Aberta 1", status: "sinalizada", orcamentoVinculadoId: null },
+      { id: "b", pacienteNome: "Aberta 2", status: "em_contato", orcamentoVinculadoId: null },
+      { id: "c", pacienteNome: "Perdida", status: "perdida", orcamentoVinculadoId: null },
+      { id: "d", pacienteNome: "Convertida", status: "convertida", orcamentoVinculadoId: null },
+      { id: "e", pacienteNome: "Já orçada", status: "atendida", orcamentoVinculadoId: "orc-1" },
+    ],
+  });
+  assert.equal(r.emPerspectiva.oportunidadesSemValor, r.emRisco.oportunidadesSemComprovacao);
+  assert.equal(r.emPerspectiva.oportunidadesSemValor, 2);
+  assert.equal(r.totalEsperado30Dias, 0);
+});
+
 // ── Anti-duplicação ────────────────────────────────────────────────────────
 
 test("anti-duplicação: tratamento com cobrança ABERTA já vinculada não conta na perspectiva — só a cobrança conta", () => {

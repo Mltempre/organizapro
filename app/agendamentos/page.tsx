@@ -531,7 +531,9 @@ export default function AgendamentosPage() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:16, marginBottom:28 }}>
         {[
           { label:'Compromissos Hoje', valor:compromissosHoje, cor:'#1F4E5F' },
-          { label:'Confirmados',       valor:confirmados,      cor:'#16a34a' },
+          // Conta quem confirmou presença (inclusive já concluídos) — rótulo distinto
+          // do status "confirmado" atual usado em Métricas, para não parecer contradição.
+          { label:'Confirmaram presença', valor:confirmados,  cor:'#16a34a' },
           { label:'Ausências',         valor:ausencias,        cor:'#dc2626' },
           { label:'Concluídos',        valor:concluidos,       cor:'#4a9bb0' },
         ].map(c => (

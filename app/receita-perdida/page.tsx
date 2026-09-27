@@ -12,7 +12,7 @@ import type { Orcamento } from '../../lib/motor-orcamentos';
 import type { Tratamento } from '../../lib/motor-tratamento';
 import type { Cobranca } from '../../lib/motor-cobranca';
 import { agregarReceitaPerdida, type ResumoReceitaPerdida, type OrigemReceitaPerdida } from '../../lib/receita-perdida';
-import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
+import { ROTULO_STATUS_OPORTUNIDADE, type OportunidadeStatus } from '../../lib/oportunidades-demanda';
 
 // ── Receita Perdida AI V1 · visão consolidada e explicável ──────────────
 // Nenhuma consulta nova, nenhum motor novo: busca exatamente os mesmos
@@ -109,6 +109,7 @@ export default function ReceitaPerdidaPage() {
     <AdminShell title="Receita Perdida AI" subtitle="Dinheiro real em risco, consolidado dos motores já existentes">
       {carregando && <PageLoader title="Consolidando receita em risco..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && erro && <button onClick={carregar}>Tentar novamente</button>}
 
       {!carregando && resumo && (
         <>
@@ -117,7 +118,7 @@ export default function ReceitaPerdidaPage() {
             <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Valor conhecido em risco (soma de dados reais)</div>
             <div style={{ fontSize: 32, fontWeight: 800, color: '#f87171' }}>{formatarValor(resumo.totalConhecido)}</div>
             <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
-              {resumo.totalItensComValor} item{resumo.totalItensComValor !== 1 ? 's' : ''} com valor comprovado
+              {resumo.totalItensComValor} {resumo.totalItensComValor === 1 ? 'item' : 'itens'} com valor comprovado
               {resumo.totalItensSemValor > 0 && <> · {resumo.totalItensSemValor} item{resumo.totalItensSemValor !== 1 ? 's' : ''} sem valor conhecido (não somado{resumo.totalItensSemValor !== 1 ? 's' : ''})</>}
               {resumo.oportunidadesSemComprovacao > 0 && <> · {resumo.oportunidadesSemComprovacao} oportunidade{resumo.oportunidadesSemComprovacao !== 1 ? 's' : ''} sem valor financeiro comprovado (nunca contada{resumo.oportunidadesSemComprovacao !== 1 ? 's' : ''} em dinheiro)</>}
             </div>
@@ -169,7 +170,7 @@ export default function ReceitaPerdidaPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {resumo.oportunidades.map(op => (
                   <div key={op.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(148,163,184,0.06)', border: '1px solid #2d3148', borderRadius: 10, padding: '10px 16px', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: '#cbd5e1' }}>{op.pacienteNome} — status: {op.status}</div>
+                    <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: '#cbd5e1' }}>{op.pacienteNome} — {ROTULO_STATUS_OPORTUNIDADE[op.status] ?? 'Em aberto'}</div>
                     <button onClick={() => router.push(op.destino)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>Ver →</button>
                   </div>
                 ))}

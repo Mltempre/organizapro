@@ -145,9 +145,10 @@ const REGRAS: Regra[] = [
       return {
         titulo: `Analisei sua agenda e encontrei ${ctx.atrasados} compromisso${plural ? "s" : ""} em atraso.`,
         explicacao: "Compromissos atrasados costumam virar clientes esquecidos se não forem resolvidos rápido. Vale sua atenção agora.",
-        motivo: `${ctx.atrasados} compromisso${plural ? "s" : ""} passou da data sem ser concluído, cancelado ou reagendado.`,
+        motivo: `${ctx.atrasados} compromisso${plural ? "s passaram" : " passou"} da data sem ser concluído, cancelado ou reagendado.`,
         acao: "Resolver agora",
-        destino: "/agendamentos", destinoLabel: "Ver agenda",
+        // Atrasados ficam na aba Histórico; "/agendamentos" abre em Próximos (lista vazia para eles).
+        destino: "/agendamentos?filtro=historico", destinoLabel: "Ver agenda",
         prioridade: "alta",
         impacto: "Evita perder o cliente e a receita do atendimento",
         tempoEstimado: "5 min",

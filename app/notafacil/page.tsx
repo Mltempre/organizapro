@@ -28,6 +28,8 @@ export default function NotaFacilPage() {
     async function carregar() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        // Sem sessão é login, não "negócio não vinculado" (mensagem falsa ao usuário).
+        if (!session) { window.location.replace("/login"); return; }
         const { data: vinculo } = await supabase
           .from("clinica_usuarios")
           .select("clinica_id")

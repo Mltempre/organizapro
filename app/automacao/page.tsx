@@ -179,7 +179,7 @@ export default function AutomacaoPage() {
   };
 
   return (
-    <AdminShell title="WhatsApp" subtitle="Historico de automacoes e envios">
+    <AdminShell title="WhatsApp" subtitle="Histórico de automações e envios">
       <div style={{ maxWidth: 1100 }}>
 
         {erro && (
@@ -191,16 +191,17 @@ export default function AutomacaoPage() {
           {[
             { label: 'Mensagens Enviadas',    valor: totalEnviados,    cor: '#4ade80', icon: '✅' },
             { label: 'Erros de Envio',        valor: totalErros,       cor: '#f87171', icon: '❌' },
-            { label: 'Avaliacoes Enviadas',   valor: totalAvaliacoes,  cor: '#fbbf24', icon: '⭐' },
-            { label: 'Avaliacoes Recebidas',  valor: totalRespondeu,   cor: '#7c3aed', icon: '🏆' },
-            { label: 'Consultas Confirmadas', valor: totalConfirmados, cor: '#38bdf8', icon: '📅' },
-            { label: 'Aguard. Reagendamento', valor: totalReagendar,   cor: '#fb923c', icon: '⚠️' },
+            { label: 'Avaliações enviadas',   valor: totalAvaliacoes,  cor: '#fbbf24', icon: '⭐' },
+            { label: 'Avaliações recebidas',  valor: totalRespondeu,   cor: '#7c3aed', icon: '🏆' },
+            { label: 'Confirmaram presença',  valor: totalConfirmados, cor: '#38bdf8', icon: '📅' },
+            { label: 'Aguardando reagendamento', valor: totalReagendar,   cor: '#fb923c', icon: '⚠️' },
           ].map(c => (
             <div key={c.label} style={card}>
               <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500, marginBottom: 8 }}>{c.label}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 20 }}>{c.icon}</span>
-                <span style={{ fontSize: 30, fontWeight: 700, color: c.cor }}>{c.valor}</span>
+                {/* Carregando ou falha de carga nunca exibem 0 (zero falso) */}
+                <span style={{ fontSize: 30, fontWeight: 700, color: c.cor }}>{carregando || erro ? '—' : c.valor}</span>
               </div>
             </div>
           ))}

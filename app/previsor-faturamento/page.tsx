@@ -125,6 +125,7 @@ export default function PrevisorFaturamentoPage() {
     <AdminShell title="Previsor de Faturamento" subtitle="Próximos 30 dias — só o que os dados reais sustentam">
       {carregando && <PageLoader title="Calculando previsão..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && erro && <button onClick={carregar}>Tentar novamente</button>}
 
       {!carregando && resumo && (
         <>

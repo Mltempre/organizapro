@@ -93,7 +93,7 @@ export default function CopilotoPage() {
       // app/dashboard/page.tsx. fetchJsonSeguro distingue falha real de
       // vazio real — uma API fora do ar nunca deve virar silenciosamente
       // "nada pendente" (achado sistêmico da auditoria de última milha).
-      const [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR, agHojeRes, semProximoRes, canceladosRes] = await Promise.all([
+      const [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR, agHojeRes, semProximoRes, canceladosRes, atrasadosRes] = await Promise.all([
         fetchJsonSeguro<{ data: OportunidadeRow[] }>('/api/oportunidades', { headers: auth }, { data: [] }),
         fetchJsonSeguro<{ orcamentos: OrcamentoRow[] }>(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }, { orcamentos: [] }),
         fetchJsonSeguro<{ tratamentos: TratamentoRow[] }>(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }, { tratamentos: [] }),
@@ -102,10 +102,13 @@ export default function CopilotoPage() {
         supabase.from('agendamentos').select('id, hora, paciente_nome, telefone, status, data').eq('clinica_id', cid).eq('data', hoje).order('hora'),
         supabase.from('pacientes').select('id, nome, telefone, whatsapp, proxima_consulta').eq('clinica_id', cid).eq('status', 'ativo').or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`).order('nome').limit(20),
         supabase.from('agendamentos').select('id, paciente_nome, telefone, data').eq('clinica_id', cid).eq('status', 'cancelado').gte('data', trintaDiasAtras).order('data', { ascending: false }).limit(50),
+        // Atrasados = mesma definição da Casa (app/dashboard/page.tsx): dias
+        // anteriores ainda "agendado". A consulta de hoje acima nunca os contém.
+        supabase.from('agendamentos').select('id, hora, paciente_nome, telefone, status, data').eq('clinica_id', cid).lt('data', hoje).eq('status', 'agendado').order('data', { ascending: false }).order('hora').limit(20),
       ]);
       const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, tratamentosRes = tratamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
       const falhaParcial = [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR].some(r => r.falhou)
-        || !!agHojeRes.error || !!semProximoRes.error || !!canceladosRes.error;
+        || !!agHojeRes.error || !!semProximoRes.error || !!canceladosRes.error || !!atrasadosRes.error;
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
@@ -205,7 +208,7 @@ export default function CopilotoPage() {
         sinais,
         atencoes: coordenarGerenteComercial(sinais, receitaPerdida, casosAgenda),
         followUpsPendentes,
-        atrasados: agendaHoje.filter(a => a.data < hoje && a.status === 'agendado'),
+        atrasados: (atrasadosRes.data ?? []) as AgItem[],
         pendentesConfirmacao: agendaHoje.filter(a => a.status === 'agendado' && a.data === hoje),
         receitaPerdida,
         previsor,
@@ -250,12 +253,19 @@ export default function CopilotoPage() {
             <section style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Agenda</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {estado.atrasados.map(a => (
+                {/* No máximo 3 aqui: o backlog completo vive no Histórico da Agenda (mesmo destino da Casa)
+                    — nunca empurra as prioridades comerciais para fora da tela. */}
+                {estado.atrasados.slice(0, 3).map(a => (
                   <div key={`atraso-${a.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 10, padding: '10px 16px', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: '#f1f5f9' }}>{a.paciente_nome} — compromisso em atraso ({a.data})</div>
-                    <button onClick={() => router.push('/agendamentos')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>Ver agenda →</button>
+                    <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: '#f1f5f9' }}>{a.paciente_nome} — compromisso de {a.data.split('-').reverse().join('/')}{a.hora ? ` às ${a.hora.slice(0, 5)}` : ''} ainda sem desfecho</div>
+                    <button onClick={() => router.push('/agendamentos?filtro=historico')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>Ver agenda →</button>
                   </div>
                 ))}
+                {estado.atrasados.length > 3 && (
+                  <button onClick={() => router.push('/agendamentos?filtro=historico')} style={{ alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 12, cursor: 'pointer' }}>
+                    + {estado.atrasados.length - 3} compromisso{estado.atrasados.length - 3 === 1 ? '' : 's'} anterior{estado.atrasados.length - 3 === 1 ? '' : 'es'} sem desfecho — revisar na agenda →
+                  </button>
+                )}
                 {estado.pendentesConfirmacao.map(a => (
                   <div key={`pend-${a.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid #2d3148', borderRadius: 10, padding: '10px 16px', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: '#f1f5f9' }}>{a.paciente_nome} — hoje às {a.hora}, aguardando confirmação</div>

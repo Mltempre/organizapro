@@ -10,6 +10,18 @@ export const OPORTUNIDADE_STATUS = [
 
 export type OportunidadeStatus = (typeof OPORTUNIDADE_STATUS)[number];
 
+// Rótulo exibido ao cliente — fonte única (Oportunidades, Receita Perdida).
+// O valor técnico (snake_case) nunca aparece na interface.
+export const ROTULO_STATUS_OPORTUNIDADE: Record<OportunidadeStatus, string> = {
+  sinalizada: "Sinalizada",
+  em_contato: "Em contato",
+  agendada: "Agendada",
+  atendida: "Atendida",
+  convertida: "Convertida",
+  perdida: "Perdida",
+  expirada: "Expirada",
+};
+
 export type NovaOportunidade = {
   canal: "whatsapp" | "manual" | "site";
   identificador_canal?: string | null;

@@ -109,6 +109,7 @@ export default function LinhaEconomicaPage() {
     <AdminShell title="Linha Econômica" subtitle="Prova de resultado — comprovado × atribuível, nunca causalidade inventada">
       {carregando && <PageLoader title="Reconstruindo cadeias econômicas..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && erro && <button onClick={carregar}>Tentar novamente</button>}
 
       {!carregando && resumo && (
         <>
@@ -137,7 +138,7 @@ export default function LinhaEconomicaPage() {
 
           <div style={{ display: 'flex', gap: 16, marginBottom: 24, fontSize: 12, color: '#94a3b8' }}>
             <span>🔗 {resumo.cadeiasCompletas} cadeia{resumo.cadeiasCompletas !== 1 ? 's' : ''} completa{resumo.cadeiasCompletas !== 1 ? 's' : ''} (oportunidade → orçamento → tratamento → pagamento)</span>
-            <span>⏳ {resumo.cadeiasParciais} cadeia{resumo.cadeiasParciais !== 1 ? 's' : ''} parcial{resumo.cadeiasParciais !== 1 ? 'is' : ''} (rastreável, ainda sem pagamento comprovado)</span>
+            <span>⏳ {resumo.cadeiasParciais} cadeia{resumo.cadeiasParciais !== 1 ? 's' : ''} {resumo.cadeiasParciais !== 1 ? 'parciais' : 'parcial'} (rastreável, ainda sem pagamento comprovado)</span>
           </div>
 
           {resumo.porCanal.length > 0 && (

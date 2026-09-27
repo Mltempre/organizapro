@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   } catch (erro) {
     const schemaPendente = erro instanceof Error && erro.message === 'ATRIBUICAO_SCHEMA_PENDENTE';
     return NextResponse.json({ indisponivel: true, schemaPendente,
-      error: schemaPendente ? 'Estrutura de atribuição ainda não disponível. Homologação de banco necessária.' : 'Não foi possível obter todas as fontes. Nenhum total parcial foi apresentado.',
+      error: schemaPendente ? 'A atribuição de origem ainda não está ativada para a sua conta. Nenhum valor foi calculado.' : 'Não foi possível obter todas as fontes. Nenhum total parcial foi apresentado.',
     }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 }

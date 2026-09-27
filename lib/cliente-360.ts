@@ -149,6 +149,10 @@ export function gerarCliente360(input: EntradaCliente360): ResumoCliente360 {
 
   // ── Timeline — só fatos reais, nunca um evento fabricado ────────────
   const timeline: EventoTimeline[] = [];
+  // Rótulos exibidos ao cliente — o valor técnico (status/canal) nunca aparece cru.
+  const rotuloStatusAgenda: Record<string, string> = { agendado: "agendado", confirmado: "confirmado", concluido: "concluído",
+    cancelado: "cancelado", faltou: "falta", reagendar: "a reagendar" };
+  const rotuloCanal: Record<string, string> = { whatsapp: "WhatsApp", site: "site", manual: "contato manual" };
   for (const a of agendamentos) {
     const dataHora = `${a.data}T${a.hora}`;
     // A aba padrão de /agendamentos ("Próximos") exclui compromissos
@@ -157,10 +161,10 @@ export function gerarCliente360(input: EntradaCliente360): ResumoCliente360 {
     // aparecia. Passado real (comparado a `agora`, nunca ao relógio do
     // navegador) manda para a aba Histórico; futuro continua na padrão.
     const destinoAgendamento = dataHora < input.agora ? "/agendamentos?filtro=historico" : "/agendamentos";
-    timeline.push({ tipo: "agendamento", data: dataHora, descricao: `Compromisso: ${a.tipoConsulta} (${a.status})`, valor: null, destino: destinoAgendamento });
+    timeline.push({ tipo: "agendamento", data: dataHora, descricao: `Compromisso: ${a.tipoConsulta} (${a.status === "agendado" && dataHora < input.agora ? "sem desfecho" : rotuloStatusAgenda[a.status] ?? a.status})`, valor: null, destino: destinoAgendamento });
   }
   for (const o of oportunidades) {
-    timeline.push({ tipo: "oportunidade", data: o.criadoEm, descricao: `Oportunidade sinalizada via ${o.canal}`, valor: null, destino: "/oportunidades" });
+    timeline.push({ tipo: "oportunidade", data: o.criadoEm, descricao: `Oportunidade sinalizada via ${rotuloCanal[o.canal] ?? o.canal}`, valor: null, destino: "/oportunidades" });
   }
   for (const o of orcamentos) {
     timeline.push({ tipo: "orcamento", data: o.apresentadoEm, descricao: `Orçamento apresentado: ${o.procedimento}`, valor: o.valor, destino: "/orcamentos" });

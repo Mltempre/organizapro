@@ -72,6 +72,26 @@ test("calcularIndicadoresCobranca: valorRecebido nunca se confunde com valorRecu
   assert.equal(indicadores.valorRecuperadoTotal, 100);
 });
 
+test("KENSA: com cobranças registradas, nada pago no mês é R$ 0 conhecido — nunca 'valor não informado' (null)", () => {
+  const base = { clinica_id: "c1", paciente_id: null, paciente_nome: "A", paciente_telefone: null, tratamento_origem_id: null,
+    descricao: "x", valor: 150, motivo_cancelamento: null, observacao: null, created_by: null, em_cobranca_em: null,
+    cancelado_em: null, created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z" };
+  // Único pagamento foi em agosto; o mês corrente é setembro (caso real da conta demo).
+  const i = motor.calcularIndicadoresCobranca(
+    [{ ...base, id: "p", status: "pago", vencimento: "2026-08-01", valor_pago: 150, pago_em: "2026-08-10T00:00:00Z" }],
+    "2026-09-27T12:00:00Z"
+  );
+  assert.equal(i.valorRecebidoMes, 0);
+  assert.equal(i.valorRecuperadoMes, 0);
+  assert.equal(i.valorEmAberto, 0);
+  assert.equal(i.valorRecebidoTotal, 150);
+  assert.equal(i.proporcaoValorAtrasado, null, "sem valor em aberto, proporção continua indefinida");
+  // Sem nenhuma cobrança registrada continua sem base (null).
+  const vazio = motor.calcularIndicadoresCobranca([], "2026-09-27T12:00:00Z");
+  assert.equal(vazio.valorRecebidoMes, null);
+  assert.equal(vazio.valorEmAberto, null);
+});
+
 // ── Cobrador Digital — elegivelParaTentativaCobranca ────────────────────
 
 test("elegivelParaTentativaCobranca: cobrança pendente, vencida, com telefone e sem tentativa hoje é elegível", () => {

@@ -256,3 +256,20 @@ test("cliente-360: toda a decisão é delegada a gerarCliente360 — nenhuma som
   assert.match(pagina, /gerarCliente360\(/);
   assert.doesNotMatch(pagina, /\.reduce\(/);
 });
+
+test("KENSA: timeline mostra rótulos legíveis — nunca o status/canal técnico cru", () => {
+  const r = gerarCliente360({ ...entradaVazia,
+    agendamentos: [
+      { id: "a1", telefone: "11911112222", data: "2026-09-01", hora: "10:00", tipoConsulta: "Corte", status: "concluido" },
+      { id: "a2", telefone: "11911112222", data: "2026-09-05", hora: "11:00", tipoConsulta: "Barba", status: "agendado" },
+      { id: "a3", telefone: "11911112222", data: "2026-09-30", hora: "09:00", tipoConsulta: "Corte", status: "agendado" },
+    ],
+    oportunidades: [{ id: "o1", telefone: "11911112222", canal: "whatsapp", status: "sinalizada", criadoEm: "2026-08-01T10:00:00Z", ultimaInteracaoEm: "2026-08-01T10:00:00Z" }],
+  });
+  const textos = r.timeline.map(e => e.descricao);
+  assert.ok(textos.includes("Compromisso: Corte (concluído)"));
+  assert.ok(textos.includes("Compromisso: Barba (sem desfecho)"), "agendado no passado = sem desfecho (mesma leitura da Casa/Copiloto)");
+  assert.ok(textos.includes("Compromisso: Corte (agendado)"), "agendado futuro continua agendado");
+  assert.ok(textos.includes("Oportunidade sinalizada via WhatsApp"));
+  assert.ok(!textos.some(t => /\(concluido\)|via whatsapp/.test(t)));
+});

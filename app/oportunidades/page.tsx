@@ -7,7 +7,7 @@ import AdminShell from '../components/AdminShell';
 import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
-import { OPORTUNIDADE_STATUS, oportunidadeElegivelParaOrcamento, type OportunidadeStatus } from '../../lib/oportunidades-demanda';
+import { OPORTUNIDADE_STATUS, ROTULO_STATUS_OPORTUNIDADE, oportunidadeElegivelParaOrcamento, type OportunidadeStatus } from '../../lib/oportunidades-demanda';
 
 // ── Superfície operacional de Oportunidades (última milha: Oportunidade →
 // Orçamento) ─────────────────────────────────────────────────────────────
@@ -33,13 +33,13 @@ type Oportunidade = {
 type OrcamentoResumo = { id: string; procedimento: string; valor: number; status: string };
 
 const STATUS_CONFIG: Record<OportunidadeStatus, { label: string; color: string; bg: string }> = {
-  sinalizada:  { label: 'Sinalizada',   color: '#38bdf8', bg: 'rgba(14,165,233,0.14)' },
-  em_contato:  { label: 'Em contato',   color: '#4a9bb0', bg: 'rgba(31,78,95,0.2)' },
-  agendada:    { label: 'Agendada',     color: '#a78bfa', bg: 'rgba(167,139,250,0.14)' },
-  atendida:    { label: 'Atendida',     color: '#fbbf24', bg: 'rgba(251,191,36,0.14)' },
-  convertida:  { label: 'Convertida',   color: '#16a34a', bg: '#dcfce7' },
-  perdida:     { label: 'Perdida',      color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
-  expirada:    { label: 'Expirada',     color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },
+  sinalizada:  { label: ROTULO_STATUS_OPORTUNIDADE.sinalizada,   color: '#38bdf8', bg: 'rgba(14,165,233,0.14)' },
+  em_contato:  { label: ROTULO_STATUS_OPORTUNIDADE.em_contato,   color: '#4a9bb0', bg: 'rgba(31,78,95,0.2)' },
+  agendada:    { label: ROTULO_STATUS_OPORTUNIDADE.agendada,     color: '#a78bfa', bg: 'rgba(167,139,250,0.14)' },
+  atendida:    { label: ROTULO_STATUS_OPORTUNIDADE.atendida,     color: '#fbbf24', bg: 'rgba(251,191,36,0.14)' },
+  convertida:  { label: ROTULO_STATUS_OPORTUNIDADE.convertida,   color: '#16a34a', bg: '#dcfce7' },
+  perdida:     { label: ROTULO_STATUS_OPORTUNIDADE.perdida,      color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+  expirada:    { label: ROTULO_STATUS_OPORTUNIDADE.expirada,     color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },
 };
 const CANAL_LABELS: Record<Oportunidade['canal'], string> = { whatsapp: 'WhatsApp', manual: 'Manual', site: 'Site' };
 const PROXIMA_ACAO: Partial<Record<OportunidadeStatus, { label: string; alvo: OportunidadeStatus }>> = {

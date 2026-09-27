@@ -8,6 +8,11 @@ import EmptyState from "../components/EmptyState";
 import Feedback, { MSG_ERRO_PADRAO } from "../components/Feedback";
 import { TIPOS_FONTE_PRECO, UNIDADES_PESQUISA, type EstadoComparacao } from "../../lib/pesquisa-precos";
 
+const ROTULO_TIPO_FONTE: Record<string, string> = {
+  manual: "Manual", documento: "Documento", cotacao: "Cotação", url_verificada: "URL verificada",
+  importacao: "Importação", api_autorizada: "API autorizada",
+};
+
 type Item = { id: string; nome: string; especificacao: string | null; unidade_canonica: string; servico_id: string | null };
 type Catalogo = { id: string; nome: string };
 type Fonte = { id: string; nome: string; tipo: string; referencia: string | null };
@@ -67,6 +72,8 @@ export default function PesquisaPrecosPage() {
   const [itemSelecionado, setItemSelecionado] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
+  // Falha ao carregar itens/fontes nunca vira "nenhum item" + formulário habilitado.
+  const [cargaFalhou, setCargaFalhou] = useState(false);
   const [sucesso, setSucesso] = useState("");
   const [salvando, setSalvando] = useState(false);
   const salvandoRef = useRef(false);
@@ -91,7 +98,7 @@ export default function PesquisaPrecosPage() {
 
   const carregarBase = useCallback(async (itemPreferido?: string) => {
     try {
-      setCarregando(true); setErro("");
+      setCarregando(true); setErro(""); setCargaFalhou(false);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) { router.push("/login"); return; }
       const accessToken = session.access_token;
@@ -119,6 +126,7 @@ export default function PesquisaPrecosPage() {
     } catch (e) {
       console.error(e);
       setErro(e instanceof Error ? e.message : MSG_ERRO_PADRAO);
+      setCargaFalhou(true);
     } finally {
       setCarregando(false);
     }
@@ -231,6 +239,10 @@ export default function PesquisaPrecosPage() {
         {erro && <Feedback type="erro" message={erro} onClose={() => setErro("")} />}
         {sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso("")} autoCloseMs={4000} />}
 
+        {cargaFalhou ? <section style={card}>
+          <p style={{ margin: "0 0 12px", color: "#94a3b8" }}>Seus itens e fontes não puderam ser carregados agora. Nada foi alterado — tente novamente em instantes.</p>
+          <button type="button" className="pp-btn" onClick={() => void carregarBase(itemSelecionado)}>Tentar novamente</button>
+        </section> :
         <div className="pp-grid">
           <aside style={{ display: "grid", gap: 16, alignContent: "start" }}>
             <section style={card}>
@@ -255,7 +267,7 @@ export default function PesquisaPrecosPage() {
               <summary style={{ cursor: "pointer", fontWeight: 700 }}>Nova fonte</summary>
               <form onSubmit={criarFonte} style={{ display: "grid", gap: 11, marginTop: 16 }}>
                 <label style={label}>Fornecedor/estabelecimento<input style={input} required maxLength={160} value={novaFonte.nome} onChange={(e) => setNovaFonte({ ...novaFonte, nome: e.target.value })} /></label>
-                <label style={label}>Tipo<select style={input} value={novaFonte.tipo} onChange={(e) => setNovaFonte({ ...novaFonte, tipo: e.target.value })}>{TIPOS_FONTE_PRECO.map((tipo) => <option key={tipo} value={tipo}>{tipo.replaceAll("_", " ")}</option>)}</select></label>
+                <label style={label}>Tipo<select style={input} value={novaFonte.tipo} onChange={(e) => setNovaFonte({ ...novaFonte, tipo: e.target.value })}>{TIPOS_FONTE_PRECO.map((tipo) => <option key={tipo} value={tipo}>{ROTULO_TIPO_FONTE[tipo] ?? tipo}</option>)}</select></label>
                 <label style={label}>Referência/evidência<input style={input} maxLength={2000} placeholder="URL, número da cotação ou documento" value={novaFonte.referencia} onChange={(e) => setNovaFonte({ ...novaFonte, referencia: e.target.value })} /></label>
                 <button className="pp-btn" disabled={salvando}>Cadastrar fonte</button>
               </form>
@@ -291,7 +303,7 @@ export default function PesquisaPrecosPage() {
               {historico.length ? <div style={{ overflowX: "auto" }}><table className="pp-table"><thead><tr><th>Fonte</th><th>Observação</th><th>Comparabilidade</th><th>Evidência</th><th></th></tr></thead><tbody>{historico.map((linha) => <tr key={linha.id}><td>{linha.fonte?.nome ?? "Fonte indisponível"}</td><td><strong>{moeda(linha.preco_centavos, linha.moeda)}</strong><br />{linha.quantidade} {linha.unidade_observada} · {dataHora(linha.observado_em)}{linha.corrige_observacao_id && <><br /><span style={{ color: "#fbbf24" }}>Correção de registro anterior</span></>}</td><td>{linha.comparavel ? <span style={{ color: "#4ade80" }}>Comparável</span> : <span style={{ color: "#fbbf24" }}>Não comparável: {linha.motivo_nao_comparavel?.replaceAll("_", " ")}</span>}</td><td style={{ maxWidth: 220, overflowWrap: "anywhere" }}>{linha.evidencia_referencia || linha.fonte?.referencia || "Registro manual por usuário autenticado"}</td><td><button type="button" className="pp-btn pp-secondary" onClick={() => corrigir(linha)}>Corrigir</button></td></tr>)}</tbody></table></div> : <EmptyState icon="🧾" title="Sem observações" description="O histórico aparecerá após o primeiro registro real." compact />}
             </section>}
           </div>
-        </div>
+        </div>}
       </div>
     </main>
   );

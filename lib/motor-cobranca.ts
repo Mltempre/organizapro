@@ -164,8 +164,11 @@ export function calcularIndicadoresCobranca(cobrancas: Cobranca[], agora: string
   const pagas = cobrancas.filter((c) => c.status === "pago");
   const canceladas = cobrancas.filter((c) => c.status === "cancelada");
 
+  // null só quando não há nenhuma cobrança registrada (sem base). Com cobranças
+  // registradas, um recorte vazio (ex.: nada pago neste mês) é zero conhecido —
+  // nunca "valor não informado" (KENSA: a Casa mostrava isso com R$ 150 pagos em outro mês).
   const somar = (lista: Cobranca[], campo: "valor" | "valor_pago"): number | null => {
-    if (lista.length === 0) return null;
+    if (lista.length === 0) return cobrancas.length === 0 ? null : 0;
     return lista.reduce((soma, c) => soma + (Number(c[campo]) || 0), 0);
   };
 

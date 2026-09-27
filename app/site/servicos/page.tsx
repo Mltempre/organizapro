@@ -140,7 +140,7 @@ export default function ServicosAdmin() {
   const cor = (icone: string) => ICON_COLORS[icone] ?? "#00c896";
 
   return (
-    <AdminShell title="Servicos" subtitle="Servicos exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"", preco:"", disponivel:true }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Serviços" subtitle="Serviços exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"", preco:"", disponivel:true }); setModal({ mode:"add" }); setErro(""); }}>
 
       <SiteWorkspaceNav />
 

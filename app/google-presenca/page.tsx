@@ -67,7 +67,7 @@ export default function GooglePresencaPage() {
   useEffect(() => {
     async function carregar() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setErro("Sessão expirada."); setCarregando(false); return; }
+      if (!session) { window.location.replace("/login"); return; }
       setAccessToken(session.access_token);
       const clinicaResponse = await fetch("/api/minha-clinica", { headers: { Authorization: `Bearer ${session.access_token}` } });
       const clinica = await clinicaResponse.json();

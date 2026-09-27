@@ -7,6 +7,7 @@ import AdminShell from '../../components/AdminShell';
 import PageLoader from '../../components/PageLoader';
 import EmptyState from '../../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../../components/Feedback';
+import { fetchJsonSeguro } from '../../../lib/fetch-seguro';
 import { gerarCliente360, type ResumoCliente360, type TipoEventoTimeline } from '../../../lib/cliente-360';
 import type { OportunidadeStatus } from '../../../lib/oportunidades-demanda';
 import type { StatusOrcamento } from '../../../lib/motor-orcamentos';
@@ -62,6 +63,8 @@ export default function Cliente360Page() {
   const [naoEncontrado, setNaoEncontrado] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
+  // Falha de alguma fonte nunca vira "cliente sem histórico" silenciosamente.
+  const [falhaParcial, setFalhaParcial] = useState(false);
   const [clinicaId, setClinicaId] = useState('');
   const [fatos, setFatos] = useState<FatoRow[]>([]);
   const [decisoes, setDecisoes] = useState<DecisaoRow[]>([]);
@@ -71,7 +74,7 @@ export default function Cliente360Page() {
 
   const carregar = useCallback(async () => {
     try {
-      setCarregando(true); setErro(''); setNaoEncontrado(false);
+      setCarregando(true); setErro(''); setNaoEncontrado(false); setFalhaParcial(false);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) { router.push('/login'); return; }
@@ -81,7 +84,7 @@ export default function Cliente360Page() {
 
       const cuRes = await fetch('/api/minha-clinica', { headers: auth });
       const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
-      if (!cid) { setCarregando(false); return; }
+      if (!cid) { setErro('Não foi possível identificar o seu negócio agora. Tente novamente.'); return; }
       setClinicaId(cid);
 
       // Cliente sempre escopado por id E clinica_id — nunca um paciente
@@ -91,17 +94,21 @@ export default function Cliente360Page() {
       if (!pacienteData) { setNaoEncontrado(true); setCarregando(false); return; }
       const paciente = pacienteData as PacienteRow;
 
-      const [agendamentosRes, avaliacoesRes, oportunidadesRes, orcamentosRes, tratamentosRes, cobrancasRes, pedidosRes, memoriaRes] = await Promise.all([
+      const [agendamentosRes, avaliacoesRes, oportunidadesR, orcamentosR, tratamentosR, cobrancasR, pedidosR, memoriaR] = await Promise.all([
         supabase.from('agendamentos').select('id, telefone, data, hora, tipo_consulta, status').eq('clinica_id', cid),
         supabase.from('avaliacoes').select('id, telefone, enviado_em, respondeu, clicado_em').eq('clinica_id', cid),
-        fetch('/api/oportunidades', { headers: auth }).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
-        fetch(`/api/orcamentos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { orcamentos: [] }).catch(() => ({ orcamentos: [] })),
-        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { tratamentos: [] }).catch(() => ({ tratamentos: [] })),
-        fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { cobrancas: [] }).catch(() => ({ cobrancas: [] })),
-        fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => r.ok ? r.json() : { pedidos: [] }).catch(() => ({ pedidos: [] })),
-        fetch(`/api/memoria?clinica_id=${cid}&paciente_id=${params.id}${paciente.telefone ? `&telefone=${encodeURIComponent(paciente.telefone)}` : ''}`, { headers: auth }).then(r => r.ok ? r.json() : { fatos: [], decisoes: [] }).catch(() => ({ fatos: [], decisoes: [] })),
+        fetchJsonSeguro<{ data?: OportunidadeRow[] }>('/api/oportunidades', { headers: auth }, { data: [] }),
+        fetchJsonSeguro<{ orcamentos?: OrcamentoRow[] }>(`/api/orcamentos?clinica_id=${cid}`, { headers: auth }, { orcamentos: [] }),
+        fetchJsonSeguro<{ tratamentos?: TratamentoRow[] }>(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }, { tratamentos: [] }),
+        fetchJsonSeguro<{ cobrancas?: CobrancaRow[] }>(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }, { cobrancas: [] }),
+        fetchJsonSeguro<{ pedidos?: PedidoRow[] }>(`/api/pedidos?clinica_id=${cid}`, { headers: auth }, { pedidos: [] }),
+        fetchJsonSeguro<{ fatos?: FatoRow[]; decisoes?: DecisaoRow[] }>(`/api/memoria?clinica_id=${cid}&paciente_id=${params.id}${paciente.telefone ? `&telefone=${encodeURIComponent(paciente.telefone)}` : ''}`, { headers: auth }, { fatos: [], decisoes: [] }),
       ]);
 
+      setFalhaParcial(!!agendamentosRes.error || !!avaliacoesRes.error
+        || [oportunidadesR, orcamentosR, tratamentosR, cobrancasR, pedidosR, memoriaR].some(r => r.falhou));
+      const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, tratamentosRes = tratamentosR.dado,
+        cobrancasRes = cobrancasR.dado, pedidosRes = pedidosR.dado, memoriaRes = memoriaR.dado;
       const agendamentos: AgendamentoRow[] = (agendamentosRes.data ?? []) as AgendamentoRow[];
       const avaliacoes: AvaliacaoRow[] = (avaliacoesRes.data ?? []) as AvaliacaoRow[];
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
@@ -170,6 +177,8 @@ export default function Cliente360Page() {
     <AdminShell title={resumo ? resumo.cliente.nome : 'Cliente 360'} subtitle="Visão consolidada — só dados reais, nenhum resumo fabricado">
       {carregando && <PageLoader title="Reconstruindo a história do cliente..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
+      {!carregando && erro && <button onClick={carregar}>Tentar novamente</button>}
+      {!carregando && resumo && falhaParcial && <Feedback type="aviso" message="Visão parcial: uma das fontes deste cliente não pôde ser carregada. O histórico e os valores abaixo podem estar incompletos." />}
       {!carregando && naoEncontrado && (
         <EmptyState icon="🔍" title="Cliente não encontrado." description="Ele pode ter sido removido, ou não pertence a este negócio." actionLabel="Voltar para Clientes" onAction={() => router.push('/clientes')} />
       )}

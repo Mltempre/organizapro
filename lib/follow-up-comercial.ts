@@ -147,7 +147,8 @@ export function gerarFollowUpsComerciais(input: EntradaFollowUp): CasoFollowUp[]
     casos.push({
       tipo: "oportunidade_parada", entidadeTipo: "cliente", entidadeId: chave,
       pacienteNome: op.pacienteNome, telefone: op.telefone,
-      motivo: `Oportunidade sinalizada há ${dias} dia${dias === 1 ? "" : "s"}, ainda sem orçamento gerado.`,
+      // `dias` conta desde a última interação (não desde a sinalização) — o texto diz exatamente isso.
+      motivo: `Oportunidade aberta sem interação há ${dias} dia${dias === 1 ? "" : "s"}, ainda sem orçamento gerado.`,
       proximaAcao: "Entrar em contato para avançar a negociação",
       destino: "/oportunidades",
       donoDoFluxo: "follow-up",

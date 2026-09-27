@@ -93,7 +93,7 @@ export default function DepoimentosAdmin() {
   const sorted = [...itens].sort((a,b) => a.ordem - b.ordem);
 
   return (
-    <AdminShell title="Depoimentos" subtitle="Avaliacoes de clientes exibidas no site" actionLabel="+ Adicionar Depoimento" actionOnClick={() => { setForm({ nome:"", cidade:"", comentario:"", nota:5, foto_url:"" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Depoimentos" subtitle="Avaliações de clientes exibidas no site" actionLabel="+ Adicionar Depoimento" actionOnClick={() => { setForm({ nome:"", cidade:"", comentario:"", nota:5, foto_url:"" }); setModal({ mode:"add" }); setErro(""); }}>
 
       <SiteWorkspaceNav />
 
