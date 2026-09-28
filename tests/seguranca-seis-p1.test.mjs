@@ -89,6 +89,8 @@ test('P1-5: follow-up concorrente também reserva antes do adaptador',async()=>{
 });
 for(const name of ['lembretes','avaliacoes'])test('P1-5: cron '+name+' concorrente chega uma vez ao provedor simulado',async()=>{
  const f=fixture({routeInternal:true}),route=f.load('app/api/cron/'+name+'/route.ts');
+ // Automações exigem ativação explícita do tenant (gate WhatsApp V1).
+ f.rows.set('auto',{id:'auto',clinica_id:tenant,tipo:'whatsapp.automacoes',payload:{estado:'ativas'},criado_em:'2026-01-01T00:00:00Z'});
  await Promise.all([route.GET(request(null,'cron')),route.GET(request(null,'cron'))]);
  assert.equal(f.calls.filter(c=>new URL(c.url).hostname==='api.z-api.io').length,1);
 });

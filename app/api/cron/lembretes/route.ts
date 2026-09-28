@@ -1,4 +1,4 @@
-import { produtoOrganizaPro } from "../../../../lib/seguranca-operacoes";
+import { produtoOrganizaPro, automacoesWhatsappAtivas } from "../../../../lib/seguranca-operacoes";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -60,6 +60,8 @@ export async function GET(request: Request) {
 
   for (const clinica of clinicas) {
     if (!await produtoOrganizaPro(supabase, clinica.clinica_id)) continue;
+    // Credencial salva não libera envio: só tenant com automações ativadas.
+    if (!await automacoesWhatsappAtivas(supabase, clinica.clinica_id)) continue;
     const { data: agendamentos } = await supabase
       .from("agendamentos")
       .select("id, paciente_nome, telefone, data, hora")

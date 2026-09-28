@@ -12,8 +12,8 @@ const B = '33333333-3333-4333-8333-333333333333';
 const SDR = '9b21a735-4bbb-4cbc-8666-7d941be9d35c';
 const CLIENTE = '5543999990001';
 const CFG = {
-  [A]:   { clinica_id: A,   user_id: 'user',  telefone: '5511000000001', zapi_instance: 'inst-A',   zapi_token: 'TOKEN_A_SECRET',   zapi_client_token: 'CLIENT_A_SECRET',   nome_clinica: 'Empresa A' },
-  [B]:   { clinica_id: B,   user_id: 'other', telefone: '5511000000002', zapi_instance: 'inst-B',   zapi_token: 'TOKEN_B_SECRET',   zapi_client_token: 'CLIENT_B_SECRET',   nome_clinica: 'Empresa B' },
+  [A]:   { clinica_id: A,   user_id: 'user',  telefone: '5511000000001', zapi_instance: 'inst-A',   zapi_token: 'TOKEN_A_SECRET',   zapi_client_token: 'CLIENT_A_SECRET',   nome_clinica: 'Empresa A', link_google: 'https://g.page/a' },
+  [B]:   { clinica_id: B,   user_id: 'other', telefone: '5511000000002', zapi_instance: 'inst-B',   zapi_token: 'TOKEN_B_SECRET',   zapi_client_token: 'CLIENT_B_SECRET',   nome_clinica: 'Empresa B', link_google: 'https://g.page/b' },
   [SDR]: { clinica_id: SDR, user_id: 'sdr',   telefone: '5543984128591', zapi_instance: 'inst-SDR', zapi_token: 'TOKEN_SDR_SECRET', zapi_client_token: 'CLIENT_SDR_SECRET', nome_clinica: 'OrganizaPro' },
 };
 
@@ -35,12 +35,14 @@ function cenario(o = {}) {
       }
       if (q.table === 'clinica_usuarios') return { data: get('clinica_id') === A ? { clinica_id: A } : null, error: null };
       if (q.table === 'clinicas') return { data: { produto: 'organizapro', nome: 'Empresa', especialidade: o.especialidade ?? null }, error: null };
-      if (q.table === 'chatbot_config') return { data: o.semChatbot ? null : { clinica_id: get('clinica_id'), ativo: true, link_humano: o.link ?? null, nome_clinica: 'Empresa' }, error: null };
+      if (q.table === 'eventos_dominio' && q.action === 'select' && get('tipo') === 'whatsapp.automacoes' && o.erroAutomacoes) return { data: null, error: { code: 'XX000' } };
+      if (q.table === 'eventos_dominio' && q.action === 'insert' && q.value.tipo === 'whatsapp.automacoes' && o.erroAutomacoes) return { data: null, error: { code: 'XX000' } };
+      if (q.table === 'chatbot_config') return { data: o.semChatbot ? null : { clinica_id: get('clinica_id'), ativo: !o.chatbotInativo, link_humano: o.link ?? null, nome_clinica: 'Empresa' }, error: null };
       if (q.table === 'chatbot_treinamento' || q.table === 'clinica_servicos') return { data: [], error: null };
       if (q.table === 'chatbot_leads' && q.action === 'select') return { data: o.lead ?? null, error: null };
       if (q.table === 'agendamentos') {
         if (q.action === 'update') return { data: null, error: null };
-        return { data: o.agendamento ? [{ id: 'ag-1', clinica_id: get('clinica_id'), paciente_nome: 'Cliente', status: 'agendado', data: '2099-01-01', hora: '10:00', confirmacao_enviada: true, confirmado: null, precisa_reagendar: false }] : [], error: null };
+        return { data: o.agendamento ? [{ id: 'ag-1', clinica_id: get('clinica_id'), paciente_nome: 'Cliente', telefone: CLIENTE, status: 'agendado', data: '2099-01-01', hora: '10:00', confirmacao_enviada: true, confirmado: null, precisa_reagendar: false }] : [], error: null };
       }
       return undefined;
     },
@@ -406,6 +408,115 @@ test('SQL pendente de unicidade: fora das migrations automáticas, pré-check qu
   assert.match(ativo, /create unique index if not exists clinica_config_zapi_instance_unica_uidx\s+on public\.clinica_config \(lower\(btrim\(zapi_instance\)\)\)\s+where zapi_instance is not null and btrim\(zapi_instance\) <> ''/);
   assert.doesNotMatch(ativo, /\b(update|delete|truncate|drop|alter)\b/i, 'nunca altera ou apaga dados/estrutura existente');
   assert.match(sql, /COMPARTILHADA com o ClínicaFlow/);
+});
+
+// ── Última milha (2026-09-28): WhatsApp conectado ≠ automações ativas ────────
+
+const ativar = (f, clinica, estado = 'ativas', criado_em = '2026-01-01T00:00:00Z', id = 'auto-' + clinica + criado_em) =>
+  f.rows.set(id, { id, clinica_id: clinica, tipo: 'whatsapp.automacoes', payload: { estado }, criado_em });
+const cron = async (f, nome) => f.load(`app/api/cron/${nome}/route.ts`).GET(request(null, 'cron'));
+
+test('E — crons: credencial salva sem ativação explícita não envia nada nem altera registros (fail-closed)', async () => {
+  for (const nome of ['lembretes', 'avaliacoes']) {
+    const f = cenario({ agendamento: true });
+    await cron(f, nome);
+    assert.equal(zapi(f).length, 0, nome);
+    assert.equal(f.queries.filter(q => q.table === 'agendamentos').length, 0, nome + ': nem busca/silencia agendamentos');
+  }
+});
+
+test('E — crons: só o tenant ativado recebe envios, pela própria instância; desativar depois volta a bloquear', async () => {
+  for (const nome of ['lembretes', 'avaliacoes']) {
+    const f = cenario({ agendamento: true });
+    ativar(f, A);
+    await cron(f, nome);
+    assert.equal(zapi(f).length, 1, nome);
+    assert.match(zapi(f)[0].url, /\/instances\/inst-A\//, nome);
+
+    const g = cenario({ agendamento: true });
+    ativar(g, A, 'ativas', '2026-01-01T00:00:00Z');
+    ativar(g, A, 'desativadas', '2026-02-01T00:00:00Z');
+    await cron(g, nome);
+    assert.equal(zapi(g).length, 0, nome + ': evento mais recente (desativadas) vale');
+
+    const h = cenario({ agendamento: true, erroAutomacoes: true });
+    ativar(h, A);
+    await cron(h, nome);
+    assert.equal(zapi(h).length, 0, nome + ': erro de leitura mantém desativado');
+  }
+});
+
+test('automações: rota exige sessão e vínculo; ativa/desativa só o próprio tenant; duplo clique não duplica', async () => {
+  const f = cenario();
+  const rota = f.load('app/api/whatsapp/automacoes/route.ts');
+  const post = (body, token) => rota.POST(request(body, token));
+  assert.equal((await post({ clinica_id: A, ativas: true, idempotency_key: 'k1' }, 'invalido')).status, 401);
+  assert.equal((await post({ clinica_id: B, ativas: true, idempotency_key: 'k1' })).status, 403);
+  for (const ruim of [{ clinica_id: A, ativas: 'sim', idempotency_key: 'k' }, { clinica_id: A, ativas: true }, { clinica_id: A, ativas: true, idempotency_key: 'x'.repeat(101) }])
+    assert.equal((await post(ruim)).status, 400);
+  assert.equal(inseridos(f, 'eventos_dominio').length, 0);
+
+  const r1 = await post({ clinica_id: A, ativas: true, idempotency_key: 'k1' });
+  assert.equal(r1.status, 200);
+  assert.equal(r1.body.automacoes_ativas, true);
+  const r2 = await post({ clinica_id: A, ativas: true, idempotency_key: 'k1' });
+  assert.equal(r2.status, 200);
+  assert.equal([...f.rows.values()].filter(v => v.tipo === 'whatsapp.automacoes').length, 1, 'duplo clique = 1 evento');
+  const ev = inseridos(f, 'eventos_dominio').find(v => v.tipo === 'whatsapp.automacoes');
+  assert.equal(ev.clinica_id, A);
+  assert.equal(ev.payload.estado, 'ativas');
+  assert.equal(ev.payload.usuario_id, 'user');
+
+  await new Promise(r => setTimeout(r, 5));
+  const r3 = await post({ clinica_id: A, ativas: false, idempotency_key: 'k2' });
+  assert.equal(r3.body.automacoes_ativas, false);
+  const leitura = await rota.GET({ ...request(null), nextUrl: new URL('https://fixture.test/api/whatsapp/automacoes?clinica_id=' + A) });
+  assert.equal(leitura.body.automacoes_ativas, false);
+
+  const g = cenario({ erroAutomacoes: true });
+  const falha = await g.load('app/api/whatsapp/automacoes/route.ts').POST(request({ clinica_id: A, ativas: true, idempotency_key: 'k' }));
+  assert.equal(falha.status, 503);
+  assert.match(falha.body.error, /Nada foi alterado/);
+});
+
+test('configurações: estado visível (WhatsApp, chatbot, automações) só em booleanos, sem segredo', async () => {
+  const req = () => ({ ...request(null), nextUrl: new URL('https://fixture.test/api/configuracoes?clinica_id=' + A) });
+  const f = cenario();
+  const r = await f.load('app/api/configuracoes/route.ts').GET(req());
+  assert.deepEqual([r.body.zapi_configurado, r.body.chatbot_ativo, r.body.automacoes_ativas], [true, true, false]);
+  const g = cenario({ chatbotInativo: true });
+  ativar(g, A);
+  const r2 = await g.load('app/api/configuracoes/route.ts').GET(req());
+  assert.deepEqual([r2.body.chatbot_ativo, r2.body.automacoes_ativas], [false, true]);
+  assert.ok(!JSON.stringify([r.body, r2.body]).match(/TOKEN_A_SECRET|CLIENT_A_SECRET/));
+});
+
+test('D — chatbot desligado: mensagem chega e é registrada pelo webhook, nenhuma resposta automática', async () => {
+  const f = cenario({ chatbotInativo: true });
+  const r = await receber(f, evento('Olá, qual o horário?'));
+  assert.equal(r.status, 200);
+  assert.equal(chamadasChatbot(f).length, 1);
+  assert.equal(f.calls.filter(c => new URL(c.url).pathname === '/api/whatsapp').length, 0);
+  assert.equal(zapi(f).length, 0);
+});
+
+test('UI: Configurações mostra estado e liga/desliga com confirmação; teste com trava e mensagens de operação; Chatbot rotula handoff', async () => {
+  const fs = await import('node:fs');
+  const ler = p => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const cfg = ler('app/configuracoes/page.tsx');
+  assert.match(cfg, /data-testid="whatsapp-status"/);
+  for (const t of ['Configurado', 'Não configurado', 'Chatbot', 'Automações (lembretes e avaliações)', 'Ativas', 'Desativadas']) assert.ok(cfg.includes(t), t);
+  assert.match(cfg, /window\.confirm\(aviso\)/);
+  assert.match(cfg, /fetch\('\/api\/whatsapp\/automacoes'/);
+  assert.match(cfg, /idempotency_key: crypto\.randomUUID\(\)/);
+  assert.match(cfg, /if \(testandoRef\.current\) return;/);
+  for (const s of [401, 403, 409, 503, 502]) assert.match(cfg, new RegExp('status === ' + s));
+  assert.doesNotMatch(cfg, /\$\{res\.status\}: \$\{detalhe\}/, 'erro técnico cru não aparece mais');
+  assert.doesNotMatch(cfg, />\s*\{config\.zapi_(client_)?token\}/, 'token nunca exibido como texto (campo é só de escrita)');
+  const bot = ler('app/chatbot/page.tsx');
+  assert.match(bot, /p === 'handoff_humano'\)\s+return <Badge label="👤 Passou para a equipe · bot pausado 24h"/);
+  assert.match(bot, /p === 'handoff_humano_ativo'\) return <Badge label="👤 Equipe atendendo · sem resposta do bot"/);
+  assert.match(bot, /p === 'limite_por_contato'\)/);
 });
 
 test('crons sem CRON_SECRET correto → 401 antes de qualquer consulta ou envio', async () => {

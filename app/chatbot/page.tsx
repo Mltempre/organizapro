@@ -103,6 +103,11 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 function processadoPorBadge(p: string) {
+  // Handoff: a partir daqui a equipe atende pelo WhatsApp e o bot fica em
+  // silêncio com este contato por 24h (ver app/api/chatbot/message).
+  if (p === 'handoff_humano')       return <Badge label="👤 Passou para a equipe · bot pausado 24h" color="#f97316" />
+  if (p === 'handoff_humano_ativo') return <Badge label="👤 Equipe atendendo · sem resposta do bot" color="#f97316" />
+  if (p === 'limite_por_contato')   return <Badge label="Limite de respostas/hora · sem resposta" color="#ef4444" />
   if (p === 'treinamento') return <Badge label="Treinamento" color="#f59e0b" />
   if (p === 'regras')      return <Badge label="Regras" color={C.purpleLight} />
   return <Badge label="IA" color={C.green} />
@@ -516,7 +521,7 @@ export default function ChatbotPage() {
                 <Field label="Nome do Negócio" hint="Usado na saudação automática">
                   <input style={inp} value={config.nome_clinica ?? ''} onChange={e => setConfig(c => ({ ...c, nome_clinica: e.target.value }))} placeholder="Ex: Studio Bella" />
                 </Field>
-                <Field label="Link WhatsApp Humano" hint="Enviado quando cliente pede atendente">
+                <Field label="Link WhatsApp Humano" hint="Enviado quando o cliente pede atendente (vazio: a equipe responde por este mesmo WhatsApp). O bot pausa 24h com esse contato.">
                   <input style={inp} value={config.link_humano ?? ''} onChange={e => setConfig(c => ({ ...c, link_humano: e.target.value }))} placeholder="https://wa.me/5541999999999" />
                 </Field>
               </div>

@@ -1,4 +1,4 @@
-import { produtoOrganizaPro } from "../../../../lib/seguranca-operacoes";
+import { produtoOrganizaPro, automacoesWhatsappAtivas } from "../../../../lib/seguranca-operacoes";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { gerarCodigoRastreio } from "../../../../lib/motor-reputacao";
@@ -54,6 +54,9 @@ export async function GET(req: NextRequest) {
 
     for (const config of configs) {
       if (!await produtoOrganizaPro(supabase, config.clinica_id)) continue;
+      // Credencial salva não libera envio: só tenant com automações ativadas
+      // (antes até da proteção de primeira ativação, que altera registros).
+      if (!await automacoesWhatsappAtivas(supabase, config.clinica_id)) continue;
       if (!config.link_google) continue;
 
       // ── Proteção contra disparo em massa na primeira ativação ──────────────
