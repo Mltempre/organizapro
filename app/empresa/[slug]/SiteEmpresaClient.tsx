@@ -1,42 +1,30 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
-import Header from "./_components/Header";
-import Hero from "./_components/Hero";
-import Banner from "./_components/Banner";
-import Problema from "./_components/Problema";
-import Sobre from "./_components/Sobre";
-import Servicos from "./_components/Servicos";
 import PedidoPublico from "./_components/PedidoPublico";
 import InteressePublico from "./_components/InteressePublico";
-import Diferenciais from "./_components/Diferenciais";
-import Processo from "./_components/Processo";
-import Galeria from "./_components/Galeria";
-import Equipe from "./_components/Equipe";
-import Depoimentos from "./_components/Depoimentos";
-import Faq from "./_components/Faq";
-import Contato from "./_components/Contato";
-import CtaFinal from "./_components/CtaFinal";
-import Footer from "./_components/Footer";
 import { IcWa } from "./_components/icons";
 import { gerarSobre, gerarTituloHero, gerarSubtituloHero, normalizarEspecialidade, safeData } from "./_lib/helpers";
-import { gradienteDe, brilhoCta } from "./_lib/theme";
-import { resolverFamilia, font } from "./_lib/families";
+import { resolverModelo, temaDoModelo, MODELOS, type ChaveSecao } from "./_lib/modelos";
+import { shellDoModelo } from "./_models/registry";
 import { CTA_CONTEXTUAL } from "./_lib/content";
 import { construirLinkComRastreio } from "../../../lib/atribuicao-origem";
 import type { Empresa, DBGaleria, DBEquipe, DBDepoimento, DBServico, DBEstrutura, DBFaq, DBAntes } from "./_lib/types";
 
-// ── Site Institucional Universal — OrganizaPro (Site Premium 10.0) ──────────
+// ── Site Institucional Universal — OrganizaPro (Site Premium 11.0) ──────────
 //
-// Este arquivo é só o orquestrador: busca os dados reais no Supabase,
-// resolve a família visual do segmento (_lib/families.ts) e distribui tudo
-// para os componentes de _components/. Nenhuma seção mostra dado específico
-// inventado (nome, fotos, depoimentos, avaliações sempre vêm do banco).
-// Seções sem fonte própria (Diferenciais, Processo, Problema) usam copy
-// universal POR FAMÍLIA — nunca um fato específico sobre esta empresa.
+// Este arquivo é só o orquestrador: busca os dados reais no Supabase, resolve
+// o MODELO VISUAL (_lib/modelos.ts: Aurora, Vértice ou Pulse) sobre o mesmo
+// dado e entrega tudo pronto para o shell do modelo escolhido (_models/).
+// Nenhuma seção mostra dado inventado (nome, fotos, depoimentos, avaliações
+// sempre vêm do banco) e seções sem fonte própria (Diferenciais, Processo,
+// Problema) usam copy universal POR SEGMENTO — nunca um fato sobre a empresa.
 //
-// Uma única arquitetura, quatro identidades visuais — mesmo padrão que já
-// funcionou nos 13 segmentos da IA Universal, agora na camada visual.
+// Uma única arquitetura de dados, TRÊS composições visuais de verdade — o
+// mesmo padrão de "1 arquitetura, N identidades" da IA Universal, agora com
+// identidade de layout real (não apenas cor) e com a cor da marca do cliente
+// aplicada por cima do modelo escolhido.
 
 export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: string; codigoRastreio?: string }) {
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
@@ -134,10 +122,19 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
     return () => { active = false; };
   }, [slug]);
 
-  const tema = resolverFamilia(empresa?.especialidade);
+  // Modelo visual pedido por URL (?modelo=aurora|vertice|pulse) — lido aqui, na
+  // camada de APRESENTAÇÃO (useSearchParams é SSR-seguro no App Router: o HTML
+  // do servidor e a hidratação do cliente leem o mesmo parâmetro, sem
+  // divergência). O contrato público deste cliente continua exatamente o de
+  // sempre — `{ slug, codigoRastreio }`: a variação de apresentação nunca entra
+  // no contrato de dados. resolverModelo() valida por allowlist e um valor
+  // inválido cai na recomendação do segmento, nunca em erro.
+  const modelo = useSearchParams()?.get("modelo")?.slice(0, 24) || undefined;
+  const modeloId = resolverModelo(empresa?.especialidade, modelo);
+  const tema = temaDoModelo(modeloId, empresa?.especialidade);
 
   if (loading || loadedSlug !== slug) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, background: "#0d1016" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Inter, system-ui, sans-serif", background: "#0d1016" }}>
       <div style={{ textAlign: "center" }}>
         <div style={{ width: 40, height: 40, border: "3px solid rgba(255,255,255,.1)", borderTop: "3px solid #79bdcd", borderRadius: "50%", margin: "0 auto 14px", animation: "spin 0.8s linear infinite" }}/>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -147,7 +144,7 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
   );
 
   if (!empresa) return (
-    <div style={{ minHeight: "100vh", background: "#0d1016", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: 24 }}>
+    <div style={{ minHeight: "100vh", background: "#0d1016", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}>
       <div style={{ maxWidth: 520, textAlign: "center", background: "rgba(255,255,255,.03)", borderRadius: 20, padding: "40px 32px", border: "1px solid rgba(255,255,255,.1)" }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>:(</div>
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: "0 0 16px", color: "#f8fafc" }}>{erroCarga ? "Site temporariamente indisponível" : "Página não encontrada"}</h1>
@@ -183,30 +180,38 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
   const temGaleria = galeria.some(g => g.url) || estrutura.some(e => e.imagem_url) || antesDepois.some(a => a.antes_url && a.depois_url);
   const temContato = Boolean(empresa.endereco || empresa.telefone || empresa.email || whatsappNumber);
 
-  // Ritmo claro/escuro (§5) calculado só entre as seções que vão de fato
-  // aparecer: quando uma seção com dado ausente some (§9 — o caso comum,
-  // não raro, para um cliente novo), a ordem fixa abaixo alternaria dois
-  // tons iguais lado a lado. Recalcular aqui garante que isso nunca aconteça,
-  // mantendo a sequência narrativa original (Sobre→Diferenciais→Como
-  // funciona→Serviços→Equipe→Galeria→Depoimentos→FAQ→Contato).
-  // Ordem aqui precisa espelhar exatamente a ordem de renderização no JSX
-  // abaixo (Servicos→Galeria→Equipe→Depoimentos→Faq→Contato) — a alternância
-  // só é válida se calculada na mesma sequência em que as seções aparecem.
-  const secoesMeio: [string, boolean][] = [
-    ["problema", true], ["sobre", true], ["diferenciais", true], ["processo", true],
-    ["servicos", servicos.length > 0], ["galeria", temGaleria], ["equipe", equipe.length > 0],
-    ["depoimentos", depoimentos.length > 0], ["faq", faqs.length > 0], ["contato", temContato],
-  ];
+  // Ritmo claro/escuro calculado só entre as seções que vão de fato aparecer:
+  // quando uma seção com dado ausente some (o caso comum, não raro, para um
+  // cliente novo), a ordem fixa alternaria dois tons iguais lado a lado.
+  // Recalcular aqui garante que isso nunca aconteça.
+  // A ORDEM é a do modelo (MODELOS[modeloId].ordemDasSecoes) e o shell do
+  // modelo renderiza exatamente nessa mesma sequência — Aurora, Vértice e Pulse
+  // têm narrativas próprias (dor → quem somos → oferta / institucional primeiro
+  // / oferta primeiro), e o ritmo é calculado na ordem em que as seções
+  // realmente aparecem, nunca numa ordem genérica.
+  const secaoDisponivel: Record<ChaveSecao, boolean> = {
+    problema: true, sobre: true, diferenciais: true, processo: true,
+    servicos: servicos.length > 0, galeria: temGaleria, equipe: equipe.length > 0,
+    depoimentos: depoimentos.length > 0, faq: faqs.length > 0, contato: temContato,
+  };
+  const secoesMeio: [ChaveSecao, boolean][] = MODELOS[modeloId].ordemDasSecoes.map(
+    (chave) => [chave, secaoDisponivel[chave]]
+  );
   const tons: Record<string, { tone: "light" | "dark"; variant: 1 | 2 }> = {};
   {
     const chavesVisiveis = secoesMeio.filter(([, v]) => v).map(([k]) => k);
-    // Início já é sempre "light" (abre contra o Hero, fixo escuro). O fecho
-    // (Contato) também precisa ser sempre "light", porque o próximo bloco —
+    // Polo inicial vem do MODELO (MODELOS[modeloId].tomInicial) — é o que faz o
+    // RITMO dos três sites ser realmente diferente, e não só a cor: Aurora e
+    // Vértice abrem em claro contra o hero institucional; Pulse abre em escuro,
+    // emendando no hero fotográfico e só então virando para o claro.
+    // O fecho (Contato) precisa terminar em "light", porque o próximo bloco —
     // CtaFinal + Footer — é um duo escuro fixo, intencional (o "fecho
-    // dramático"), não parte do ritmo alternado do meio do site. Quando o
-    // total de seções visíveis é par, a alternação simples terminaria em
-    // "dark" bem contra esse duo; corrigimos só a última posição.
-    const tons_: ("light" | "dark")[] = chavesVisiveis.map((_, i) => (i % 2 === 0 ? "light" : "dark"));
+    // dramático"), não parte do ritmo alternado do meio do site. Quando a
+    // contagem de seções visíveis termina em "dark", corrigimos só a última
+    // posição (mesmo critério já usado antes desta missão).
+    const tomInicial = MODELOS[modeloId].tomInicial;
+    const tomAlternado: "light" | "dark" = tomInicial === "light" ? "dark" : "light";
+    const tons_: ("light" | "dark")[] = chavesVisiveis.map((_, i) => (i % 2 === 0 ? tomInicial : tomAlternado));
     if (tons_.length > 0 && tons_[tons_.length - 1] === "dark") tons_[tons_.length - 1] = "light";
     let claros = 0, escuros = 0;
     chavesVisiveis.forEach((chave, i) => {
@@ -217,7 +222,13 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
     });
   }
 
-  const navItems: [string, string][] = [
+  // A navegação segue a ordem em que as seções realmente aparecem no modelo
+  // escolhido: nenhum link aponta para uma seção que não vai existir e a ordem
+  // do menu nunca contradiz a ordem da página.
+  const posicaoDaSecao = new Map<string, number>(
+    MODELOS[modeloId].ordemDasSecoes.map((chave, indice) => [chave, indice])
+  );
+  const navItems: [string, string][] = ([
     ["#sobre", "Sobre"],
     ...(servicos.length > 0 ? [["#servicos", "Serviços"]] as [string, string][] : []),
     ...(temGaleria ? [["#galeria", "Galeria"]] as [string, string][] : []),
@@ -225,86 +236,86 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
     ...(depoimentos.length > 0 ? [["#depoimentos", "Depoimentos"]] as [string, string][] : []),
     ...(faqs.length > 0 ? [["#faq", "FAQ"]] as [string, string][] : []),
     ...(temContato ? [["#contato", "Contato"]] as [string, string][] : []),
-  ];
+  ] as [string, string][]).sort(
+    (a, b) => (posicaoDaSecao.get(a[0].slice(1)) ?? 99) - (posicaoDaSecao.get(b[0].slice(1)) ?? 99)
+  );
+
+  // ── Composição ─────────────────────────────────────────────────────────
+  // O orquestrador continua sendo o ÚNICO lugar que fala com o banco; os três
+  // modelos são estritamente camada de apresentação. `blocoPublico` preserva
+  // exatamente o par <PedidoPublico/><InteressePublico/> já homologado (mesma
+  // ordem, mesmos props, nenhuma mudança de contrato) — só posicionado dentro
+  // da composição do modelo escolhido.
+  const blocoPublico = <>
+        <PedidoPublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}/>
+        <InteressePublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}/>
+  </>;
+  const ModeloSite = shellDoModelo(modeloId);
+  const baseEscura = tema.base === "escuro";
+  const propsDoSite = {
+    slug, codigoRastreio, modelo: modeloId, tema, empresa, nome, esp, local, sobre, titulo, subtitulo,
+    navItems, tons, waHero, waContato: waProblema, waFinal, waBase, whatsappNumber,
+    mediaHero, ctaMsgs, servicos, galeria, estrutura, antesDepois, equipe, depoimentos, faqs,
+    temGaleria, temContato, blocoPublico,
+  };
 
   return (
-    <div style={{ fontFamily: font.body, background: tema.ink, color: tema.text }}>
+    <div className="site-premium" style={{ fontFamily: tema.fonteCorpo, background: baseEscura ? tema.ink : tema.paper, color: baseEscura ? tema.text : tema.textOnPaper }}>
       <style>{`
-        @font-face{font-family:'Fraunces';font-style:normal;font-weight:300 700;font-display:swap;src:local('Fraunces');}
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Inter:wght@400;500;600;700;800&display=swap');
-        *{box-sizing:border-box}body{margin:0}body{overflow-x:hidden}a,button{outline-offset:4px}a:focus-visible,button:focus-visible{outline:2px solid ${tema.primary}}
+        ${MODELOS[modeloId].importacaoDeFontes}
+        *{box-sizing:border-box}
+        body{margin:0}
+        body{overflow-x:hidden}
+        .site-premium{
+          --op-raio:${tema.radius}px;
+          --op-display:${tema.fonteDisplay};
+          --op-corpo:${tema.fonteCorpo};
+          --op-claro-fundo:${tema.paper};
+          --op-claro-card:${tema.paper2};
+          --op-claro-texto:${tema.textOnPaper};
+          --op-claro-suave:${tema.textMutedOnPaper};
+          --op-claro-linha:${tema.lineOnPaper};
+          --op-claro-acento:${tema.contrast};
+          --op-primario:${tema.primaryDeep};
+          overflow-x:hidden
+        }
+        a,button{outline-offset:4px}
+        a:focus-visible,button:focus-visible{outline:2px solid ${tema.contrast};outline-offset:3px}
         html{scroll-behavior:smooth}
         @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
         h1,h2,h3{text-wrap:balance}
-        #sobre,#servicos,#depoimentos,#contato,#faq,#galeria,#equipe{scroll-margin-top:76px}
+        img,svg{max-width:100%}
+        #hero,#sobre,#servicos,#depoimentos,#contato,#faq,#galeria,#equipe,#pedido,#interesse{scroll-margin-top:86px}
         .premium-section{padding:96px 24px}
         .section-shell{max-width:1180px;margin:0 auto}
-        .section-label{display:inline-block;color:${tema.primary};font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-family:${font.body}}
-        .section-heading{display:flex;align-items:end;justify-content:space-between;gap:48px;margin-bottom:46px}
-        .section-heading h2{max-width:620px;margin:18px 0 0;color:${tema.text};font-family:${font.display};font-weight:600;font-size:clamp(30px,3.8vw,44px);line-height:1.12}
-        .section-heading>p{max-width:360px;margin:0;color:${tema.textMuted};font-size:14px;line-height:1.75}
-
-        .nav-link-item{transition:opacity .18s}
-        .nav-link-item:hover{opacity:1!important}
-        .galeria-item:hover img{transform:scale(1.06)}
-        .btn-hero-glow{animation:ctaGlow 2.6s ease-in-out infinite}
-        @keyframes ctaGlow{0%,100%{box-shadow:${brilhoCta(tema)}}50%{box-shadow:${brilhoCta(tema)}}}
-        @keyframes heroIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-        #hero .premium-hero__copy{animation:heroIn .8s ease both}
-        #hero .premium-hero__media,#hero .premium-hero__fallback{animation:heroIn .9s ease .12s both}
-        @media(prefers-reduced-motion:reduce){#hero .premium-hero__copy,#hero .premium-hero__media,#hero .premium-hero__fallback{animation:none}}
-
+        .section-label{display:inline-block;color:${tema.contrast};font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-family:${tema.fonteCorpo}}
+        .section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:48px;margin-bottom:46px}
+        .section-heading h2{max-width:620px;margin:18px 0 0;color:${tema.textOnPaper};font-family:${tema.fonteDisplay};font-weight:600;font-size:clamp(29px,3.6vw,44px);line-height:1.12}
+        .section-heading>p{max-width:360px;margin:0;color:${tema.textMutedOnPaper};font-size:14px;line-height:1.75}
+        .site-premium__aviso{margin:0;padding:18px 24px;text-align:center;background:${tema.primarySoft};color:${tema.textOnPaper};font-size:13.5px}
+        .site-premium__fab{position:fixed;bottom:22px;right:22px;z-index:9999;width:56px;height:56px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 18px 36px -14px rgba(0,0,0,.5);transition:transform .18s}
+        .site-premium__fab:hover{transform:scale(1.07)}
         @media(max-width:1024px){
-          .three-col{grid-template-columns:repeat(2,1fr)!important}
-          .dif-grid{grid-template-columns:repeat(2,1fr)!important}
-          .four-col{grid-template-columns:repeat(2,1fr)!important}
+          .three-col{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+          .dif-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+          .four-col{grid-template-columns:repeat(2,minmax(0,1fr))!important}
         }
-        @media(max-width:900px){
-          .nav-links{display:none!important}
-          .nav-burger{display:flex!important}
-          .section-heading{align-items:start;flex-direction:column;gap:18px}
-        }
-        @media(max-width:768px){
-          .hero-ctas{flex-direction:column!important;align-items:stretch!important}
-          .two-col{grid-template-columns:1fr!important;gap:16px!important}
-          .footer-cols{flex-direction:column!important;gap:24px!important}
-        }
+        @media(max-width:900px){.section-heading{align-items:flex-start;flex-direction:column;gap:18px}}
         @media(max-width:560px){
-          .three-col{grid-template-columns:1fr!important}
-          .dif-grid{grid-template-columns:1fr!important}
-          .four-col{grid-template-columns:1fr!important}
+          .three-col,.dif-grid,.four-col{grid-template-columns:1fr!important}
           .premium-section{padding:74px 20px}
         }
       `}</style>
 
-      <Header nome={nome} logoUrl={empresa.logo_url} waLink={waHero} whatsappNumber={whatsappNumber} navItems={navItems} tema={tema}/>
-      <Hero empresa={empresa} esp={esp} local={local} titulo={titulo} subtitulo={subtitulo} waLink={waHero} whatsappNumber={whatsappNumber} mediaUrl={mediaHero} hasServices={servicos.length > 0} tema={tema}/>
-      {erroCarga && <p role="status" style={{ padding: "20px 24px", textAlign: "center" }}>Parte do conteúdo está temporariamente indisponível. Recarregue a página para tentar novamente.</p>}
-      <Banner bannerUrl={empresa.hero_url ? empresa.banner_url : null} nome={nome} tema={tema}/>
-      <Problema familiaId={tema.id} tema={tema} ctaHref={waProblema} ctaTexto="Conte com a gente para resolver isso" tone={tons.problema?.tone} variant={tons.problema?.variant}/>
-      <Sobre empresa={empresa} nome={nome} sobre={sobre} tema={tema} tone={tons.sobre?.tone} variant={tons.sobre?.variant}/>
-      <Diferenciais familiaId={tema.id} tema={tema} tone={tons.diferenciais?.tone} variant={tons.diferenciais?.variant}/>
-      <Processo familiaId={tema.id} tema={tema} tone={tons.processo?.tone} variant={tons.processo?.variant}/>
-      <Servicos servicos={servicos} empresa={empresa} tema={tema} familiaId={tema.id} waBase={waBase} codigoRastreio={codigoRastreio} tone={tons.servicos?.tone} variant={tons.servicos?.variant}/>
-      <PedidoPublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}/>
-      <InteressePublico slug={slug} servicos={servicos} codigoRastreio={codigoRastreio}/>
-      <Galeria antesDepois={antesDepois} galeria={galeria} estrutura={estrutura} empresa={empresa} tema={tema} tone={tons.galeria?.tone} variant={tons.galeria?.variant}/>
-      <Equipe equipe={equipe} tema={tema} tone={tons.equipe?.tone} variant={tons.equipe?.variant}/>
-      <Depoimentos depoimentos={depoimentos} tema={tema} tone={tons.depoimentos?.tone} variant={tons.depoimentos?.variant}/>
-      <Faq faqs={faqs} tema={tema} tone={tons.faq?.tone} variant={tons.faq?.variant}/>
-      <Contato empresa={empresa} waLink={waComMsg(ctaMsgs.problema)} whatsappNumber={whatsappNumber} tema={tema} tone={tons.contato?.tone} variant={tons.contato?.variant}/>
-      <CtaFinal empresa={empresa} waLink={waFinal} whatsappNumber={whatsappNumber} titulo="Seu próximo passo pode começar agora." subtitulo="Entre em contato pelo canal que for mais conveniente para você." ctaTexto={ctaMsgs.final.includes("orçamento") ? "Solicitar orçamento" : "Falar no WhatsApp"} tema={tema}/>
+      {erroCarga && <p role="status" className="site-premium__aviso">Parte do conteúdo está temporariamente indisponível. Recarregue a página para tentar novamente.</p>}
+
+      <ModeloSite {...propsDoSite}/>
 
       {whatsappNumber && (
-        <a href={waFinal} target="_blank" rel="noreferrer" title="Falar no WhatsApp" className="btn-hero-glow"
-          style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, width: 56, height: 56, borderRadius: "50%", background: gradienteDe(tema), color: "#0c0f12", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", transition: "transform 0.2s" }}
-          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "scale(1.08)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = ""; }}>
+        <a href={waFinal} target="_blank" rel="noreferrer" title="Falar no WhatsApp" className="site-premium__fab" style={{ background: tema.primaryDeep }}>
           <IcWa/>
         </a>
       )}
-
-      <Footer empresa={empresa} nome={nome} esp={esp} waLink={waFinal} whatsappNumber={whatsappNumber} navItems={navItems} tema={tema}/>
     </div>
   );
 }

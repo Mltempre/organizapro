@@ -1,7 +1,7 @@
 import Reveal from "./Reveal";
 import { Icon } from "./icons";
 import { DIFERENCIAIS } from "../_lib/content";
-import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
+import { paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
 
 // A seção que mais "cheirava a template": antes, os mesmos 6 itens fixos
 // para qualquer negócio do país. Agora o conteúdo vem da família visual do
@@ -10,6 +10,8 @@ import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/fami
 export default function Diferenciais({ familiaId, tema, tone = "light", variant = 1 }: { familiaId: FamiliaId; tema: Tema; tone?: Tone; variant?: 1 | 2 }) {
   const itens = DIFERENCIAIS[familiaId];
   const p = paleta(tema, tone, variant);
+  // Tipografia do modelo resolvido (nunca mais uma fonte fixa global).
+  const font = { display: p.fonteDisplay, body: p.fonteCorpo };
   return (
     <section className="premium-section premium-dif">
       <Reveal>

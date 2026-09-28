@@ -3,11 +3,13 @@ import { useState } from "react";
 import Reveal from "./Reveal";
 import { Icon } from "./icons";
 import { eyebrow, radius } from "../_lib/theme";
-import { font, paleta, type Tema, type Tone } from "../_lib/families";
+import { paleta, type Tema, type Tone } from "../_lib/families";
 import type { DBFaq } from "../_lib/types";
 
 function FaqItem({ p, r, isFirst, pal }: { p: string; r: string; isFirst: boolean; pal: ReturnType<typeof paleta> }) {
   const [open, setOpen] = useState(false);
+  // Tipografia do modelo resolvido (nunca mais uma fonte fixa global).
+  const font = { display: pal.fonteDisplay, body: pal.fonteCorpo };
   return (
     <div onClick={() => setOpen(o => !o)} style={{ borderTop: isFirst ? "none" : `1px solid ${pal.line}`, cursor: "pointer", paddingTop: isFirst ? 0 : 22, paddingBottom: 22 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
@@ -29,6 +31,8 @@ function FaqItem({ p, r, isFirst, pal }: { p: string; r: string; isFirst: boolea
 export default function Faq({ faqs, tema, tone = "light", variant = 2 }: { faqs: DBFaq[]; tema: Tema; tone?: Tone; variant?: 1 | 2 }) {
   if (faqs.length === 0) return null;
   const p = paleta(tema, tone, variant);
+  // Tipografia do modelo resolvido (nunca mais uma fonte fixa global).
+  const font = { display: p.fonteDisplay, body: p.fonteCorpo };
   return (
     <section id="faq" style={{ padding: "112px 24px", background: p.bg }}>
       <Reveal>

@@ -1,7 +1,7 @@
 import Reveal, { RevealItem } from "./Reveal";
 import { PROCESSO } from "../_lib/content";
 import { eyebrow, radius } from "../_lib/theme";
-import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
+import { paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
 
 // "Como funciona" — existia pronto no código e nunca aparecia em nenhum
 // site publicado (achado da Fase 1). Só precisava ser ligado — e ganhar a
@@ -9,6 +9,8 @@ import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/fami
 export default function Processo({ familiaId, tema, tone = "dark", variant = 1 }: { familiaId: FamiliaId; tema: Tema; tone?: Tone; variant?: 1 | 2 }) {
   const passos = PROCESSO[familiaId];
   const p = paleta(tema, tone, variant);
+  // Tipografia do modelo resolvido (nunca mais uma fonte fixa global).
+  const font = { display: p.fonteDisplay, body: p.fonteCorpo };
   return (
     <section style={{ padding: "112px 24px", background: p.bg }}>
       <Reveal>

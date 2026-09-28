@@ -2,15 +2,19 @@
 
 import { useState, useRef } from "react";
 import type { DBServico } from "../_lib/types";
+import { paleta, resolverFamilia, type Tema } from "../_lib/families";
 
-type Props = { slug: string; servicos: DBServico[]; codigoRastreio?: string };
+// `tema` é opcional para o componente continuar utilizável isolado (testes,
+// usos internos): no site publicado o orquestrador sempre passa o tema do
+// modelo resolvido, para este bloco nunca destoar da identidade visual.
+type Props = { slug: string; servicos: DBServico[]; codigoRastreio?: string; tema?: Tema };
 type Quantidades = Record<string, number>;
 
 function dinheiro(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function PedidoPublico({ slug, servicos, codigoRastreio }: Props) {
+export default function PedidoPublico({ slug, servicos, codigoRastreio, tema = resolverFamilia(undefined) }: Props) {
   const tentativa = useRef<{ corpo: string; chave: string } | null>(null);
   const compraveis = servicos.filter((servico) => servico.disponivel !== false && typeof servico.preco_centavos === "number" && servico.preco_centavos > 0);
   const [quantidades, setQuantidades] = useState<Quantidades>({});
@@ -60,6 +64,12 @@ export default function PedidoPublico({ slug, servicos, codigoRastreio }: Props)
     } finally { setEnviando(false); }
   }
 
+  // Este bloco nasceu no Site Premium 6.0 com uma paleta clara fixa (era
+  // "Clínica Sorrisos"). Agora ele usa o tema do MODELO resolvido — mantendo o
+  // polo claro, para o formulário continuar contrastando com o ritmo do site
+  // nos três modelos. Nenhuma classe, campo ou regra de envio mudou.
+  const p = paleta(tema, "light", 2);
+  const fonte = { display: tema.fonteDisplay, corpo: tema.fonteCorpo };
   return <section id="pedido" className="public-order-section">
     <div className="public-order-shell">
       <div className="public-order-heading"><span>Pedido online</span><h2>Escolha o que você precisa</h2><p>Seu pedido será registrado para confirmação pela empresa. Não há pagamento online nesta etapa.</p></div>
@@ -71,6 +81,30 @@ export default function PedidoPublico({ slug, servicos, codigoRastreio }: Props)
         <div className="public-order-form"><h3>Seus dados</h3><label>Nome<input required maxLength={160} value={nome} onChange={(evento) => setNome(evento.target.value)} /></label><label>Telefone<input required maxLength={40} value={telefone} onChange={(evento) => setTelefone(evento.target.value)} /></label><label>Observação (opcional)<textarea maxLength={500} value={observacao} onChange={(evento) => setObservacao(evento.target.value)} /></label><div className="public-order-total"><span>Total do pedido</span><strong>{dinheiro(total)}</strong></div><button type="submit" disabled={enviando}>{enviando ? "Registrando..." : "Enviar pedido"}</button>{mensagem && <p role="status" className={mensagem.tipo}>{mensagem.texto}</p>}</div>
       </form>
     </div>
-    <style>{`.public-order-section{padding:96px 24px;background:#f7f3ec;color:#1b2621}.public-order-shell{max-width:1180px;margin:0 auto}.public-order-heading{max-width:650px;margin-bottom:36px}.public-order-heading span{color:#7b5b2e;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.public-order-heading h2{margin:14px 0 10px;font-size:clamp(30px,3.8vw,44px);line-height:1.12}.public-order-heading p{margin:0;color:#5d675f;line-height:1.7}.public-order-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:22px}.public-order-items,.public-order-form{display:grid;gap:12px}.public-order-item,.public-order-form{background:#fff;border:1px solid #ded8cd;border-radius:8px;padding:20px}.public-order-item{display:flex;justify-content:space-between;gap:20px;align-items:center}.public-order-item h3,.public-order-form h3{margin:0 0 7px;font-size:18px}.public-order-item p{margin:0 0 10px;color:#66736a;font-size:14px;line-height:1.5}.public-order-item strong{color:#7b5b2e}.public-order-item label,.public-order-form label{display:grid;gap:6px;color:#66736a;font-size:12px;font-weight:700}.public-order-item input{width:76px}.public-order-form input,.public-order-form textarea,.public-order-item input{box-sizing:border-box;border:1px solid #cfc8bc;border-radius:5px;padding:10px;background:#fff;color:#1b2621;font:inherit}.public-order-form textarea{min-height:86px;resize:vertical}.public-order-total{display:flex;justify-content:space-between;border-top:1px solid #e5dfd5;padding-top:15px;margin-top:4px;color:#66736a}.public-order-total strong{color:#1b2621;font-size:21px}.public-order-form button{border:0;border-radius:5px;padding:12px;background:#1b5e49;color:#fff;font-weight:800;cursor:pointer}.public-order-form button:disabled{opacity:.6;cursor:wait}.public-order-form p{margin:0;font-size:14px;line-height:1.5}.public-order-form p.sucesso{color:#176b52}.public-order-form p.erro{color:#a12b25}@media(max-width:760px){.public-order-layout{grid-template-columns:1fr}.public-order-section{padding:72px 20px}.public-order-item{align-items:flex-start;flex-direction:column}}`}</style>
+    <style>{`.public-order-section{padding:96px 24px;background:var(--op-claro-fundo,${p.bg});color:var(--op-claro-texto,${p.text});font-family:var(--op-corpo,${fonte.corpo})}
+    .public-order-shell{max-width:1180px;margin:0 auto}
+    .public-order-heading{max-width:650px;margin-bottom:36px}
+    .public-order-heading span{color:var(--op-claro-acento,${p.accent});font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+    .public-order-heading h2{margin:14px 0 10px;font-family:var(--op-display,${fonte.display});font-weight:600;font-size:clamp(28px,3.6vw,42px);line-height:1.12;text-wrap:balance}
+    .public-order-heading p{margin:0;color:var(--op-claro-suave,${p.textMuted});line-height:1.7;overflow-wrap:anywhere}
+    .public-order-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr);gap:22px}
+    .public-order-items,.public-order-form{display:grid;gap:12px;min-width:0}
+    .public-order-item,.public-order-form{background:var(--op-claro-card,${p.card});border:1px solid var(--op-claro-linha,${p.line});border-radius:var(--op-raio,${tema.radius}px);padding:20px}
+    .public-order-item{display:flex;justify-content:space-between;gap:20px;align-items:center}
+    .public-order-item h3,.public-order-form h3{margin:0 0 7px;font-size:18px;font-family:var(--op-display,${fonte.display});font-weight:600;overflow-wrap:anywhere}
+    .public-order-item p{margin:0 0 10px;color:var(--op-claro-suave,${p.textMuted});font-size:14px;line-height:1.5}
+    .public-order-item strong{color:var(--op-claro-acento,${p.accent})}
+    .public-order-item label,.public-order-form label{display:grid;gap:6px;color:var(--op-claro-suave,${p.textMuted});font-size:12px;font-weight:700}
+    .public-order-item input{width:76px}
+    .public-order-form input,.public-order-form textarea,.public-order-item input{box-sizing:border-box;border:1px solid var(--op-claro-linha,${p.line});border-radius:6px;padding:10px;background:var(--op-claro-fundo,${p.bg});color:var(--op-claro-texto,${p.text});font:inherit}
+    .public-order-form textarea{min-height:86px;resize:vertical}
+    .public-order-total{display:flex;justify-content:space-between;border-top:1px solid var(--op-claro-linha,${p.line});padding-top:15px;margin-top:4px;color:var(--op-claro-suave,${p.textMuted})}
+    .public-order-total strong{color:var(--op-claro-texto,${p.text});font-size:21px}
+    .public-order-form button{border:0;border-radius:6px;padding:13px;background:var(--op-primario,${tema.primaryDeep});color:#fff;font-weight:800;cursor:pointer;font-family:var(--op-corpo,${fonte.corpo})}
+    .public-order-form button:disabled{opacity:.6;cursor:wait}
+    .public-order-form p{margin:0;font-size:14px;line-height:1.5}
+    .public-order-form p.sucesso{color:var(--op-claro-acento,${p.accent})}
+    .public-order-form p.erro{color:#b3261e}
+    @media(max-width:760px){.public-order-section{padding:74px 20px}.public-order-layout{grid-template-columns:1fr}.public-order-item{flex-direction:column;align-items:flex-start}}`}</style>
   </section>;
 }

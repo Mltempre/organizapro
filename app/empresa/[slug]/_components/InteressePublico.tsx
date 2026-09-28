@@ -2,8 +2,12 @@
 
 import { useState, useRef } from "react";
 import type { DBServico } from "../_lib/types";
+import { paleta, resolverFamilia, type Tema } from "../_lib/families";
 
-type Props = { slug: string; servicos: DBServico[]; codigoRastreio?: string };
+// `tema` é opcional para o componente continuar utilizável isolado (testes,
+// usos internos): no site publicado o orquestrador sempre passa o tema do
+// modelo resolvido, para este bloco nunca destoar da identidade visual.
+type Props = { slug: string; servicos: DBServico[]; codigoRastreio?: string; tema?: Tema };
 
 // ── Interesse Público — E-commerce IA V1 ─────────────────────────────────
 //
@@ -16,7 +20,7 @@ type Props = { slug: string; servicos: DBServico[]; codigoRastreio?: string };
 // sinal rastreável em public.oportunidades_demanda (canal "site"), sem
 // nenhuma alteração em Servicos.tsx ou qualquer seção já homologada do
 // Site Premium.
-export default function InteressePublico({ slug, servicos, codigoRastreio }: Props) {
+export default function InteressePublico({ slug, servicos, codigoRastreio, tema = resolverFamilia(undefined) }: Props) {
   const tentativa = useRef<{ corpo: string; chave: string } | null>(null);
   const semPreco = servicos.filter((s) => s.disponivel !== false && !(typeof s.preco_centavos === "number" && s.preco_centavos > 0));
   const [nome, setNome] = useState("");
@@ -58,6 +62,10 @@ export default function InteressePublico({ slug, servicos, codigoRastreio }: Pro
     } finally { setEnviando(false); }
   }
 
+  // Mesmo caso de PedidoPublico: paleta clara fixa substituída pelo tema do
+  // modelo resolvido (polo claro), sem tocar em nenhuma regra de envio.
+  const p = paleta(tema, "light", 2);
+  const fonte = { display: tema.fonteDisplay, corpo: tema.fonteCorpo };
   return <section id="interesse" className="public-interest-section">
     <div className="public-interest-shell">
       <div className="public-interest-heading"><span>Solicitar informações</span><h2>Peça um orçamento ou tire uma dúvida</h2><p>Deixe seu contato que a empresa retorna diretamente com você.</p></div>
@@ -73,6 +81,21 @@ export default function InteressePublico({ slug, servicos, codigoRastreio }: Pro
         {feedback && <p role="status" className={feedback.tipo}>{feedback.texto}</p>}
       </form>
     </div>
-    <style>{`.public-interest-section{padding:80px 24px;background:#fff}.public-interest-shell{max-width:680px;margin:0 auto}.public-interest-heading{margin-bottom:28px}.public-interest-heading span{color:#7b5b2e;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.public-interest-heading h2{margin:14px 0 10px;font-size:clamp(26px,3.2vw,36px);line-height:1.15;color:#1b2621}.public-interest-heading p{margin:0;color:#5d675f;line-height:1.7}.public-interest-form{display:grid;gap:14px;border:1px solid #ded8cd;border-radius:8px;padding:22px;background:#f7f3ec}.public-interest-form label{display:grid;gap:6px;color:#66736a;font-size:12px;font-weight:700}.public-interest-form input,.public-interest-form select,.public-interest-form textarea{box-sizing:border-box;border:1px solid #cfc8bc;border-radius:5px;padding:10px;background:#fff;color:#1b2621;font:inherit}.public-interest-form textarea{min-height:80px;resize:vertical}.public-interest-form button{border:0;border-radius:5px;padding:12px;background:#1b5e49;color:#fff;font-weight:800;cursor:pointer}.public-interest-form button:disabled{opacity:.6;cursor:wait}.public-interest-form p{margin:0;font-size:14px;line-height:1.5}.public-interest-form p.sucesso{color:#176b52}.public-interest-form p.erro{color:#a12b25}`}</style>
+    <style>{`.public-interest-section{padding:80px 24px;background:var(--op-claro-card,${p.card});color:var(--op-claro-texto,${p.text});font-family:var(--op-corpo,${fonte.corpo})}
+    .public-interest-shell{max-width:680px;margin:0 auto}
+    .public-interest-heading{margin-bottom:28px}
+    .public-interest-heading span{color:var(--op-claro-acento,${p.accent});font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+    .public-interest-heading h2{margin:14px 0 10px;font-family:var(--op-display,${fonte.display});font-weight:600;font-size:clamp(26px,3.2vw,36px);line-height:1.15;text-wrap:balance}
+    .public-interest-heading p{margin:0;color:var(--op-claro-suave,${p.textMuted});line-height:1.7}
+    .public-interest-form{display:grid;gap:14px;border:1px solid var(--op-claro-linha,${p.line});border-radius:var(--op-raio,${tema.radius}px);padding:22px;background:var(--op-claro-fundo,${p.bg})}
+    .public-interest-form label{display:grid;gap:6px;color:var(--op-claro-suave,${p.textMuted});font-size:12px;font-weight:700}
+    .public-interest-form input,.public-interest-form select,.public-interest-form textarea{box-sizing:border-box;border:1px solid var(--op-claro-linha,${p.line});border-radius:6px;padding:10px;background:var(--op-claro-card,${p.card});color:var(--op-claro-texto,${p.text});font:inherit}
+    .public-interest-form textarea{min-height:80px;resize:vertical}
+    .public-interest-form button{border:0;border-radius:6px;padding:13px;background:var(--op-primario,${tema.primaryDeep});color:#fff;font-weight:800;cursor:pointer;font-family:var(--op-corpo,${fonte.corpo})}
+    .public-interest-form button:disabled{opacity:.6;cursor:wait}
+    .public-interest-form p{margin:0;font-size:14px;line-height:1.5}
+    .public-interest-form p.sucesso{color:var(--op-claro-acento,${p.accent})}
+    .public-interest-form p.erro{color:#b3261e}
+    @media(max-width:560px){.public-interest-section{padding:64px 20px}}`}</style>
   </section>;
 }

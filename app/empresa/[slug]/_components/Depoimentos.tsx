@@ -2,12 +2,14 @@ import Reveal, { RevealItem } from "./Reveal";
 import { IcStarFilled, Icon } from "./icons";
 import { initials, gerarTituloDepoimentos } from "../_lib/helpers";
 import { gradienteDe } from "../_lib/theme";
-import { font, paleta, type Tema, type Tone } from "../_lib/families";
+import { paleta, type Tema, type Tone } from "../_lib/families";
 import type { DBDepoimento } from "../_lib/types";
 
 export default function Depoimentos({ depoimentos, tema, tone = "dark", variant = 1 }: { depoimentos: DBDepoimento[]; tema: Tema; tone?: Tone; variant?: 1 | 2 }) {
   if(!depoimentos.length)return null;
   const p = paleta(tema, tone, variant);
+  // Tipografia do modelo resolvido (nunca mais uma fonte fixa global).
+  const font = { display: p.fonteDisplay, body: p.fonteCorpo };
   return <section id="depoimentos" className="premium-section premium-testimonials"><Reveal><div className="section-shell">
     <div className="section-heading"><div><span className="section-label">Depoimentos</span><h2>{gerarTituloDepoimentos()}</h2></div><p>Experiências compartilhadas por quem já entrou em contato com a empresa.</p></div>
     <div className="testimonial-grid">{depoimentos.map((d,i)=><RevealItem key={d.id} index={i}><article className="testimonial"><div className="testimonial__top"><Icon name="quote" size={28} color={p.accent}/><div>{[1,2,3,4,5].map(n=><IcStarFilled key={n} size={13} color={n<=d.nota?tema.emotional:p.line}/>)}</div></div><blockquote>“{d.comentario}”</blockquote><footer>{d.foto_url?<img src={d.foto_url} alt={d.nome}/>:<span>{initials(d.nome)}</span>}<div><strong>{d.nome}</strong>{d.cidade&&<small>{d.cidade}</small>}</div></footer></article></RevealItem>)}</div>

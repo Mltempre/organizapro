@@ -1,13 +1,15 @@
 import Reveal, { RevealItem } from "./Reveal";
 import { initials } from "../_lib/helpers";
 import { radius, eyebrow, gradienteDe } from "../_lib/theme";
-import { font, paleta, type Tema, type Tone } from "../_lib/families";
+import { paleta, type Tema, type Tone } from "../_lib/families";
 import type { DBEquipe } from "../_lib/types";
 
 // Só renderiza com equipe real cadastrada — nunca nome ou cargo inventado.
 export default function Equipe({ equipe, tema, tone = "dark", variant = 2 }: { equipe: DBEquipe[]; tema: Tema; tone?: Tone; variant?: 1 | 2 }) {
   if (equipe.length === 0) return null;
   const p = paleta(tema, tone, variant);
+  // Tipografia do modelo resolvido (nunca mais uma fonte fixa global).
+  const font = { display: p.fonteDisplay, body: p.fonteCorpo };
   return (
     <section id="equipe" style={{ padding: "112px 24px", background: p.bg }}>
       <Reveal>

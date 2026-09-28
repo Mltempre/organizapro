@@ -10,9 +10,28 @@
 
 export type FamiliaId = "saude" | "autoridade" | "consumo" | "tecnica" | "universal";
 
+// Tipografia padrão (usada por qualquer tema resolvido direto de família, sem
+// passar por um modelo visual — _lib/modelos.ts sobrescreve quando há modelo).
+// Vive aqui, antes de FAMILIAS, porque cada família precisa dos mesmos dois
+// campos de fonte no próprio literal (nunca uma referência a `font`, que só
+// é declarado no fim deste arquivo).
+const FONTE_PADRAO = {
+  fonteDisplay: "'Fraunces', Georgia, 'Iowan Old Style', serif",
+  fonteCorpo: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+} as const;
+
 export type Tema = {
   id: FamiliaId;
   nome: string;
+  // Tipografia resolvida do tema — permite que cada modelo visual tenha
+  // identidade tipográfica própria sem que nenhum componente precise de um
+  // segundo prop só para isso.
+  fonteDisplay: string;
+  fonteCorpo: string;
+  // Preenchidos por temaDoModelo() (_lib/modelos.ts). Ausentes quando o tema
+  // veio direto de resolverFamilia() — nenhum componente depende deles.
+  modeloId?: string;
+  base?: "claro" | "escuro";
   // fundo
   ink: string; ink2: string; ink3: string;
   paper: string; paper2: string;
@@ -43,6 +62,7 @@ const FAMILIAS: Record<FamiliaId, Tema> = {
     text: "#eef2ee", textMuted: "#a9bcb4", textFaint: "#7c9188",
     textOnPaper: "#20302a", textMutedOnPaper: "#5f6d64",
     line: "rgba(238,242,238,.12)", lineOnPaper: "rgba(32,48,42,.13)",
+    ...FONTE_PADRAO,
     radius: 16,
   },
   // Advogados, contadores, imobiliárias, consultorias.
@@ -57,6 +77,7 @@ const FAMILIAS: Record<FamiliaId, Tema> = {
     text: "#f1f0ec", textMuted: "#a7aeb6", textFaint: "#78818b",
     textOnPaper: "#1c2126", textMutedOnPaper: "#5a6068",
     line: "rgba(241,240,236,.1)", lineOnPaper: "rgba(28,33,38,.12)",
+    ...FONTE_PADRAO,
     radius: 3,
   },
   // Barbearias, restaurantes, academias, pet shops, negócios de experiência.
@@ -70,6 +91,7 @@ const FAMILIAS: Record<FamiliaId, Tema> = {
     contrast: "#6b2b2b", contrastSoft: "rgba(107,43,43,.18)",
     text: "#f2e8d8", textMuted: "#b8a58c", textFaint: "#8a7860",
     textOnPaper: "#241a15", textMutedOnPaper: "#6b5c47",
+    ...FONTE_PADRAO,
     line: "rgba(242,232,216,.14)", lineOnPaper: "rgba(36,26,21,.14)",
     radius: 6,
   },
@@ -85,6 +107,7 @@ const FAMILIAS: Record<FamiliaId, Tema> = {
     text: "#eef1f3", textMuted: "#a3b0b8", textFaint: "#72828c",
     textOnPaper: "#161e24", textMutedOnPaper: "#556168",
     line: "rgba(238,241,243,.1)", lineOnPaper: "rgba(22,30,36,.12)",
+    ...FONTE_PADRAO,
     radius: 4,
   },
   // Sem segmento cadastrado — o mesmo tom neutro-premium que o site já usava
@@ -99,6 +122,7 @@ const FAMILIAS: Record<FamiliaId, Tema> = {
     text: "#f8fafc", textMuted: "#9aa8b9", textFaint: "#687589",
     textOnPaper: "#161b1f", textMutedOnPaper: "#565f66",
     line: "rgba(248,250,252,.1)", lineOnPaper: "rgba(22,27,31,.12)",
+    ...FONTE_PADRAO,
     radius: 8,
   },
 };
@@ -116,10 +140,11 @@ export function resolverFamilia(especialidade?: string | null): Tema {
   return FAMILIAS.universal;
 }
 
-export const font = {
-  display: "'Fraunces', Georgia, 'Iowan Old Style', serif",
-  body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
+// Compatibilidade: componentes que ainda importam `font` continuam funcionando.
+// A partir dos modelos visuais, a tipografia vem do próprio Tema
+// (tema.fonteDisplay / tema.fonteCorpo) para cada modelo poder ter identidade
+// tipográfica própria.
+export const font = { display: FONTE_PADRAO.fonteDisplay, body: FONTE_PADRAO.fonteCorpo };
 
 export type Tone = "light" | "dark";
 
@@ -134,6 +159,9 @@ export function paleta(tema: Tema, tone: Tone, variant: 1 | 2 = 1) {
   // tema.contrast é escuro (feito para ler sobre paper); tema.primary é claro
   // (feito para ler sobre ink). O acento precisa trocar junto com o fundo,
   // senão um link/ícone fica ilegível ao migrar de polo.
+  //
+  // fonteDisplay/fonteCorpo viajam junto para o componente poder aplicar a
+  // tipografia do MODELO resolvido sem precisar de um segundo prop.
   if (tone === "light") {
     return {
       bg: variant === 1 ? tema.paper : tema.paper2,
@@ -142,6 +170,8 @@ export function paleta(tema: Tema, tone: Tone, variant: 1 | 2 = 1) {
       textMuted: tema.textMutedOnPaper,
       line: tema.lineOnPaper,
       accent: tema.contrast,
+      fonteDisplay: tema.fonteDisplay,
+      fonteCorpo: tema.fonteCorpo,
     };
   }
   return {
@@ -151,5 +181,7 @@ export function paleta(tema: Tema, tone: Tone, variant: 1 | 2 = 1) {
     textMuted: tema.textMuted,
     line: tema.line,
     accent: tema.primary,
+    fonteDisplay: tema.fonteDisplay,
+    fonteCorpo: tema.fonteCorpo,
   };
 }

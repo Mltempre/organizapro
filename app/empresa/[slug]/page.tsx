@@ -74,9 +74,15 @@ async function buscarResumoEmpresa(slug: string): Promise<ResumoEmpresa | null |
   };
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
   const resumo = await buscarResumoEmpresa(slug);
+  // ?modelo= é só uma variação de APRESENTAÇÃO do mesmo conteúdo (comparação
+  // dos três modelos visuais pelo próprio cliente/equipe). Nunca deve virar
+  // conteúdo duplicado no índice de busca: a URL canônica indexável continua
+  // sendo /empresa/[slug] sem parâmetro.
+  const sp = (await searchParams) ?? {};
+  const variacaoDeModelo = Boolean(sp.modelo);
 
   if (!resumo) {
     return { title: "Site não encontrado | OrganizaPro" };
@@ -94,6 +100,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: titulo,
     description: descricao,
+    ...(variacaoDeModelo ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title: titulo,
       description: descricao,
@@ -135,6 +142,9 @@ async function capturarEPersistirOrigem(
     const codigoRastreio = gerarCodigoOrigem();
     const adsParams = new URLSearchParams();
     for (const [chave, valor] of Object.entries(searchParams)) {
+      // "modelo" é escolha de apresentação, nunca identificador de mídia —
+      // fica fora da captura de Ads pelo mesmo motivo que fica fora do índice.
+      if (chave === "modelo") continue;
       if (valor) adsParams.set(chave, Array.isArray(valor) ? valor[0] : valor);
     }
 
@@ -171,5 +181,11 @@ export default async function Page({ params, searchParams }: Props) {
     ? await capturarEPersistirOrigem(resumo.clinica_id, sp)
     : undefined;
 
+  // ?modelo=aurora|vertice|pulse é só uma variação de APRESENTAÇÃO do mesmo
+  // conteúdo: quem a lê e valida é o próprio orquestrador (SiteEmpresaClient,
+  // via useSearchParams + resolverModelo(), por allowlist). O contrato desta
+  // página continua exatamente o de sempre — slug + código de rastreio — e
+  // nada é gravado no banco por causa da variação. generateMetadata acima usa
+  // o mesmo parâmetro apenas para manter a URL canônica fora do índice.
   return <SiteEmpresaClient slug={slug} codigoRastreio={codigoRastreio} />;
 }

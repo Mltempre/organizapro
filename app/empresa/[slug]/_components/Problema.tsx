@@ -1,6 +1,6 @@
 import Reveal from "./Reveal";
 import { PROBLEMA } from "../_lib/content";
-import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
+import { paleta, type FamiliaId, type Tema, type Tone } from "../_lib/families";
 
 // "Problema" — a seção que faltava. Não fala da empresa, fala do visitante:
 // nomeia a dor universal do segmento antes de qualquer solução (nunca uma
@@ -9,6 +9,8 @@ import { font, paleta, type FamiliaId, type Tema, type Tone } from "../_lib/fami
 export default function Problema({ familiaId, tema, ctaHref, ctaTexto, tone = "light", variant = 1 }: { familiaId: FamiliaId; tema: Tema; ctaHref: string; ctaTexto: string; tone?: Tone; variant?: 1 | 2 }) {
   const conteudo = PROBLEMA[familiaId];
   const p = paleta(tema, tone, variant);
+  // Tipografia do modelo resolvido (nunca mais uma fonte fixa global).
+  const font = { display: p.fonteDisplay, body: p.fonteCorpo };
   return (
     <section className="premium-problema">
       <Reveal>
