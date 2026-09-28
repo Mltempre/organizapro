@@ -1,4 +1,5 @@
-import { produtoOrganizaPro } from "../../../../lib/seguranca-operacoes";
+import { produtoOrganizaPro, consumirCotaIa } from "../../../../lib/seguranca-operacoes";
+import { entidadeIdDeTelefone } from "../../../../lib/whatsapp-governado";
 import { NUMERO_COMERCIAL_EXIBICAO } from "../../../components/landing/whatsapp";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -69,6 +70,46 @@ function ehConfirmacaoDeConsulta(msg: string): boolean {
 // (TENANTS_COM_AUTOMACAO_PAUSADA) para o mesmo tenant isolado por outro motivo.
 const TENANT_SDR_ORGANIZAPRO = "9b21a735-4bbb-4cbc-8666-7d941be9d35c";
 
+// ─── Handoff humano e anti-loop (gate WhatsApp V1) ────────────────────────────
+// Pedido explícito de pessoa (ou sinal de crise) encerra o bot para aquele
+// contato: responde uma vez, registra o handoff em eventos_dominio e fica em
+// silêncio pela janela abaixo — a equipe continua pelo próprio WhatsApp sem o
+// bot responder por cima. Erro de leitura mantém o silêncio (nunca fala por
+// cima de um humano por indisponibilidade do banco).
+const PEDIDO_HUMANO =
+  /\b(humano|atendente|atendimento humano|recepcionista|falar com (uma pessoa|alguem|a equipe|voces|um especialista|o responsavel))\b/;
+const AFIRMATIVO = /^(sim|s|ok|quero|pode|pode ser|claro|bora|vamos)[\s,!.?]*$/;
+const JANELA_HANDOFF_MS = 24 * 60 * 60 * 1000;
+// Teto durável de respostas por contato/hora: corta loop com outro
+// auto-respondedor e avalanche sem depender de memória do processo.
+const LIMITE_RESPOSTAS_CONTATO_HORA = 15;
+const TIPO_HANDOFF = "chatbot.handoff_humano";
+
+async function atendimentoHumanoAtivo(clinica_id: string, telefone: string): Promise<boolean> {
+  const desde = new Date(Date.now() - JANELA_HANDOFF_MS).toISOString();
+  const { data, error } = await supabase.from("eventos_dominio").select("id")
+    .eq("clinica_id", clinica_id).eq("tipo", TIPO_HANDOFF).eq("entidade_tipo", "contato_whatsapp")
+    .eq("entidade_id", entidadeIdDeTelefone(clinica_id, telefone)).gte("criado_em", desde).limit(1);
+  if (error) return true;
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function registrarHandoff(clinica_id: string, telefone: string, operacao: string, motivo: string): Promise<void> {
+  const entidadeId = entidadeIdDeTelefone(clinica_id, telefone);
+  const { error } = await supabase.from("eventos_dominio").insert({
+    clinica_id, tipo: TIPO_HANDOFF, entidade_tipo: "contato_whatsapp", entidade_id: entidadeId,
+    chave_idempotencia: `${entidadeId}:${TIPO_HANDOFF}:${operacao}`,
+    payload: { motivo }, criado_em: new Date().toISOString(),
+  });
+  if (error && error.code !== "23505") console.error("[CHATBOT] handoff não registrado");
+}
+
+function respostaHandoff(config: Config): string {
+  return config.link_humano
+    ? `Claro! Para falar com nossa equipe:\n\n${config.link_humano}`
+    : `Certo! Vou pedir para alguém da nossa equipe continuar seu atendimento por aqui. 🙌`;
+}
+
 // ─── Classificador de tópico (regras fixas) ───────────────────────────────────
 
 function classificarTopico(msg: string): Topico {
@@ -124,7 +165,7 @@ function montarResposta(topico: Topico, config: Config, ehTenantSdrOrganizaPro: 
       return (
         `A consulta inicial pode variar conforme a avaliação e o procedimento necessário.` +
         ` Para confirmar o valor certinho, nossa equipe pode te atender.` +
-        ` Quer que eu chame um atendente?${link}`
+        ` Se quiser falar com a equipe, é só escrever *atendente*.${link}`
       );
     case "faq":
       return config.faq
@@ -554,6 +595,14 @@ async function salvarLead(clinica_id: string, telefone: string, updates: LeadUpd
   }
 }
 
+async function registrarLogSemResposta(clinica_id: string, telefone: string, motivo: string): Promise<void> {
+  const { error } = await supabase.from("chatbot_logs").insert({
+    clinica_id, telefone, nome_paciente: null,
+    mensagem_paciente: "[conteúdo omitido]", resposta_bot: "[sem resposta]", processado_por: motivo,
+  });
+  if (error) console.error("[CHATBOT] log:");
+}
+
 // ─── POST /api/chatbot/message ────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -611,7 +660,11 @@ export async function POST(req: NextRequest) {
       console.warn("[CHATBOT] vincularOrigemSeReferenciada falhou (ignorado):");
     });
 
-    if (ehConfirmacaoDeConsulta(mensagem)) {
+    const ehTenantSdrOrganizaPro = clinica_id === TENANT_SDR_ORGANIZAPRO;
+    // No SDR, "sim" logo após o convite para demonstração é aceite (tratado
+    // abaixo, com o estado do lead); fora disso segue ignorado como antes.
+    const ehConfirmacao = ehConfirmacaoDeConsulta(mensagem);
+    if (ehConfirmacao && !ehTenantSdrOrganizaPro) {
       console.log("[CHATBOT] retorno antecipado: confirmação de consulta detectada — ignorada pelo chatbot");
       return NextResponse.json({ sucesso: true, ignorado: "confirmacao_de_consulta" });
     }
@@ -626,7 +679,7 @@ export async function POST(req: NextRequest) {
 
     if (configErr) {
       console.error("[CHATBOT] retorno antecipado: erro ao buscar chatbot_config:");
-      return NextResponse.json({ sucesso: false, error: configErr.message }, { status: 500 });
+      return NextResponse.json({ sucesso: false, error: "Configuração indisponível" }, { status: 500 });
     }
 
     if (!config) {
@@ -640,6 +693,12 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("[CHATBOT] config encontrada e ativa — prosseguindo");
+
+    if (await atendimentoHumanoAtivo(clinica_id, telefone)) {
+      console.log("[CHATBOT] retorno antecipado: contato em atendimento humano — bot em silêncio");
+      await registrarLogSemResposta(clinica_id, telefone, "handoff_humano_ativo");
+      return NextResponse.json({ sucesso: true, ignorado: "atendimento_humano" });
+    }
 
     // Busca treinamentos + estado do lead + especialidade + serviços (IA Universal · Camadas 2 e 3) em paralelo
     const [treinaResult, leadAtual, clinicaResult, servicosResult] = await Promise.all([
@@ -675,11 +734,29 @@ export async function POST(req: NextRequest) {
     let processadoPor: string;
     let topico:        string;
     let leadUpdates:   LeadUpdates = { score };
+    let handoff:       string | null = null;
 
-    const ehTenantSdrOrganizaPro = clinica_id === TENANT_SDR_ORGANIZAPRO;
+    // ── Handoff: aceite do convite (SDR) ou pedido explícito de pessoa ───────
+    // Tem prioridade sobre coleta SDR e treinamentos: nunca é consumido como
+    // resposta de qualificação (ex.: virar o "nome" do lead).
+    if (ehConfirmacao) {
+      if (leadAtual?.etapa !== "concluido" || !AFIRMATIVO.test(msgNorm)) {
+        console.log("[CHATBOT] retorno antecipado: confirmação sem convite pendente — ignorada pelo chatbot");
+        return NextResponse.json({ sucesso: true, ignorado: "confirmacao_de_consulta" });
+      }
+      resposta      = respostaHandoff(config as Config);
+      processadoPor = "handoff_humano";
+      topico        = "handoff_humano";
+      handoff       = "aceite_convite";
+    } else if (PEDIDO_HUMANO.test(msgNorm)) {
+      resposta      = respostaHandoff(config as Config);
+      processadoPor = "handoff_humano";
+      topico        = "handoff_humano";
+      handoff       = "pedido_cliente";
+      if (emColeta) leadUpdates = { score, etapa: "concluido" };
 
     // ── GOLDEN RULE: mensagem QUENTE sem coleta ativa → CTA direto ───────────
-    if (ehTenantSdrOrganizaPro && novoScore >= 100 && !emColeta && !match) {
+    } else if (ehTenantSdrOrganizaPro && novoScore >= 100 && !emColeta && !match) {
       resposta      = respostaLeadQuente(leadAtual);
       processadoPor = "sdr_quente";
       topico        = "cta_quente";
@@ -736,6 +813,7 @@ export async function POST(req: NextRequest) {
           resposta      = resultadoUniversal.resposta;
           topico        = resultadoUniversal.intencao;
           processadoPor = resultadoUniversal.modulo ? `ia_universal:${resultadoUniversal.modulo}` : "ia_universal";
+          if (resultadoUniversal.sinal === "situacao_de_crise") handoff = "situacao_de_crise";
           console.log("[CHATBOT] ia_universal:");
         } else {
           topico        = classificarTopico(mensagem);
@@ -760,7 +838,14 @@ export async function POST(req: NextRequest) {
 
     console.log("[CHATBOT] resposta gerada:");
 
+    if (!await consumirCotaIa(supabase, clinica_id, `chatbot:${entidadeIdDeTelefone(clinica_id, telefone)}`, LIMITE_RESPOSTAS_CONTATO_HORA)) {
+      console.warn("[CHATBOT] limite de respostas por contato atingido (ou cota indisponível) — sem envio");
+      await registrarLogSemResposta(clinica_id, telefone, "limite_por_contato");
+      return NextResponse.json({ sucesso: true, ignorado: "limite_por_contato" });
+    }
+
     await salvarLead(clinica_id, telefone, leadUpdates);
+    if (handoff) await registrarHandoff(clinica_id, telefone, body.operacao || new Date().toISOString(), handoff);
 
     // ── Envio via Z-API ───────────────────────────────────────────────────────
     console.log("[CHATBOT] enviando resposta via /api/whatsapp");
