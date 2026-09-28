@@ -30,11 +30,12 @@ function cenario(o = {}) {
         const alvo = inst?.replace(/\\(.)/g, '$1').toLowerCase();
         const rows = Object.values(CFG)
           .filter(c => (inst === undefined || c.zapi_instance.toLowerCase() === alvo) && (cid === undefined || c.clinica_id === cid))
-          .map(c => o.semZapi?.includes(c.clinica_id) ? { ...c, zapi_token: null } : c);
+          .map(c => o.semZapi?.includes(c.clinica_id) ? { ...c, zapi_token: null } : c)
+          .map(c => o.semCampo ? { ...c, [o.semCampo]: null } : c);
         return { data: q.single ? rows[0] ?? null : rows, error: null };
       }
       if (q.table === 'clinica_usuarios') return { data: get('clinica_id') === A ? { clinica_id: A } : null, error: null };
-      if (q.table === 'clinicas') return { data: { produto: 'organizapro', nome: 'Empresa', especialidade: o.especialidade ?? null }, error: null };
+      if (q.table === 'clinicas') return { data: { produto: o.produto ?? 'organizapro', nome: 'Empresa', especialidade: o.especialidade ?? null }, error: null };
       if (q.table === 'eventos_dominio' && q.action === 'select' && get('tipo') === 'whatsapp.automacoes' && o.erroAutomacoes) return { data: null, error: { code: 'XX000' } };
       if (q.table === 'eventos_dominio' && q.action === 'insert' && q.value.tipo === 'whatsapp.automacoes' && o.erroAutomacoes) return { data: null, error: { code: 'XX000' } };
       if (q.table === 'chatbot_config') return { data: o.semChatbot ? null : { clinica_id: get('clinica_id'), ativo: !o.chatbotInativo, link_humano: o.link ?? null, nome_clinica: 'Empresa' }, error: null };
@@ -517,6 +518,99 @@ test('UI: Configurações mostra estado e liga/desliga com confirmação; teste 
   assert.match(bot, /p === 'handoff_humano'\)\s+return <Badge label="👤 Passou para a equipe · bot pausado 24h"/);
   assert.match(bot, /p === 'handoff_humano_ativo'\) return <Badge label="👤 Equipe atendendo · sem resposta do bot"/);
   assert.match(bot, /p === 'limite_por_contato'\)/);
+});
+
+// ── Gate operacional final da pista V1 ───────────────────────────────────────
+
+test('emergência: chatbot OFF + automações OFF = zero envio automático; WhatsApp segue conectado; nada é apagado', async () => {
+  const f = cenario({ chatbotInativo: true, agendamento: true });
+  await receber(f, evento('Olá'));
+  await receber(f, evento('quero falar com um atendente'));
+  await cron(f, 'lembretes');
+  await cron(f, 'avaliacoes');
+  assert.equal(zapi(f).length, 0);
+  assert.equal(f.queries.filter(q => q.action === 'delete').length, 0, 'logs e eventos preservados');
+  const cfgReq = { ...request(null), nextUrl: new URL('https://fixture.test/api/configuracoes?clinica_id=' + A) };
+  const estado = await f.load('app/api/configuracoes/route.ts').GET(cfgReq);
+  assert.deepEqual([estado.body.zapi_configurado, estado.body.chatbot_ativo, estado.body.automacoes_ativas], [true, false, false]);
+  // Atendimento humano continua possível pelo mesmo número: o teste manual controlado ainda envia.
+  const teste = '✅ Teste OrganizaPro: integração Z-API funcionando corretamente!';
+  assert.equal((await f.load('app/api/whatsapp/route.ts').POST(request({ clinica_id: A, telefone: CFG[A].telefone, mensagem: teste }))).status, 200);
+  assert.equal(zapi(f).length, 1);
+});
+
+test('SIM/NÃO do cliente funciona independentemente do toggle de automações (OFF e ON)', async () => {
+  for (const ligado of [false, true]) {
+    const f = cenario({ agendamento: true });
+    if (ligado) ativar(f, A);
+    await receber(f, evento('SIM'));
+    assert.ok(updatesAgenda(f).some(q => q.value.status === 'confirmado'), String(ligado));
+    assert.equal(zapi(f).length, 1, String(ligado));
+  }
+});
+
+test('ClínicaFlow não é afetada: não liga/desliga automações e cron não processa, mesmo com evento de ativação', async () => {
+  const f = cenario({ produto: 'clinicaflow', agendamento: true });
+  const r = await f.load('app/api/whatsapp/automacoes/route.ts').POST(request({ clinica_id: A, ativas: true, idempotency_key: 'k' }));
+  assert.equal(r.status, 403);
+  assert.equal(inseridos(f, 'eventos_dominio').length, 0);
+  ativar(f, A);
+  for (const nome of ['lembretes', 'avaliacoes']) await cron(f, nome);
+  assert.equal(zapi(f).length, 0);
+  assert.equal(f.queries.filter(q => q.table === 'agendamentos').length, 0);
+});
+
+test('configuração incompleta: sem telefone / instância / token / client token → falha compreensível, sem envio, destino ou tenant errado', async () => {
+  const teste = '✅ Teste OrganizaPro: integração Z-API funcionando corretamente!';
+  const cfgReq = { ...request(null), nextUrl: new URL('https://fixture.test/api/configuracoes?clinica_id=' + A) };
+  for (const [campo, statusTeste] of [['telefone', 403], ['zapi_instance', 503], ['zapi_token', 503], ['zapi_client_token', 503]]) {
+    const f = cenario({ semCampo: campo });
+    const r = await f.load('app/api/whatsapp/route.ts').POST(request({ clinica_id: A, telefone: CFG[A].telefone, mensagem: teste }));
+    assert.equal(r.status, statusTeste, campo);
+    assert.equal(r.body.nao_enviado, true, campo);
+    assert.doesNotMatch(JSON.stringify(r.body), /TOKEN_|CLIENT_|stack|at \w+ \(/, campo);
+    assert.equal(zapi(f).length, 0, campo);
+    if (campo === 'telefone') continue; // telefone do negócio só é destino do teste manual
+    assert.equal((await f.load('app/api/configuracoes/route.ts').GET(cfgReq)).body.zapi_configurado, false, campo);
+    // Inbound com credencial incompleta também não envia (nem por outro tenant).
+    await receber(f, evento('Olá'));
+    assert.equal(zapi(f).length, 0, campo + ' inbound');
+  }
+});
+
+test('sessão expirada: Configurações, automações e teste respondem 401 sem efeito', async () => {
+  const f = cenario();
+  const q = p => ({ ...request(null, 'expirada'), nextUrl: new URL('https://fixture.test' + p) });
+  assert.equal((await f.load('app/api/configuracoes/route.ts').GET(q('/api/configuracoes?clinica_id=' + A))).status, 401);
+  assert.equal((await f.load('app/api/whatsapp/automacoes/route.ts').GET(q('/api/whatsapp/automacoes?clinica_id=' + A))).status, 401);
+  assert.equal((await f.load('app/api/whatsapp/automacoes/route.ts').POST(request({ clinica_id: A, ativas: true, idempotency_key: 'k' }, 'expirada'))).status, 401);
+  assert.equal((await f.load('app/api/whatsapp/route.ts').POST(request({ clinica_id: A, telefone: CFG[A].telefone, mensagem: 'x' }, 'expirada'))).status, 401);
+  assert.equal(inseridos(f, 'eventos_dominio').length, 0);
+  assert.equal(f.calls.length, 0);
+});
+
+test('documentação de implantação: checklist de 15 minutos, fases A–L, testes A–E e nenhum segredo real', async () => {
+  const fs = await import('node:fs');
+  const doc = fs.readFileSync(new URL('../docs/WHATSAPP_CHATBOT_IMPLANTACAO_V1.md', import.meta.url), 'utf8');
+  assert.match(doc, /## IMPLANTAÇÃO EM 15 MINUTOS — CHECKLIST/);
+  for (const fase of 'ABCDEFGHIJKL') assert.match(doc, new RegExp('## FASE ' + fase + ' —'), fase);
+  for (const t of ['A — Entrada', 'B — Saída', 'C — Handoff', 'D — Chatbot desligado', 'E — Automações desligadas']) assert.ok(doc.includes(t), t);
+  assert.match(doc, /\(43\) 98412-8591/);
+  assert.match(doc, /\?token=<WEBHOOK_SECRET>/);
+  assert.match(doc, /fix-clinica-config-zapi-instance-unica-v1\.sql/);
+  assert.doesNotMatch(doc, /eyJ[A-Za-z0-9_-]{10,}|sk-[A-Za-z0-9]{10,}|token=[A-Za-z0-9]{12,}/, 'nenhum segredo real');
+  // A ordem documentada liga o chatbot só no teste de entrada.
+  assert.ok(doc.indexOf('Automações OFF') < doc.indexOf('Teste de entrada') && doc.indexOf('Teste de entrada') < doc.indexOf('**Só então**'));
+});
+
+test('observabilidade: página Automação distingue enviado / recebido / erro e explica número oculto', async () => {
+  const fs = await import('node:fs');
+  const pag = fs.readFileSync(new URL('../app/automacao/page.tsx', import.meta.url), 'utf8');
+  assert.match(pag, /status === 'recebido'\) return \{ icone: '📥'/);
+  assert.match(pag, /status === 'enviado'\)\s+return \{ icone: '✅'/);
+  assert.match(pag, /contato_sem_telefone_confiavel/);
+  assert.match(pag, /Número oculto pelo WhatsApp — sem resposta automática; atender pelo aparelho/);
+  assert.match(pag, /\{log\.telefone \|\| '-'\}/, 'log sem telefone (@lid) não quebra a tabela');
 });
 
 test('crons sem CRON_SECRET correto → 401 antes de qualquer consulta ou envio', async () => {

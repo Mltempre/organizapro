@@ -10,10 +10,18 @@ import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 interface WhatsappLog {
   id: string;
   clinica_id: string;
-  telefone: string;
+  telefone: string | null;
   mensagem: string;
   status: string;
+  resposta?: { tipo?: string } | null;
   created_at: string;
+}
+
+// Entrada registrada pelo webhook ("recebido") não é falha: só "erro" é vermelho.
+function statusLog(status: string): { icone: string; rotulo: string; fundo: string; cor: string } {
+  if (status === 'enviado')  return { icone: '✅', rotulo: 'enviado',  fundo: '#16a34a22', cor: '#4ade80' };
+  if (status === 'recebido') return { icone: '📥', rotulo: 'recebido', fundo: '#64748b22', cor: '#cbd5e1' };
+  return { icone: '❌', rotulo: status, fundo: '#dc262622', cor: '#f87171' };
 }
 
 interface Avaliacao {
@@ -328,17 +336,19 @@ export default function AutomacaoPage() {
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 6,
                             padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                            background: log.status === 'enviado' ? '#16a34a22' : '#dc262622',
-                            color:      log.status === 'enviado' ? '#4ade80'   : '#f87171',
+                            background: statusLog(log.status).fundo,
+                            color:      statusLog(log.status).cor,
                           }}>
-                            {log.status === 'enviado' ? '✅' : '❌'} {log.status}
+                            {statusLog(log.status).icone} {statusLog(log.status).rotulo}
                           </span>
                         </td>
                         <td style={{ padding: '12px 16px', borderBottom: '1px solid #1a1d2e', fontSize: 13, color: '#cbd5e1', whiteSpace: 'nowrap' }}>
                           {log.telefone || '-'}
                         </td>
                         <td style={{ padding: '12px 16px', borderBottom: '1px solid #1a1d2e', fontSize: 12, color: '#64748b', maxWidth: 320 }}>
-                          {truncar(log.mensagem)}
+                          {log.resposta?.tipo === 'contato_sem_telefone_confiavel'
+                            ? 'Número oculto pelo WhatsApp — sem resposta automática; atender pelo aparelho'
+                            : truncar(log.mensagem)}
                         </td>
                         <td style={{ padding: '12px 16px', borderBottom: '1px solid #1a1d2e', fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
                           {formatarDataHora(log.created_at)}
