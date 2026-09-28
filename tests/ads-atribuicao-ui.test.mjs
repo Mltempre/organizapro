@@ -25,6 +25,7 @@ function render(dados, loading = false, erro = '') {
     if (request.endsWith('/Feedback')) return { __esModule: true, default: ({ message }) => React.createElement('p', { role: 'alert' }, message) };
     if (request.endsWith('/atribuicao-relatorio')) return { TIPOS_VINCULO_ATRIBUICAO: ['cliente','oportunidade','agendamento','orcamento','pedido','cobranca'] };
     if (request.endsWith('/ads-contratos')) return { CONEXOES_ADS_V1: [{ plataforma: 'google_ads' }, { plataforma: 'meta_ads' }] };
+    if (request.endsWith('/MetaAdsSecao')) return { __esModule: true, default: () => React.createElement('section', { 'aria-label': 'Meta Ads' }, 'Meta Ads') };
     return original.call(this, request, parent, isMain);
   };
   try {

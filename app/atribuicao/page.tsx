@@ -10,6 +10,7 @@ import Feedback from '../components/Feedback';
 import type { carregarRelatorioAtribuicao } from '../../lib/atribuicao-dados';
 import { TIPOS_VINCULO_ATRIBUICAO, type TipoVinculoAtribuicao } from '../../lib/atribuicao-relatorio';
 import { CONEXOES_ADS_V1 } from '../../lib/ads-contratos';
+import MetaAdsSecao from './MetaAdsSecao';
 
 type Dados = Awaited<ReturnType<typeof carregarRelatorioAtribuicao>>;
 const dinheiro = (v: number) => (v / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -71,7 +72,10 @@ export default function AtribuicaoPage() {
   return <AdminShell title="Ads e Atribuição" subtitle="Origem → contato → oportunidade → venda. Google Ads e Meta Ads: não confundir com Google Presença.">
     <style>{`.atr-section{margin:20px 0;padding:16px;border:1px solid #64748b;border-radius:10px}.atr-table{width:100%;border-collapse:collapse}.atr-table th,.atr-table td{text-align:left;padding:9px;border-bottom:1px solid #64748b}.atr-form{display:grid;gap:12px;max-width:720px}.atr-form label{display:grid;gap:5px}.atr-form select,.atr-form textarea{padding:9px;color:#0f172a;background:#fff}.atr-section button{padding:9px 14px;border:1px solid #64748b;border-radius:6px;cursor:pointer}`}</style>
     <p>Identificadores e UTMs são marcações capturadas, não confirmação da plataforma. Receita atribuída indica vínculo rastreável, não causalidade. CAC/ROAS: — (gastos não integrados).</p>
-    <p>{CONEXOES_ADS_V1.map(c => `${labels[c.plataforma]}: integração oficial não conectada`).join(' · ')}</p>
+    {/* Google Ads segue sem integração oficial; o estado real do Meta Ads é
+        a seção dinâmica abaixo (nunca afirmamos "não conectada" para Meta). */}
+    <p>{CONEXOES_ADS_V1.filter(c => c.plataforma === 'google_ads').map(c => `${labels[c.plataforma]}: integração oficial não conectada`).join(' · ')}</p>
+    <MetaAdsSecao sessao={sessao} linhas={r?.linhas ?? []} />
     {carregando && <PageLoader title="Conferindo origens e resultados..." />}
     {erro && <Feedback type="erro" message={erro} />}
     {sucesso && <Feedback type="sucesso" message={sucesso} />}
