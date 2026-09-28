@@ -37,7 +37,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Orçamentos",      h: "/orcamentos",       i: "💰" },
       { l: "Follow-up",       h: "/follow-up",        i: "🔁" },
       { l: "Cobranças",       h: "/cobrancas",        i: "🧾" },
-      { l: "E-commerce IA",   h: "/pedidos",          i: "🛒" },
+      { l: "Pedidos",         h: "/pedidos",          i: "🛒" },
       { l: "Tratamentos",     h: "/tratamentos",      i: "🩺" },
       { l: "Receita Perdida", h: "/receita-perdida",  i: "📉" },
     ],
@@ -48,13 +48,13 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Agenda",          h: "/agendamentos",    i: "📅" },
       { l: "Agenda Autônoma", h: "/agenda-autonoma", i: "🔄" },
       { l: "Chatbot",         h: "/chatbot",          i: "💬" },
-      { l: "Automação",       h: "/automacao",        i: "🤖" },
+      { l: "WhatsApp",        h: "/automacao",        i: "📲" },
     ],
   },
   {
     titulo: "Presença",
     itens: [
-      { l: "Google",     h: "/google-presenca", i: "📍" },
+      { l: "Google Presença", h: "/google-presenca", i: "📍" },
       { l: "Reputação",  h: "/reputacao",        i: "⭐" },
       { l: "Site",       h: "/site",             i: "🌍" },
       { l: "Conteúdo IA", h: "/conteudo",        i: "✍️" },
@@ -63,7 +63,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
   {
     titulo: "Inteligência",
     itens: [
-      { l: "Copiloto",              h: "/copiloto",              i: "🧑‍💼" },
+      { l: "Gerente Comercial AI",  h: "/copiloto",              i: "💼" },
       { l: "Métricas",              h: "/metricas",              i: "📈" },
       { l: "Raio-X",                h: "/raio-x",                i: "🔍" },
       { l: "Previsor de Faturamento", h: "/previsor-faturamento", i: "🔮" },

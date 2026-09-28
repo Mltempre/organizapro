@@ -62,10 +62,10 @@ test("DashboardView: 'Ver todas' do Radar aponta para /copiloto (mesmo motor unc
   assert.doesNotMatch(codigo, /verTodasDestino="\/oportunidades"/);
 });
 
-test("FaixaExecutiva: tile 'Oportunidades' aponta para /copiloto, nunca /oportunidades", () => {
+test("FaixaExecutiva: tile 'Prioridades comerciais' (oportunidades de clientes) aponta para /copiloto, nunca /oportunidades", () => {
   const codigo = ler("app/components/FaixaExecutiva.tsx");
-  const linha = codigo.split("\n").find(l => l.includes('label: "Oportunidades"'));
-  assert.ok(linha, "tile 'Oportunidades' deveria existir");
+  const linha = codigo.split("\n").find(l => l.includes('label: "Prioridades comerciais"'));
+  assert.ok(linha, "tile 'Prioridades comerciais' deveria existir");
   assert.match(linha, /destino: "\/copiloto"/);
 });
 

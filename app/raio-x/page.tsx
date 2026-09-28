@@ -203,7 +203,7 @@ export default function RaioX() {
   ];
 
   return (
-    <AdminShell title="📊 Raio-X da Empresa" subtitle={`Semana ${dataRange} · Consultoria executiva`}>
+    <AdminShell title="Raio-X da Empresa" subtitle={`Semana ${dataRange} · Consultoria executiva`}>
 
       {/* ── BOTÃO ATUALIZAR ── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>

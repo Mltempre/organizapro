@@ -232,8 +232,8 @@ export default function Conteudo() {
 
   return (
     <AdminShell
-      title="Biblioteca de Marketing"
-      subtitle="Conteúdos profissionais criados por IA para ajudar seu negócio a atrair clientes e fortalecer sua presença digital."
+      title="Conteúdo IA"
+      subtitle="Biblioteca de marketing: conteúdos profissionais criados por IA para ajudar seu negócio a atrair clientes e fortalecer sua presença digital."
     >
       <style>{`
         .ct-obj-card:hover:not(.ct-sel) { border-color: #3d4360 !important; }

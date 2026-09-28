@@ -230,10 +230,10 @@ export default function CopilotoPage() {
     : 0;
 
   return (
-    <AdminShell title="Copiloto Administrativo" subtitle="Prioridades e próximos passos para cuidar do seu negócio">
+    <AdminShell title="Gerente Comercial AI" subtitle="Prioridades comerciais e próximos passos para cuidar do seu negócio">
       <div className="copiloto">
       <nav className="copiloto-acessos" aria-label="Acessos comerciais">
-        <a href="/pedidos">🛒 E-commerce IA →</a>
+        <a href="/pedidos">🛒 Pedidos →</a>
       </nav>
       {carregando && <PageLoader title="Consolidando o que precisa da sua atenção..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
@@ -279,7 +279,7 @@ export default function CopilotoPage() {
           {/* ── PRIORIDADES COMERCIAIS (Radar + Smart Commerce, uncapped) ── */}
           {estado.sinais.length > 0 && (
             <section id="gerente-comercial" aria-label="Gerente Comercial AI" style={{ marginBottom: 24 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>Gerente Comercial AI ({estado.atencoes.length})</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>Prioridades comerciais ({estado.atencoes.length})</h2>
               <p>Veja o motivo de cada prioridade e abra o próximo passo para agir.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {estado.atencoes.map(({ sinal, impacto, destinoAcao }) => {

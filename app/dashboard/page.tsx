@@ -510,15 +510,15 @@ export default function Dashboard() {
   const estadoComercial = gerarEstadoComercialCanonico(sinaisCanonicos);
   const missaoDoDia: SinalCanonico[] = estadoComercial.missaoDoDia;
   if (loading || (!clinicaId && !erroCarga)) return (
-    <AdminShell title="Painel Executivo">
+    <AdminShell title="Visão Geral">
       <PageLoader title="Preparando seu painel..." />
     </AdminShell>
   );
 
   if (erroCarga) return (
-    <AdminShell title="Casa">
+    <AdminShell title="Visão Geral">
       <section role="alert" style={{ color: "#e2e8f0", padding: 24 }}>
-        <h1>Não foi possível carregar a Casa</h1><p>{erroCarga}</p>
+        <h1>Não foi possível carregar a Visão Geral</h1><p>{erroCarga}</p>
         <button onClick={carregarDados} style={{ padding: "12px 18px", cursor: "pointer" }}>Tentar novamente</button>
       </section>
     </AdminShell>

@@ -284,25 +284,21 @@ export default function ConfiguracoesPage() {
   };
 
   if (loading) return (
-    <AdminShell title="⚙️ Configurações da Empresa" subtitle="Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.">
+    <AdminShell title="Configurações da Empresa" subtitle="Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.">
       <PageLoader title="Carregando configurações..." />
     </AdminShell>
   );
 
   return (
-    <AdminShell title="⚙️ Configurações da Empresa" subtitle="Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.">
+    <AdminShell title="Configurações da Empresa" subtitle="Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.">
       <style>{`
         .cfg-btn-salvar:hover:not(:disabled) { filter: brightness(1.1); }
         .cfg-btn-testar:hover:not(:disabled) { background: rgba(79,70,229,0.2) !important; }
       `}</style>
       <div style={{ width: '100%', maxWidth: 960 }}>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>⚙️ Configurações da Empresa</h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '8px 0 0' }}>Mantenha os dados da sua empresa sempre atualizados. Essas informações serão utilizadas em todo o OrganizaPro.</p>
-          </div>
+        {/* Ação principal — título e subtítulo já vêm do AdminShell (evita cabeçalho duplicado) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
           <button className="cfg-btn-salvar" onClick={salvar} disabled={salvando} style={{ padding: '12px 22px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1, transition: 'filter 0.15s' }}>
             {salvando ? 'Salvando...' : 'Salvar'}
           </button>

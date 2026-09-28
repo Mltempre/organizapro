@@ -45,7 +45,7 @@ export default function CasaDashboard(props: CasaDashboardProps) {
   );
   const riscos = receitaPerdida.porOrigem.filter(r => r.itensComValor + r.itensSemValor > 0);
   return (
-    <AdminShell title="Casa">
+    <AdminShell title="Visão Geral">
       <div className={styles.casa}>
         <header className={styles.cabecalho}>
           <div><p className={styles.muted}>{dataStr}</p><h1>{saudacaoCard.linha1}</h1>
@@ -118,8 +118,8 @@ export default function CasaDashboard(props: CasaDashboardProps) {
           <section className={styles.card} aria-labelledby="casa-comercial">
             <h2 id="casa-comercial">Comercial e presença</h2>
             <p>{orcamentosParadosCount > 0 ? `${orcamentosParadosCount} orçamento(s) apresentado(s) aguardando resposta.` : "Nenhum orçamento apresentado aguardando resposta."}</p>
-            <nav className={styles.links} aria-label="Comercial"><Link href="/orcamentos">Orçamentos →</Link><Link href="/pedidos" aria-describedby="casa-ecommerce-descricao">E-commerce IA →</Link><Link href="/oportunidades">Interesses recebidos →</Link></nav>
-            <p id="casa-ecommerce-descricao" className={styles.muted}>E-commerce IA: catálogo, pedidos online e inteligência comercial.</p>
+            <nav className={styles.links} aria-label="Comercial"><Link href="/orcamentos">Orçamentos →</Link><Link href="/pedidos" aria-describedby="casa-ecommerce-descricao">Pedidos →</Link><Link href="/oportunidades">Oportunidades →</Link></nav>
+            <p id="casa-ecommerce-descricao" className={styles.muted}>Pedidos (E-commerce IA): catálogo, pedidos online e inteligência comercial.</p>
             <div className={styles.risco}><h3>Avaliações solicitadas</h3>
               <p>{indicadores.avaliacoesPendentes > 0 ? `${indicadores.avaliacoesPendentes} solicitação(ões) aguardando resposta do cliente.` : "Nenhuma solicitação de avaliação aguardando resposta."}</p>
               <nav className={styles.links} aria-label="Presença"><Link href="/reputacao">Ver avaliações →</Link><Link href="/google-presenca">Presença no Google →</Link></nav>

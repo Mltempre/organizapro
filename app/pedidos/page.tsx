@@ -204,7 +204,7 @@ export default function PedidosPage() {
   return (
     <AdminShell
       title="Pedidos"
-      subtitle={`${filtrados.length} pedido${filtrados.length !== 1 ? 's' : ''}`}
+      subtitle={`${filtrados.length} pedido${filtrados.length !== 1 ? 's' : ''} · E-commerce IA: pedidos do catálogo e do site`}
       actionLabel="+ Novo pedido"
       actionOnClick={abrirNovo}
     >
@@ -326,6 +326,15 @@ export default function PedidosPage() {
             </div>
 
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Itens</label>
+            {/* Catálogo vazio não é erro: explica de onde vêm os itens em vez de
+                deixar só "— Item avulso —" sem contexto. */}
+            {catalogo.filter(c => c.disponivel !== false && c.preco_centavos).length === 0 && (
+              <p data-testid="catalogo-vazio" style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 10px', lineHeight: 1.5 }}>
+                Seu catálogo ainda não tem serviços com preço. Cadastre nome e preço em{' '}
+                <a href="/site/servicos" style={{ color: '#4a9bb0' }}>Site → Serviços</a>{' '}
+                para selecioná-los aqui; enquanto isso, use um item avulso.
+              </p>
+            )}
             {linhas.map((l, idx) => {
               const itemCatalogo = catalogo.find(c => c.id === l.servicoId);
               return (
