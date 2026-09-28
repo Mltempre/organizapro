@@ -44,6 +44,19 @@ export async function PUT(req: NextRequest) {
       values[c] = body[c];
     }
     if (values.link_google && !/^https?:\/\//i.test(values.link_google)) return resposta({ error: "Link inválido" }, 400);
+    // Uma instância Z-API pertence a um único negócio: o webhook resolve o
+    // tenant pela instância e fica fail-closed quando ela é ambígua. Bloqueia
+    // antes de gravar (sem diferenciar maiúsculas/espaços); erro de leitura
+    // também bloqueia.
+    if (values.zapi_instance !== undefined) {
+      values.zapi_instance = values.zapi_instance.trim();
+      if (values.zapi_instance) {
+        const padrao = values.zapi_instance.replace(/[\\%_]/g, m => "\\" + m);
+        const { data: usos, error: usoErro } = await admin.from("clinica_config").select("clinica_id").ilike("zapi_instance", padrao);
+        if (usoErro || !Array.isArray(usos)) return resposta({ error: "Configuração indisponível" }, 503);
+        if (usos.some(u => u.clinica_id !== body.clinica_id)) return resposta({ error: "Esta instância Z-API já está vinculada a outro negócio." }, 409);
+      }
+    }
     const { data: atual, error: leitura } = await admin.from("clinica_config").select("user_id").eq("clinica_id", body.clinica_id).maybeSingle();
     if (leitura) return resposta({ error: "Configuração indisponível" }, 503);
     const registro = { ...values, updated_at: new Date().toISOString() };

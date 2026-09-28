@@ -23,8 +23,13 @@ function cenario(o = {}) {
     responder: (q, get) => {
       if (q.table === 'clinica_config' && q.action === 'select') {
         const inst = get('zapi_instance'), cid = get('clinica_id');
+        if (inst !== undefined && o.erroInstancia) return { data: null, error: { code: 'XX000' } };
+        // Duas linhas com a mesma instância: maybeSingle do PostgREST devolve erro.
+        if (inst !== undefined && o.instanciaDuplicada && q.single) return { data: null, error: { code: 'PGRST116' } };
+        // eq exato e ilike (padrão escapado) comparados sem diferenciar maiúsculas.
+        const alvo = inst?.replace(/\\(.)/g, '$1').toLowerCase();
         const rows = Object.values(CFG)
-          .filter(c => (inst === undefined || c.zapi_instance === inst) && (cid === undefined || c.clinica_id === cid))
+          .filter(c => (inst === undefined || c.zapi_instance.toLowerCase() === alvo) && (cid === undefined || c.clinica_id === cid))
           .map(c => o.semZapi?.includes(c.clinica_id) ? { ...c, zapi_token: null } : c);
         return { data: q.single ? rows[0] ?? null : rows, error: null };
       }
@@ -288,6 +293,119 @@ test('segredos: tokens Z-API e segredos de rota nunca aparecem em console, respo
   }
   const tudo = JSON.stringify([f.logs, respostas, f.queries.filter(q => q.action === 'insert')]);
   for (const s of ['TOKEN_A_SECRET', 'CLIENT_A_SECRET', 'WEBHOOK_SECRET_VALUE']) assert.ok(!tudo.includes(s), s);
+});
+
+// ── Residuais (2026-09-28): @lid, mídia, instância duplicada ─────────────────
+
+test('telefoneConfiavelZapi: só número real; @lid, grupo, canal e LID sem sufixo → null (nunca telefone falso)', () => {
+  const { telefoneConfiavelZapi: t } = cenario().load('lib/whatsapp-governado.ts');
+  assert.equal(t('5544999999999', ['81896604192873@lid']), '5544999999999');
+  assert.equal(t('5544999999999@c.us'), '5544999999999');
+  assert.equal(t('5544999999999@s.whatsapp.net'), '5544999999999');
+  assert.equal(t('+55 (44) 99999-9999'), '5544999999999');
+  for (const [phone, lids] of [
+    ['81896604192873@lid', []], ['81896604192873@LID', []], ['81896604192873', ['81896604192873@lid']],
+    ['120363012345678@g.us', []], ['120363012345678@newsletter', []], ['status@broadcast', []],
+    ['123', []], ['1234567890123456', []], ['abc5544999999999', []], ['', []], [null, []], [5544999999999, []],
+  ]) assert.equal(t(phone, lids), null, String(phone));
+});
+
+test('@lid: sem telefone confiável não responde, não busca agendamento, não grava contato; log sanitizado no tenant', async () => {
+  for (const extra of [
+    { phone: '81896604192873@lid', senderLid: '81896604192873@lid' },
+    { phone: '81896604192873', senderLid: '81896604192873@lid' },
+    { phone: '81896604192873', chatLid: '81896604192873@lid' },
+  ]) {
+    for (const texto of ['Olá', 'SIM', 'quero falar com um atendente', 'parar']) {
+      const f = cenario({ agendamento: true });
+      const r = await receber(f, evento(texto, extra));
+      assert.equal(r.status, 200);
+      assert.equal(r.body.ignorado, 'contato_sem_telefone');
+      assert.equal(chamadasChatbot(f).length, 0);
+      assert.equal(f.calls.length, 0);
+      assert.equal(f.queries.filter(q => ['agendamentos', 'chatbot_leads', 'eventos_dominio'].includes(q.table)).length, 0);
+      const log = inseridos(f, 'whatsapp_logs');
+      assert.deepEqual(log.map(l => [l.clinica_id, l.telefone, l.mensagem, l.resposta.tipo]), [[A, null, '[conteúdo omitido]', 'contato_sem_telefone_confiavel']]);
+      assert.ok(!JSON.stringify([f.logs, f.queries]).includes('81896604192873'), 'LID não vai para log nem consulta');
+    }
+  }
+});
+
+test('@lid: instância desconhecida registra sem tenant; phone real com senderLid segue o fluxo normal', async () => {
+  const f = cenario();
+  await receber(f, evento('Olá', { phone: '81896604192873@lid', instanceId: 'inst-desconhecida' }));
+  assert.equal(inseridos(f, 'whatsapp_logs')[0].clinica_id, null);
+  assert.equal(f.calls.length, 0);
+
+  const g = cenario();
+  await receber(g, evento('Olá', { senderLid: '81896604192873@lid' }));
+  assert.equal(zapi(g).length, 1);
+  assert.equal(enviado(zapi(g)[0]).phone, CLIENTE);
+});
+
+test('áudio, imagem, figurinha e documento: sem erro, sem resposta inventada, sem consulta, sem loop', async () => {
+  for (const midia of [
+    { audio: { ptt: true, seconds: 10, audioUrl: 'https://midia.test/SENSITIVE_SENTINEL.ogg', mimeType: 'audio/ogg; codecs=opus' } },
+    { image: { mimeType: 'image/jpeg', imageUrl: 'https://midia.test/SENSITIVE_SENTINEL.jpg', caption: 'SENSITIVE_SENTINEL', width: 600, height: 315 } },
+    { sticker: { stickerUrl: 'https://midia.test/SENSITIVE_SENTINEL.webp', mimeType: 'image/webp' } },
+    { document: { documentUrl: 'https://midia.test/SENSITIVE_SENTINEL.pdf', fileName: 'SENSITIVE_SENTINEL.pdf' } },
+  ]) {
+    const f = cenario();
+    const e = { ...evento('x'), text: undefined, ...midia };
+    for (let n = 0; n < 3; n++) {
+      const r = await receber(f, { ...e, messageId: 'midia-' + (++seq) });
+      assert.equal(r.status, 200);
+      assert.equal(r.body.ignorado, 'sem_dados');
+    }
+    assert.equal(f.queries.length, 0);
+    assert.equal(f.calls.length, 0);
+    assert.ok(!JSON.stringify([f.logs]).includes('SENSITIVE_SENTINEL'));
+  }
+});
+
+test('instância duplicada ou leitura com erro no webhook: fail-closed, nenhuma resposta', async () => {
+  for (const o of [{ instanciaDuplicada: true }, { erroInstancia: true }]) {
+    for (const texto of ['Olá', 'SIM']) {
+      const f = cenario({ ...o, agendamento: true });
+      await receber(f, evento(texto));
+      assert.equal(chamadasChatbot(f).length, 0, texto);
+      assert.equal(zapi(f).length, 0, texto);
+      assert.equal(updatesAgenda(f).length, 0, texto);
+    }
+  }
+});
+
+test('configurações: instância Z-API de outro negócio é recusada (409) sem gravar; re-salvar a própria continua ok', async () => {
+  const salvar = async (f, zapi_instance) => f.load('app/api/configuracoes/route.ts').PUT(request({ clinica_id: A, nome_clinica: 'Empresa A', zapi_instance }));
+  for (const valor of ['inst-B', ' INST-b ']) {
+    const f = cenario();
+    const r = await salvar(f, valor);
+    assert.equal(r.status, 409, valor);
+    assert.ok(!JSON.stringify(r.body).includes(B));
+    assert.equal(f.queries.filter(q => q.table === 'clinica_config' && ['update', 'insert', 'upsert'].includes(q.action)).length, 0);
+  }
+  const g = cenario();
+  assert.equal((await salvar(g, ' inst-A ')).status, 200);
+  const upd = g.queries.find(q => q.table === 'clinica_config' && q.action === 'update');
+  assert.equal(upd.value.zapi_instance, 'inst-A', 'grava sem espaços nas bordas');
+  const h = cenario({ erroInstancia: true });
+  assert.equal((await salvar(h, 'inst-nova')).status, 503);
+  assert.equal(h.queries.filter(q => q.action === 'update' || q.action === 'insert').length, 0);
+  const k = cenario();
+  assert.equal((await salvar(k, '')).status, 200, 'limpar instância não consulta conflito');
+});
+
+test('SQL pendente de unicidade: fora das migrations automáticas, pré-check que aborta sem alterar, índice parcial normalizado', async () => {
+  const fs = await import('node:fs');
+  const arq = new URL('../sql/saneamento-pendente/fix-clinica-config-zapi-instance-unica-v1.sql', import.meta.url);
+  assert.ok(!fs.existsSync(new URL('../supabase/migrations/fix-clinica-config-zapi-instance-unica-v1.sql', import.meta.url)));
+  const sql = fs.readFileSync(arq, 'utf8').replace(/\r\n/g, '\n');
+  const ativo = sql.replace(/--.*$/gm, '');
+  assert.match(ativo, /raise exception 'ABORTADO:/);
+  assert.ok(ativo.indexOf('raise exception') < ativo.indexOf('create unique index'));
+  assert.match(ativo, /create unique index if not exists clinica_config_zapi_instance_unica_uidx\s+on public\.clinica_config \(lower\(btrim\(zapi_instance\)\)\)\s+where zapi_instance is not null and btrim\(zapi_instance\) <> ''/);
+  assert.doesNotMatch(ativo, /\b(update|delete|truncate|drop|alter)\b/i, 'nunca altera ou apaga dados/estrutura existente');
+  assert.match(sql, /COMPARTILHADA com o ClínicaFlow/);
 });
 
 test('crons sem CRON_SECRET correto → 401 antes de qualquer consulta ou envio', async () => {

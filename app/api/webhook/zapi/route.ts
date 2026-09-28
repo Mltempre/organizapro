@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { classificarResposta } from "../../../../lib/zapi-classificar-resposta";
 import {
   detectarPedidoOptOut, entidadeIdDeTelefone, entidadeIdDeterministico,
-  chaveIdempotenciaWebhookRecebido, chaveIdempotenciaConsentimento,
+  chaveIdempotenciaWebhookRecebido, chaveIdempotenciaConsentimento, telefoneConfiavelZapi,
 } from "../../../../lib/whatsapp-governado";
 
 const supabase = createClient(
@@ -161,7 +161,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ sucesso: true, ignorado: "sem_dados" });
     }
 
-    const telefone = normalizarTelefone(phoneRaw);
+    // @lid (identificador privado do WhatsApp) não é telefone e a Z-API não o
+    // converte: sem número real, nada é respondido nem associado a contato —
+    // só um registro sanitizado no tenant da instância, quando identificado.
+    const telefoneConfiavel = telefoneConfiavelZapi(phoneRaw, [body.senderLid, body.chatLid, body.participantLid]);
+    if (!telefoneConfiavel) {
+      console.warn("[WEBHOOK] contato sem telefone confiável (ex.: @lid) — não respondível automaticamente");
+      let clinicaLog: string | null = null;
+      if (instanceId) {
+        const { data: cfgLid } = await supabase.from("clinica_config").select("clinica_id").eq("zapi_instance", instanceId).maybeSingle();
+        if (cfgLid?.clinica_id && await produtoOrganizaPro(supabase, cfgLid.clinica_id)) clinicaLog = cfgLid.clinica_id;
+      }
+      await supabase.from("whatsapp_logs").insert({
+        clinica_id: clinicaLog, telefone: null, mensagem: "[conteúdo omitido]", status: "recebido",
+        resposta: { tipo: "contato_sem_telefone_confiavel" },
+      });
+      return NextResponse.json({ sucesso: true, ignorado: "contato_sem_telefone" });
+    }
+
+    const telefone = normalizarTelefone(telefoneConfiavel);
     const sufixo9  = telefone.slice(-9);
     const sufixo8  = telefone.slice(-8);
     // Opt-out explícito ("não quero mais receber", "cancelar inscrição") começa
