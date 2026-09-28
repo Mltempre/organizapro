@@ -137,7 +137,10 @@ function buildPdfHtml(ags: Agendamento[], empresa: EmpresaConfig | null, data: s
 
   const cabecalho = `<header class="hdr">
     <div class="hdr-l">
-      <div class="op-logo"><span class="op-mark">O</span>OrganizaPro</div>
+      <div class="op-brand">
+        <svg class="op-mark" viewBox="0 0 44 44" width="40" height="40" role="img" aria-label="OrganizaPro"><defs><linearGradient id="opMarcaGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1F4E5F"/><stop offset="1" stop-color="#0d3547"/></linearGradient></defs><rect width="44" height="44" rx="11" fill="url(#opMarcaGrad)"/><ellipse cx="22" cy="22" rx="9.2" ry="10.4" fill="none" stroke="#ffffff" stroke-width="4.4"/></svg>
+        <div><div class="op-name">OrganizaPro</div><div class="op-tag">Inteligência para organizar e fazer crescer</div></div>
+      </div>
       <div class="brand-divider"></div>${logo}
       <div><div class="brand">${escaparHtml(nomeEmpresa)}</div><div class="emp">Relatório Executivo do Dia</div></div>
     </div>
@@ -171,7 +174,7 @@ body{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#17212b;background:#eef
 .page main{flex:1}
 .hdr{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:25px;border-bottom:1px solid #dce4e8;margin-bottom:28px}
 .hdr-l{display:flex;align-items:center;gap:16px}
-.op-logo{display:flex;align-items:center;gap:7px;color:#183b49;font-size:12px;font-weight:800;letter-spacing:-.2px}.op-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#183b49;color:#fff;font-size:15px}.brand-divider{width:1px;height:45px;background:#dce4e8}
+.op-brand{display:flex;align-items:center;gap:10px}.op-mark{display:block;width:40px;height:40px;flex:0 0 auto}.op-name{font-size:17px;font-weight:800;color:#0d3547;letter-spacing:-.4px;line-height:1.1}.op-tag{margin-top:3px;font-size:8.5px;font-weight:500;color:#5f707b;letter-spacing:.2px;white-space:nowrap}.brand-divider{width:1px;height:45px;background:#dce4e8}
 .brand{font-size:22px;font-weight:750;color:#183b49;letter-spacing:-0.5px}
 .emp{font-size:12px;color:#64748b;margin-top:4px}
 .hdr-r{text-align:right}
