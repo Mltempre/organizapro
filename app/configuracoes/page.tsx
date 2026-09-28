@@ -45,6 +45,17 @@ const configInicial: Config = {
   zapi_client_token: '',
 };
 
+// Resposta do teste de envio em linguagem de operação — nunca o erro técnico
+// cru da rota (status/segredo/provedor).
+function mensagemFalhaTeste(status: number): string {
+  if (status === 401) return 'Sessão expirada. Entre novamente e repita o teste.';
+  if (status === 403) return 'O teste só envia para o WhatsApp salvo do negócio. Salve as configurações e tente de novo.';
+  if (status === 409) return 'Já houve um teste nesta hora (ou este número pediu para não receber mensagens). Confira o aparelho antes de repetir; um novo teste fica disponível na próxima hora.';
+  if (status === 503) return 'WhatsApp não configurado: preencha Instance ID, Token e Security Token, salve e tente de novo.';
+  if (status === 502 || status === 500) return 'A Z-API não confirmou o envio. Confira no painel da Z-API se a instância está conectada (QR Code lido) e confira o aparelho antes de repetir.';
+  return MSG_ERRO_PADRAO;
+}
+
 export default function ConfiguracoesPage() {
   const router = useRouter();
   const [config, setConfig]     = useState<Config>(configInicial);
@@ -56,7 +67,12 @@ export default function ConfiguracoesPage() {
   const [clinicaId, setClinicaId] = useState('');
   const [zapiConfigurado, setZapiConfigurado] = useState(false);
   const [testando, setTestando] = useState(false);
+  const testandoRef = useRef(false); // trava síncrona contra duplo clique no teste
   const [testeMsg, setTesteMsg] = useState('');
+  const [chatbotAtivo, setChatbotAtivo] = useState(false);
+  const [automacoesAtivas, setAutomacoesAtivas] = useState(false);
+  const [alterandoAutomacoes, setAlterandoAutomacoes] = useState(false);
+  const [automacoesMsg, setAutomacoesMsg] = useState('');
   const [linkGoogleMsg, setLinkGoogleMsg] = useState('');
 
   const carregar = useCallback(async () => {
@@ -87,6 +103,8 @@ export default function ConfiguracoesPage() {
       const data = segura.config;
       if (!data || typeof segura.zapi_configurado !== 'boolean') throw new Error('Configuração inválida');
       setZapiConfigurado(segura.zapi_configurado);
+      setChatbotAtivo(segura.chatbot_ativo === true);
+      setAutomacoesAtivas(segura.automacoes_ativas === true);
       if (data) {
         setConfig({
           nome_clinica:          data.nome_clinica          || '',
@@ -164,7 +182,37 @@ export default function ConfiguracoesPage() {
     window.open(link, '_blank', 'noopener,noreferrer');
   }
 
+  async function alternarAutomacoes() {
+    if (alterandoAutomacoes || !clinicaId) return;
+    const ativar = !automacoesAtivas;
+    const aviso = ativar
+      ? 'Ativar as automações de WhatsApp deste negócio?\n\nA partir de agora, lembretes (às 18h, na véspera de cada compromisso) e pedidos de avaliação no Google serão enviados automaticamente aos clientes.'
+      : 'Desativar as automações de WhatsApp deste negócio?\n\nLembretes e pedidos de avaliação deixam de ser enviados. O chatbot não é afetado.';
+    if (!window.confirm(aviso)) return;
+    setAlterandoAutomacoes(true); setAutomacoesMsg('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { router.push('/login'); return; }
+      const res = await fetch('/api/whatsapp/automacoes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ clinica_id: clinicaId, ativas: ativar, idempotency_key: crypto.randomUUID() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || typeof data?.automacoes_ativas !== 'boolean') throw new Error('Falha ao alterar automações');
+      setAutomacoesAtivas(data.automacoes_ativas);
+      setAutomacoesMsg(data.automacoes_ativas ? 'sucesso:Automações ativadas.' : 'sucesso:Automações desativadas. Nenhum lembrete ou avaliação será enviado.');
+    } catch (e) {
+      console.error(e);
+      setAutomacoesMsg('erro:Não foi possível alterar as automações agora. Nada foi alterado; tente novamente.');
+    } finally {
+      setAlterandoAutomacoes(false);
+    }
+  }
+
   async function testarWhatsapp() {
+    if (testandoRef.current) return;
+    testandoRef.current = true;
     setTestando(true); setTesteMsg('');
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -205,20 +253,19 @@ export default function ConfiguracoesPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (res.ok && data?.sucesso === true) {
-        setTesteMsg('sucesso:Mensagem de teste enviada com sucesso.');
+        setTesteMsg('sucesso:Mensagem de teste enviada para o WhatsApp salvo do negócio. Confira o aparelho.');
       } else {
-        console.error(data);
-        const detalhe = data?.error || data?.detalhe;
-        setTesteMsg('erro:' + (detalhe ? `${MSG_ERRO_PADRAO} (${res.status}: ${detalhe})` : MSG_ERRO_PADRAO));
+        setTesteMsg('erro:' + mensagemFalhaTeste(res.status));
       }
     } catch (e) {
       console.error(e);
       setTesteMsg('erro:' + MSG_ERRO_PADRAO);
     } finally {
       setTestando(false);
-      setTimeout(() => setTesteMsg(''), 4000);
+      testandoRef.current = false;
+      setTimeout(() => setTesteMsg(''), 10000);
     }
   }
 
@@ -370,9 +417,43 @@ export default function ConfiguracoesPage() {
             <span style={{ fontSize: 20 }}>📲</span>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Integração WhatsApp (Z-API)</h2>
           </div>
-          <p style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>
+          <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
             Encontre esses dados em <strong style={{ color: '#a78bfa' }}>app.z-api.io</strong> → sua instância → Credenciais e Segurança.
           </p>
+
+          {/* Estado operacional — só situação, nunca credencial */}
+          <div data-testid="whatsapp-status" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginBottom: 20 }}>
+            {[
+              { l: 'WhatsApp (Z-API)', ok: zapiConfigurado, sim: 'Configurado', nao: 'Não configurado' },
+              { l: 'Chatbot', ok: chatbotAtivo, sim: 'Ativo', nao: 'Desativado', dica: 'Ligue/desligue em Chatbot' },
+              { l: 'Automações (lembretes e avaliações)', ok: automacoesAtivas, sim: 'Ativas', nao: 'Desativadas' },
+            ].map(s => (
+              <div key={s.l} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117' }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.l}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: s.ok ? '#22c55e' : '#f59e0b' }}>{s.ok ? '● ' + s.sim : '○ ' + s.nao}</div>
+                {s.dica && <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{s.dica}</div>}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+            <button
+              className="cfg-btn-testar"
+              type="button"
+              onClick={alternarAutomacoes}
+              disabled={alterandoAutomacoes || !clinicaId}
+              style={{ padding: '10px 18px', borderRadius: 8, border: `1px solid ${automacoesAtivas ? '#b45309' : '#16a34a'}`, background: automacoesAtivas ? 'rgba(180,83,9,0.12)' : 'rgba(22,163,74,0.12)', color: automacoesAtivas ? '#fbbf24' : '#4ade80', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: alterandoAutomacoes ? 0.5 : 1 }}
+            >
+              {alterandoAutomacoes ? '⏳ Alterando...' : automacoesAtivas ? '⏸ Desativar automações' : '▶ Ativar automações'}
+            </button>
+            <span style={{ fontSize: 11, color: '#64748b', flex: '1 1 260px' }}>
+              Conectar o WhatsApp não liga as automações. Teste envio, chatbot e atendimento humano antes; só então ative.
+            </span>
+          </div>
+          {automacoesMsg && (
+            <div style={{ marginBottom: 16 }}>
+              <Feedback type={automacoesMsg.startsWith('sucesso:') ? 'sucesso' : 'erro'} message={automacoesMsg.split(':').slice(1).join(':')} onClose={() => setAutomacoesMsg('')} />
+            </div>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
             <div>

@@ -56,4 +56,5 @@ export type ResultadoCamadaUniversal = {
   intencao: IntencaoUniversal;
   resposta: string;
   modulo?:  string; // chave do módulo de segmento, quando quem respondeu foi a Camada 2
+  sinal?:   string; // id do sinal do módulo que respondeu (ex.: situacao_de_crise exige humano)
 };

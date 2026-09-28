@@ -74,7 +74,9 @@ export function montarRespostaUniversal(
     case "reagendar_cancelar":
       return `Sem problemas. Me diga o que precisa reagendar ou cancelar que já encaminho para a equipe.${link}`;
     case "confirmar_presenca":
-      return `Combinado, presença confirmada! Até lá. ✅`;
+      // Nunca afirma confirmação que não foi gravada: a confirmação real só
+      // acontece pelo SIM ao lembrete (webhook), com agendamento identificado.
+      return `Anotado! Nossa equipe confere seu horário e confirma com você por aqui. ✅`;
     case "duvida_preco_generica":
       // Nunca cita valor do OrganizaPro nem estima um número — só o que a
       // própria empresa (dados) informar. Como DadosEmpresaUniversal não tem
@@ -137,7 +139,7 @@ export function resolverComCamadaUniversal(
       const bate = sinal.exemplosDeFrase.some(frase => msgNorm.includes(normalizarUniversal(frase)));
       if (!bate) continue;
       const resposta = sinal.resolver(dados);
-      if (resposta && respeitaRegrasDeSeguranca(resposta)) return { intencao, resposta, modulo: modulo.chave };
+      if (resposta && respeitaRegrasDeSeguranca(resposta)) return { intencao, resposta, modulo: modulo.chave, sinal: sinal.id };
       return null;
     }
     return null; // vocabulário do segmento bateu, mas nenhuma intenção específica reconheceu a frase exata

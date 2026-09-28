@@ -45,6 +45,28 @@ export function normalizarTelefone(telefone: string): string {
   return "55" + soNumeros;
 }
 
+// ─── Telefone confiável do payload Z-API (@lid) ──────────────────────────
+// O campo `phone` do webhook pode trazer o número real OU o identificador
+// privado do WhatsApp ("...@lid"), e a Z-API documenta que @lid NÃO pode ser
+// convertido em telefone. Só aceita número real: sufixo de contato 1:1
+// conhecido (ou nenhum), só dígitos/separadores, 10–15 dígitos e diferente
+// dos LIDs do mesmo payload. Qualquer outro caso devolve null — o chamador
+// não responde, não busca agendamento e não grava contato (fail-closed).
+const SUFIXOS_CONTATO = ["c.us", "s.whatsapp.net"];
+
+export function telefoneConfiavelZapi(phone: unknown, lids: unknown[] = []): string | null {
+  if (typeof phone !== "string") return null;
+  const bruto = phone.trim().toLowerCase();
+  const arroba = bruto.indexOf("@");
+  if (arroba >= 0 && !SUFIXOS_CONTATO.includes(bruto.slice(arroba + 1))) return null;
+  const numero = arroba >= 0 ? bruto.slice(0, arroba) : bruto;
+  if (!/^\+?[\d\s().-]+$/.test(numero)) return null;
+  const digitos = numero.replace(/\D/g, "");
+  if (digitos.length < 10 || digitos.length > 15) return null;
+  const digitosLid = lids.filter((l): l is string => typeof l === "string").map(l => l.split("@")[0].replace(/\D/g, ""));
+  return digitosLid.includes(digitos) ? null : digitos;
+}
+
 // ─── Entidade determinística (telefone/mensagem -> uuid estável) ────────
 
 export function entidadeIdDeterministico(...partes: string[]): string {

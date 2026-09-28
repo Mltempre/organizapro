@@ -28,6 +28,8 @@ export function fixture(options = {}) {
   const get=k=>q.filters.find(f=>f[0]===k)?.[1];
   const matches=r=>q.filters.every(([k,v])=>(k.startsWith('payload->>')?r.payload?.[k.slice(10)]:r[k])===v);
   async function run(){
+   // Opcional: respostas por tenant/instância (gate WhatsApp); undefined segue o padrão abaixo.
+   if(settings.responder){const r=settings.responder(q,get);if(r!==undefined)return r;}
    if(settings.fechamento){
     if(settings.readError===table && q.action==='select')return {data:null,error:{code:'XX000'}};
     if(table==='pacientes')return {data:settings.missingClient?null:{id:resource,nome:'Fixture',telefone:phone}};
@@ -83,6 +85,10 @@ export function fixture(options = {}) {
    calls.push({url:String(url),init});
    if(settings.routeInternal && new URL(url).pathname==='/api/whatsapp'){
     const r=await load('app/api/whatsapp/route.ts').POST(request(JSON.parse(init.body),'internal'));
+    return {ok:r.status>=200&&r.status<300,status:r.status,json:async()=>r.body};
+   }
+   if(settings.routeChatbot && new URL(url).pathname==='/api/chatbot/message'){
+    const r=await load('app/api/chatbot/message/route.ts').POST(request(JSON.parse(init.body),init.headers?.Authorization?.slice(7)));
     return {ok:r.status>=200&&r.status<300,status:r.status,json:async()=>r.body};
    }
    if(settings.networkError)throw Error('SENSITIVE_SENTINEL');

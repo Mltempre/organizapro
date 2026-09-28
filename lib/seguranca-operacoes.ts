@@ -16,6 +16,34 @@ export async function consentimentoEnvio(db: SupabaseClient, clinicaId: string, 
   return estadoConsentimentoAtual(data.map(e => ({ criadoEm: e.criado_em, estado: e.payload?.estado }))) !== "bloqueado";
 }
 
+// ─── Liga/desliga das automações WhatsApp (lembretes e avaliações) ───────
+// WhatsApp conectado ≠ automações ativas. Estado = evento mais recente de
+// "whatsapp.automacoes" do tenant (append-only, sem schema novo). Sem evento
+// ou com erro de leitura: DESATIVADAS (fail-closed) — só um ato explícito em
+// Configurações libera os crons para o tenant.
+export const TIPO_AUTOMACOES_WHATSAPP = "whatsapp.automacoes";
+
+export async function automacoesWhatsappAtivas(db: SupabaseClient, clinicaId: string): Promise<boolean> {
+  const { data, error } = await db.from("eventos_dominio").select("payload, criado_em")
+    .eq("clinica_id", clinicaId).eq("tipo", TIPO_AUTOMACOES_WHATSAPP);
+  if (error || !Array.isArray(data) || data.length === 0) return false;
+  const recente = [...data].sort((a, b) => (a.criado_em < b.criado_em ? 1 : a.criado_em > b.criado_em ? -1 : 0))[0];
+  return recente.payload?.estado === "ativas";
+}
+
+// Um evento por clique (chave do cliente): duplo clique/replay não duplica.
+export async function registrarAutomacoesWhatsapp(db: SupabaseClient, clinicaId: string, ativas: boolean,
+  usuarioId: string, chaveCliente: string): Promise<boolean> {
+  const entidadeId = entidadeIdDeterministico(TIPO_AUTOMACOES_WHATSAPP, clinicaId);
+  const { error } = await db.from("eventos_dominio").insert({
+    id: entidadeIdDeterministico(TIPO_AUTOMACOES_WHATSAPP, JSON.stringify([clinicaId, chaveCliente])),
+    clinica_id: clinicaId, tipo: TIPO_AUTOMACOES_WHATSAPP, entidade_tipo: "operacao", entidade_id: entidadeId,
+    chave_idempotencia: `${entidadeId}:${TIPO_AUTOMACOES_WHATSAPP}:${chaveCliente}`,
+    payload: { estado: ativas ? "ativas" : "desativadas", usuario_id: usuarioId }, criado_em: new Date().toISOString(),
+  });
+  return !error || error.code === "23505";
+}
+
 export type Reserva = { id: string; clinicaId: string; ticket: string; hash: string };
 export type EstadoOperacao = "sucesso" | "incerto" | "rejeitado";
 

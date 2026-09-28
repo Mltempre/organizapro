@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../lib/auth-clinica";
+import { automacoesWhatsappAtivas } from "../../../lib/seguranca-operacoes";
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const campos = ["nome_clinica", "telefone", "email", "endereco", "logo_url", "link_google", "msg_lembrete", "msg_confirmacao", "msg_avaliacao", "msg_reagendamento", "horario_funcionamento", "zapi_instance"] as const;
@@ -22,7 +23,12 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) return resposta({ error: auth.error }, auth.status);
     const { data, error } = await admin.from("clinica_config").select(selecao).eq("clinica_id", tenant).maybeSingle<Record<string, unknown>>();
     if (error) return resposta({ error: "Configuração indisponível" }, 503);
-    return resposta(publica(data));
+    // Estado operacional visível sem olhar o banco — só booleanos, nunca segredo.
+    const [chatbot, automacoesAtivas] = await Promise.all([
+      admin.from("chatbot_config").select("ativo").eq("clinica_id", tenant).maybeSingle(),
+      automacoesWhatsappAtivas(admin, tenant),
+    ]);
+    return resposta({ ...publica(data), chatbot_ativo: !chatbot.error && chatbot.data?.ativo === true, automacoes_ativas: automacoesAtivas });
   } catch {
     return resposta({ error: "Configuração indisponível" }, 503);
   }
@@ -44,6 +50,19 @@ export async function PUT(req: NextRequest) {
       values[c] = body[c];
     }
     if (values.link_google && !/^https?:\/\//i.test(values.link_google)) return resposta({ error: "Link inválido" }, 400);
+    // Uma instância Z-API pertence a um único negócio: o webhook resolve o
+    // tenant pela instância e fica fail-closed quando ela é ambígua. Bloqueia
+    // antes de gravar (sem diferenciar maiúsculas/espaços); erro de leitura
+    // também bloqueia.
+    if (values.zapi_instance !== undefined) {
+      values.zapi_instance = values.zapi_instance.trim();
+      if (values.zapi_instance) {
+        const padrao = values.zapi_instance.replace(/[\\%_]/g, m => "\\" + m);
+        const { data: usos, error: usoErro } = await admin.from("clinica_config").select("clinica_id").ilike("zapi_instance", padrao);
+        if (usoErro || !Array.isArray(usos)) return resposta({ error: "Configuração indisponível" }, 503);
+        if (usos.some(u => u.clinica_id !== body.clinica_id)) return resposta({ error: "Esta instância Z-API já está vinculada a outro negócio." }, 409);
+      }
+    }
     const { data: atual, error: leitura } = await admin.from("clinica_config").select("user_id").eq("clinica_id", body.clinica_id).maybeSingle();
     if (leitura) return resposta({ error: "Configuração indisponível" }, 503);
     const registro = { ...values, updated_at: new Date().toISOString() };
