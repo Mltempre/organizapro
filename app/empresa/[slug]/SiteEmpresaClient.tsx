@@ -6,7 +6,7 @@ import PedidoPublico from "./_components/PedidoPublico";
 import InteressePublico from "./_components/InteressePublico";
 import { IcWa } from "./_components/icons";
 import { gerarSobre, gerarTituloHero, gerarSubtituloHero, normalizarEspecialidade, safeData } from "./_lib/helpers";
-import { resolverModelo, temaDoModelo, MODELOS, type ChaveSecao } from "./_lib/modelos";
+import { resolverModelo, isModeloId, temaDoModelo, MODELOS, type ChaveSecao, type ModeloId } from "./_lib/modelos";
 import { shellDoModelo } from "./_models/registry";
 import { CTA_CONTEXTUAL } from "./_lib/content";
 import { construirLinkComRastreio } from "../../../lib/atribuicao-origem";
@@ -38,12 +38,17 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
   const [loadedSlug, setLoadedSlug] = useState(slug);
   const [erroCarga, setErroCarga] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Modelo visual salvo pelo tenant (clinica_config.modelo, lido pela view
+  // pública). null = "sem escolha manual" → vale a recomendação do segmento.
+  // Só recebe valores da allowlist (isModeloId) — nunca outro texto.
+  const [modeloSalvo, setModeloSalvo] = useState<ModeloId | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setErroCarga(false);
     setEmpresa(null);
+    setModeloSalvo(null);
     async function carregar() {
       try {
       if (!slug) return;
@@ -69,7 +74,7 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
       if (!dados?.clinica_id) return;
       const cid = dados.clinica_id;
 
-      const [galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes, antesRes] = await Promise.all([
+      const [galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes, antesRes, modeloRes] = await Promise.all([
         supabase.from("clinica_galeria").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_equipe").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_depoimentos").select("*").eq("clinica_id", cid).order("ordem"),
@@ -77,10 +82,20 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
         supabase.from("clinica_estrutura").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_faq").select("*").eq("clinica_id", cid).order("ordem"),
         supabase.from("clinica_antes_depois").select("*").eq("clinica_id", cid).order("ordem"),
+        // Modelo visual salvo pelo tenant. Consulta OPCIONAL e isolada das
+        // sete de conteúdo: se a coluna ainda não existir (migration pendente
+        // de aplicação manual) ou falhar, o site segue exatamente como hoje —
+        // cai na recomendação do segmento — e nenhum aviso de conteúdo
+        // parcial é disparado por causa dela.
+        supabase.from("clinica_config_publica").select("modelo").eq("clinica_id", cid).maybeSingle(),
       ]);
 
       if (!active) return;
       setErroCarga([galeriaRes, equipeRes, depRes, srvRes, estRes, faqRes, antesRes].some(res => Boolean(res.error)));
+      // Allowlist na leitura: só aurora|vertice|pulse vira "escolha salva";
+      // qualquer outro valor (ou ausência) vira null = recomendação do segmento.
+      const modeloCru = (modeloRes?.data as { modelo?: unknown } | null | undefined)?.modelo;
+      setModeloSalvo(isModeloId(modeloCru) ? modeloCru : null);
       setEmpresa({
         nome: dados.nome,
         especialidade: normalizarEspecialidade(dados.especialidade),
@@ -122,15 +137,20 @@ export default function SiteEmpresaClient({ slug, codigoRastreio }: { slug: stri
     return () => { active = false; };
   }, [slug]);
 
-  // Modelo visual pedido por URL (?modelo=aurora|vertice|pulse) — lido aqui, na
-  // camada de APRESENTAÇÃO (useSearchParams é SSR-seguro no App Router: o HTML
-  // do servidor e a hidratação do cliente leem o mesmo parâmetro, sem
+  // Modelo visual — precedência (nada aqui inventa dado e nada quebra slug):
+  //   1. `?modelo=` VÁLIDO na URL (prévia/comparação — sempre por allowlist);
+  //   2. modelo salvo pelo tenant (clinica_config.modelo via view pública);
+  //   3. recomendação automática por segmento (MODELO_PADRAO_POR_FAMILIA).
+  // Um valor inválido em qualquer nível é ignorado em silêncio e o fluxo
+  // segue para o próximo — nunca vira erro nem 404. Lido aqui, na camada de
+  // APRESENTAÇÃO (useSearchParams é SSR-seguro no App Router: o HTML do
+  // servidor e a hidratação do cliente leem o mesmo parâmetro, sem
   // divergência). O contrato público deste cliente continua exatamente o de
-  // sempre — `{ slug, codigoRastreio }`: a variação de apresentação nunca entra
-  // no contrato de dados. resolverModelo() valida por allowlist e um valor
-  // inválido cai na recomendação do segmento, nunca em erro.
-  const modelo = useSearchParams()?.get("modelo")?.slice(0, 24) || undefined;
-  const modeloId = resolverModelo(empresa?.especialidade, modelo);
+  // sempre — `{ slug, codigoRastreio }` — a variação de apresentação nunca
+  // entra no contrato de dados.
+  const modeloNaUrl = useSearchParams()?.get("modelo")?.slice(0, 24) || undefined;
+  const preferido = isModeloId(modeloNaUrl) ? modeloNaUrl : modeloSalvo;
+  const modeloId = resolverModelo(empresa?.especialidade, preferido);
   const tema = temaDoModelo(modeloId, empresa?.especialidade);
 
   if (loading || loadedSlug !== slug) return (

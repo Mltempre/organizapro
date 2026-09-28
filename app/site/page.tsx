@@ -6,6 +6,7 @@ import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 import SiteWorkspaceNav from "./SiteWorkspaceNav";
 import { normalizarEspecialidade } from "../empresa/[slug]/_lib/helpers";
+import { MODELOS_LISTA, isModeloId } from "../empresa/[slug]/_lib/modelos";
 
 type SiteForm = {
   nome: string;
@@ -31,6 +32,9 @@ type SiteForm = {
   seo_titulo: string;
   seo_descricao: string;
   seo_imagem_url: string;
+  // Modelo visual escolhido (allowlist: aurora | vertice | pulse). "" = sem
+  // escolha manual → o site público usa a recomendação automática do segmento.
+  modelo: string;
 };
 
 type ClinicaInfo = {
@@ -90,6 +94,8 @@ export default function Site() {
   const [uploadingSeoImg, setUploadingSeoImg]   = useState(false);
   const [feedbackModal, setFeedbackModal]       = useState(false);
   const [showPreview, setShowPreview]           = useState(false);
+  const [modeloSalvo, setModeloSalvo]           = useState("");
+  const [salvandoModelo, setSalvandoModelo]     = useState(false);
   const logoInputRef   = useRef<HTMLInputElement>(null);
   const heroInputRef   = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +107,7 @@ export default function Site() {
     logo_url: "", hero_url: "", nota_google: "", num_avaliacoes: "", horario_funcionamento: "",
     banner_url: "", instagram_url: "", facebook_url: "", linkedin_url: "", tiktok_url: "",
     seo_titulo: "", seo_descricao: "", seo_imagem_url: "",
+    modelo: "",
   });
 
   const carregar = useCallback(async () => {
@@ -170,6 +177,27 @@ export default function Site() {
           seo_imagem_url:        config.seo_imagem_url             || "",
         }));
       }
+
+      // Modelo visual: leitura SEPARADA e tolerante, sempre do próprio tenant
+      // (clinica_config sob RLS). Se a coluna `modelo` ainda não existir
+      // (migration de aplicação manual pendente), o select falha em silêncio e
+      // o painel segue funcionando por completo — só a escolha fica vazia
+      // (recomendação automática do site público). Nunca derruba a carga nem
+      // bloqueia a publicação por causa desta coluna.
+      try {
+        const { data: modeloCfg } = await supabase
+          .from("clinica_config")
+          .select("modelo")
+          .eq("clinica_id", cu.clinica_id)
+          .maybeSingle();
+        // Allowlist na leitura: valor gravado fora de aurora|vertice|pulse
+        // nunca volta para a UI nem para o banco.
+        const bruto = (modeloCfg as { modelo?: unknown } | null)?.modelo;
+        const salvo = isModeloId(bruto) ? bruto : "";
+        setModeloSalvo(salvo);
+        setForm(prev => ({ ...prev, modelo: salvo }));
+      } catch { /* coluna indisponível: mantém "" (recomendação automática) */ }
+
       setConfigReady(true);
     } catch (e) {
       console.error(e);
@@ -234,6 +262,62 @@ export default function Site() {
       return;
     }
     window.open(siteUrl, "_blank", "noopener,noreferrer");
+  }
+
+  // ── MODELO VISUAL: salvar a escolha do cliente ────────────────────────────
+  // Grava SOMENTE clinica_config.modelo do PRÓPRIO tenant (eq clinica_id —
+  // o RLS da tabela é o mesmo guardião de sempre), sempre validado por
+  // allowlist antes do update. "" grava NULL = volta a usar a recomendação
+  // automática por segmento. Se a coluna ainda não existir no banco, o erro
+  // aparece só aqui — a publicação normal do site não é afetada.
+  async function salvarModelo() {
+    if (!configReady) { setErro("Recarregue as configurações do site antes de salvar o modelo."); return; }
+    if (salvandoModelo) return;
+    if (!clinicaId) { setErro("Não foi possível identificar seu negócio. Recarregue a página e tente novamente."); return; }
+    const escolhido = form.modelo || "";
+    if (escolhido && !isModeloId(escolhido)) {
+      setErro("Modelo visual inválido. Escolha Aurora, Vértice ou Pulse.");
+      return;
+    }
+    setSalvandoModelo(true);
+    setErro("");
+    setSucesso("");
+    try {
+      const { data, error } = await supabase
+        .from("clinica_config")
+        .update({ modelo: escolhido || null })
+        .eq("clinica_id", clinicaId)
+        .select("clinica_id");
+      if (error) throw error;
+      // Update sem linha correspondente não devolve erro — só dados vazios.
+      // Nesse caso o site ainda não foi publicado: avisamos em vez de fingir
+      // que a escolha foi salva.
+      const persistiu = Array.isArray(data) ? data.length > 0 : Boolean(data);
+      if (!persistiu) {
+        setErro("Publique seu site primeiro (botão \"Publicar alterações\", no final da página) para depois salvar o modelo visual.");
+        return;
+      }
+      setModeloSalvo(escolhido);
+      const nomeModelo = MODELOS_LISTA.find(m => m.id === escolhido)?.nome;
+      setSucesso(nomeModelo
+        ? `Modelo ${nomeModelo} salvo! O site publicado já usa essa escolha — abra a prévia para conferir.`
+        : "Modelo automático: o site continua usando a recomendação de modelo pelo segmento.");
+    } catch {
+      setErro("Não foi possível salvar o modelo visual agora. Tente novamente em instantes.");
+    } finally {
+      setSalvandoModelo(false);
+    }
+  }
+
+  // Prévia em nova aba com ?modelo= — o mesmo mecanismo de prévia do site
+  // público: mostra a escolha SEM alterar nada publicado e sem gravar nada.
+  function abrirPreviaModelo() {
+    if (!siteUrl) {
+      setErro("Seu site ainda não possui um endereço publicado. Revise os dados e publique as alterações primeiro.");
+      return;
+    }
+    const escolhido = isModeloId(form.modelo) ? form.modelo : (isModeloId(modeloSalvo) ? modeloSalvo : null);
+    window.open(escolhido ? `${siteUrl}?modelo=${escolhido}` : siteUrl, "_blank", "noopener,noreferrer");
   }
 
   const normalizePhone = (value: string) => value.replace(/\D/g, "");
@@ -551,6 +635,82 @@ export default function Site() {
           </div>
         )
       )}
+
+      {/* ══════════════════════ MODELO VISUAL ══════════════════════ */}
+      <SectionEyebrow>Modelo Visual</SectionEyebrow>
+
+      <div className="panel">
+        <div style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)", marginBottom:4 }}>🎨 Escolha o modelo do seu site</div>
+        <div style={{ fontSize:12, color:"var(--muted)", marginBottom:14 }}>
+          Três composições visuais completas sobre os MESMOS dados e conteúdo do seu site — a escolha muda layout, ritmo e tipografia, nunca as informações. Sem escolha salva, vale a recomendação automática pelo seu segmento. A prévia abre em nova aba sem alterar nada publicado.
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))", gap:14 }}>
+          {MODELOS_LISTA.map((m) => {
+            const selecionado = (form.modelo || "") === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                data-modelo={m.id}
+                aria-pressed={selecionado}
+                onClick={() => setForm(prev => ({ ...prev, modelo: m.id }))}
+                style={{
+                  textAlign:"left",
+                  cursor:"pointer",
+                  padding:16,
+                  borderRadius:12,
+                  border: selecionado ? "2px solid var(--accent, #00c896)" : "1px solid rgba(255,255,255,0.08)",
+                  background: selecionado ? "rgba(0,200,150,0.06)" : "rgba(255,255,255,0.02)",
+                  transition:"border-color 0.15s",
+                }}
+              >
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:"var(--text, #f1f5f9)" }}>{m.nome}</span>
+                  {selecionado && <span style={{ fontSize:11, color:"#00c896", fontWeight:700, whiteSpace:"nowrap" }}>✓ Selecionado</span>}
+                </div>
+                <div style={{ fontSize:11.5, color:"var(--accent)", marginTop:2, fontWeight:600 }}>{m.rotulo}</div>
+                <div style={{ fontSize:12, color:"var(--muted)", marginTop:8, lineHeight:1.6 }}>{m.resumo}</div>
+                <div style={{ fontSize:11, color:"var(--muted)", marginTop:8, opacity:.8 }}>{m.indicadoPara}</div>
+                {modeloSalvo === m.id && (
+                  <div style={{ fontSize:11, color:"#00c896", marginTop:8, fontWeight:600 }}>Modelo atualmente salvo</div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display:"flex", gap:10, marginTop:16, flexWrap:"wrap", alignItems:"center" }}>
+          <button
+            type="button"
+            data-testid="salvar-modelo"
+            className="button-primary"
+            onClick={salvarModelo}
+            disabled={salvandoModelo || !configReady}
+            style={{ padding:"10px 18px", fontSize:13, opacity: salvandoModelo || !configReady ? 0.7 : 1 }}
+          >
+            {salvandoModelo
+              ? "Salvando..."
+              : form.modelo && form.modelo !== modeloSalvo
+                ? "Salvar escolha do modelo"
+                : "Salvar modelo"}
+          </button>
+          <button
+            type="button"
+            data-testid="previa-modelo"
+            className="button-secondary"
+            onClick={abrirPreviaModelo}
+            disabled={!siteUrl}
+            title={siteUrl ? undefined : "Publique seu site primeiro (botão \"Publicar alterações\", no final da página) para liberar esta ação."}
+            style={{ padding:"10px 18px", fontSize:13, opacity: siteUrl ? 1 : 0.5, cursor: siteUrl ? "pointer" : "not-allowed" }}
+          >
+            👁️ Abrir prévia{form.modelo ? ` (${MODELOS_LISTA.find(m => m.id === form.modelo)?.nome ?? ""})` : ""}
+          </button>
+          {!modeloSalvo && (
+            <span style={{ fontSize:11.5, color:"var(--muted)" }}>
+              Nenhum modelo salvo ainda — vale a recomendação automática pelo segmento.
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* ══════════════════════ IDENTIDADE VISUAL ══════════════════════ */}
       <SectionEyebrow>Identidade Visual</SectionEyebrow>
