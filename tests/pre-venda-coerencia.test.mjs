@@ -82,3 +82,12 @@ test("saneamento de dados de teste do tenant oficial: proposto, fora das migrati
   assert.doesNotMatch(ativo, /\b(drop|truncate|alter|update)\b/i);
   assert.doesNotMatch(sql, /oportunidades_demanda\s+where|delete from public\.oportunidades/i, "contatos reais de terceiros preservados");
 });
+
+test("seed de demonstração (preços do catálogo demo): proposto, separado de código, só preenche NULL no tenant demo", () => {
+  const sql = ler("sql/saneamento-pendente/demo-precos-catalogo-black-crown-v1.sql");
+  const ativo = sql.replace(/--.*$/gm, "");
+  assert.match(sql, /NÃO APLICADO\. Exige GO\. Não é correção de código: é DADO de demonstração\./);
+  assert.match(ativo, /where s\.id = v\.id and s\.clinica_id = demo and s\.preco_centavos is null;/);
+  assert.match(ativo, /raise exception 'ABORTADO: tenant demo não confere/);
+  assert.doesNotMatch(ativo, /\b(delete|drop|truncate|alter|insert)\b/i);
+});
