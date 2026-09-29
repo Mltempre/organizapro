@@ -38,6 +38,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Follow-up Comercial",  h: "/follow-up",       i: "🔁" },
       { l: "Cobranças",            h: "/cobrancas",       i: "🧾" },
       { l: "Catálogo e Pedidos",   h: "/pedidos",         i: "🛒" },
+      { l: "Pesquisa de Preços",   h: "/pesquisa-precos", i: "💲" },
       { l: "Serviços contratados", h: "/tratamentos",     i: "🧰" },
       { l: "Receita Perdida",      h: "/receita-perdida", i: "📉" },
     ],
@@ -74,12 +75,12 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
 ];
 
 // Superfícies reais, mas ainda sem dados/fluxo prontos para demonstração —
+// (Pesquisa de Preços voltou ao menu em 2026-09-28, com busca real na web) —
 // FORA do menu comercial (pré-venda, 2026-09-28). Reversível: mover o item
 // de volta para navGrupos. Páginas, rotas, APIs e motores continuam intactos
 // e com o mesmo shell; o card da Visão Geral (Fechamento) continua levando à
 // página quando o negócio tem a vertical configurada.
 export const navForaDoMenuPreVenda: { l: string; h: string; i: string }[] = [
-  { l: "Pesquisa de Preços",  h: "/pesquisa-precos",     i: "💲" },
   { l: "NotaFácil",           h: "/notafacil",           i: "📄" },
   { l: "Fechamento Contábil", h: "/fechamento-contabil", i: "🧮" },
 ];

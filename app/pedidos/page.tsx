@@ -330,6 +330,7 @@ export default function PedidosPage() {
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
                         <button className="ped-btn" onClick={() => abrirEditarItem(c)} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 12, cursor: 'pointer' }}>{c.preco_centavos ? 'Editar' : 'Definir preço'}</button>
+                        <a className="ped-btn" href={`/pesquisa-precos?termo=${encodeURIComponent(c.nome)}&servico_id=${encodeURIComponent(c.id)}`} title="Buscar referências de mercado para este item" style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #2d3148', color: '#94a3b8', fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap' }}>Pesquisar preço</a>
                         {vendavel && (
                           <button className="ped-btn" onClick={() => abrirNovo(c.id)} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Adicionar ao pedido</button>
                         )}

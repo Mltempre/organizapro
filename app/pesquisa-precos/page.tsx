@@ -3,10 +3,30 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
 import EmptyState from "../components/EmptyState";
 import Feedback, { MSG_ERRO_PADRAO } from "../components/Feedback";
 import { TIPOS_FONTE_PRECO, UNIDADES_PESQUISA, type EstadoComparacao } from "../../lib/pesquisa-precos";
+import type { ReferenciaPreco, ResumoReferencias, TipoConsultaPreco } from "../../lib/pesquisa-precos-web";
+
+// Resultado de /api/pesquisa-precos/busca-web (referências reais, validadas no servidor).
+type ResultadoBusca = {
+  consulta: { termo: string; tipo: TipoConsultaPreco; localidade: string | null; pesquisadoEm: string };
+  itemCatalogo: { id: string; nome: string } | null;
+  referencias: ReferenciaPreco[];
+  descartadas: { motivo: string; quantidade: number }[];
+  fontesConsultadas: number;
+  resumo: ResumoReferencias;
+  provedor: { nome: string; modelo: string };
+};
+
+// Chave estável e curta para a idempotência do registro (mesma referência = mesma chave).
+function chaveReferencia(texto: string): string {
+  let h = 5381;
+  for (let i = 0; i < texto.length; i++) h = ((h << 5) + h + texto.charCodeAt(i)) >>> 0;
+  return `web:${h.toString(36)}:${texto.length}`;
+}
 
 const ROTULO_TIPO_FONTE: Record<string, string> = {
   manual: "Manual", documento: "Documento", cotacao: "Cotação", url_verificada: "URL verificada",
@@ -81,6 +101,23 @@ export default function PesquisaPrecosPage() {
   const [novoItem, setNovoItem] = useState({ nome: "", especificacao: "", unidade: "un", servicoId: "" });
   const [novaFonte, setNovaFonte] = useState({ nome: "", tipo: "manual", referencia: "" });
   const [observacao, setObservacao] = useState({ fonteId: "", preco: "", quantidade: "1", unidade: "un", observadoEm: agoraLocal(), evidencia: "", corrigeId: "" });
+
+  // Busca real na web (produto ou serviço/mão de obra)
+  const [busca, setBusca] = useState<{ termo: string; tipo: TipoConsultaPreco; localidade: string; servicoId: string }>({ termo: "", tipo: "produto", localidade: "", servicoId: "" });
+  const [buscando, setBuscando] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoBusca | null>(null);
+  const [erroBusca, setErroBusca] = useState("");
+  const [registradas, setRegistradas] = useState<Set<string>>(new Set());
+  const buscandoRef = useRef(false);
+
+  // Vindo do Catálogo ("Pesquisar preço"): consulta já preparada com o item.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const termo = q.get("termo")?.slice(0, 160) ?? "";
+    const servicoId = q.get("servico_id") ?? "";
+    const tipo = q.get("tipo") === "servico" ? "servico" : "produto";
+    if (termo || servicoId) setBusca((b) => ({ ...b, termo, servicoId, tipo }));
+  }, []);
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }), [token]);
   const itemAtual = itens.find((item) => item.id === itemSelecionado) ?? null;
@@ -203,6 +240,52 @@ export default function PesquisaPrecosPage() {
     catch (e) { setErro(e instanceof Error ? e.message : MSG_ERRO_PADRAO); }
   }
 
+  async function buscarNaWeb(evento: FormEvent) {
+    evento.preventDefault();
+    if (buscandoRef.current) return;
+    buscandoRef.current = true; setBuscando(true); setErroBusca(""); setResultado(null); setRegistradas(new Set());
+    try {
+      const resposta = await fetch("/api/pesquisa-precos/busca-web", {
+        method: "POST", headers,
+        body: JSON.stringify({ termo: busca.termo, tipo: busca.tipo, localidade: busca.localidade || undefined, servico_id: busca.servicoId || undefined }),
+      });
+      const json = await resposta.json().catch(() => ({}));
+      if (!resposta.ok || !json.sucesso) throw new Error(json.error || MSG_ERRO_PADRAO);
+      setResultado(json as ResultadoBusca);
+    } catch (e) { setErroBusca(e instanceof Error ? e.message : MSG_ERRO_PADRAO); }
+    finally { buscandoRef.current = false; setBuscando(false); }
+  }
+
+  // Registrar uma referência encontrada usa SÓ as rotas existentes
+  // (item → fonte → observação imutável), com a URL como evidência.
+  async function registrarReferencia(ref: ReferenciaPreco) {
+    if (!resultado || salvandoRef.current) return;
+    salvandoRef.current = true; setSalvando(true); setErro("");
+    try {
+      const nome = resultado.consulta.termo;
+      let item = itens.find((i) => i.nome.trim().toLowerCase() === nome.trim().toLowerCase() && i.unidade_canonica === "un");
+      if (!item) {
+        const json = await enviar("/api/pesquisa-precos/itens", { nome, unidade_canonica: "un", servico_id: resultado.itemCatalogo?.id || undefined,
+          especificacao: `${resultado.consulta.tipo === "servico" ? "Serviço/mão de obra" : "Produto"}${resultado.consulta.localidade ? ` · ${resultado.consulta.localidade}` : ""}` });
+        item = json.item as Item;
+      }
+      let fonte = fontes.find((f) => f.nome === ref.fonte && f.tipo === "api_autorizada");
+      if (!fonte) {
+        const json = await enviar("/api/pesquisa-precos/fontes", { nome: ref.fonte, tipo: "api_autorizada", referencia: `https://${ref.fonte}` });
+        fonte = json.fonte as Fonte;
+      }
+      await enviar("/api/pesquisa-precos/observacoes", {
+        item_id: item.id, fonte_id: fonte.id, preco_centavos: ref.precoCentavos, moeda: "BRL", quantidade: 1, unidade_observada: "un",
+        observado_em: resultado.consulta.pesquisadoEm, evidencia_referencia: ref.url,
+        chave_idempotencia: chaveReferencia(`${resultado.consulta.pesquisadoEm}|${ref.url}|${ref.precoCentavos}`),
+      });
+      setRegistradas((s) => new Set(s).add(ref.url + ref.precoCentavos));
+      setSucesso("Referência registrada no histórico, com a página como evidência.");
+      await carregarBase(item.id);
+    } catch (e) { setErro(e instanceof Error ? e.message : MSG_ERRO_PADRAO); }
+    finally { salvandoRef.current = false; setSalvando(false); }
+  }
+
   function corrigir(registro: Historico) {
     setObservacao({
       fonteId: registro.fonte_id,
@@ -216,28 +299,84 @@ export default function PesquisaPrecosPage() {
     document.getElementById("nova-observacao")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  if (carregando) return <PageLoader title="Carregando pesquisa de preços..." subtitle="Consultando somente fontes registradas pelo seu negócio" />;
+  if (carregando) return (
+    <AdminShell title="Pesquisa de Preços" subtitle="Referências de mercado para produtos e mão de obra">
+      <PageLoader title="Carregando pesquisa de preços..." subtitle="Consultando o histórico registrado pelo seu negócio" />
+    </AdminShell>
+  );
+
+  const R = (c: number | null) => (c === null ? "—" : moeda(c));
+  const resumo = resultado?.resumo ?? null;
 
   return (
-    <main className="pp-root">
+    <AdminShell title="Pesquisa de Preços" subtitle="Referências de mercado para produtos e mão de obra">
+    <div className="pp-root">
       <style>{`
-        .pp-root{min-height:100vh;background:#0f1117;color:#e2e8f0;padding:28px;font-family:Inter,sans-serif}
+        .pp-root{color:#e2e8f0}
         .pp-wrap{max-width:1180px;margin:0 auto}.pp-grid{display:grid;grid-template-columns:340px 1fr;gap:18px}
         .pp-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pp-span{grid-column:1/-1}
         .pp-btn{border:0;border-radius:9px;background:#1f4e5f;color:white;padding:11px 16px;font-weight:700;cursor:pointer}
         .pp-btn:disabled{opacity:.55;cursor:not-allowed}.pp-secondary{background:transparent;border:1px solid #384155;color:#94a3b8}
         .pp-table{width:100%;border-collapse:collapse}.pp-table th,.pp-table td{text-align:left;padding:11px 10px;border-bottom:1px solid #252b3a;font-size:12px;vertical-align:top}
         .pp-table th{color:#64748b;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
-        @media(max-width:800px){.pp-root{padding:16px}.pp-grid,.pp-form-grid{grid-template-columns:1fr}.pp-span{grid-column:auto}.pp-table{display:block;overflow-x:auto;white-space:nowrap}}
+        .pp-resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+        .pp-kpi{background:#0f1117;border:1px solid #252b3a;border-radius:10px;padding:10px 12px}.pp-kpi b{display:block;font-size:17px;color:#f1f5f9;margin-top:4px}
+        @media(max-width:800px){.pp-grid,.pp-form-grid{grid-template-columns:1fr}.pp-span{grid-column:auto}.pp-table{display:block;overflow-x:auto;white-space:nowrap}}
       `}</style>
       <div className="pp-wrap">
-        <header style={{ marginBottom: 24 }}>
-          <div style={{ color: "#4a9bb0", fontSize: 12, fontWeight: 800, letterSpacing: ".08em" }}>INTELIGÊNCIA DE COMPRAS</div>
-          <h1 style={{ margin: "6px 0", fontSize: 28 }}>Pesquisa de Preços</h1>
-          <p style={{ color: "#64748b", margin: 0, maxWidth: 760 }}>Registre observações rastreáveis e compare somente unidades compatíveis. O sistema não pesquisa a internet nem altera seus preços de venda.</p>
-        </header>
+        <p style={{ color: "#64748b", margin: "0 0 18px", maxWidth: 820, fontSize: 13 }}>
+          Busque referências reais na web para um produto ou para a mão de obra de um serviço, compare com o seu preço e, se quiser, registre as referências no histórico. Nada altera seus preços de venda.
+        </p>
         {erro && <Feedback type="erro" message={erro} onClose={() => setErro("")} />}
         {sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso("")} autoCloseMs={4000} />}
+
+        {/* ── BUSCA REAL NA WEB ── */}
+        {!cargaFalhou && <section data-testid="busca-web" style={{ ...card, marginBottom: 18 }}>
+          <h2 style={{ margin: "0 0 4px", fontSize: 17 }}>Buscar referências na web</h2>
+          <p style={{ color: "#64748b", fontSize: 12, margin: "0 0 14px" }}>
+            Busca real na internet feita por IA (OpenAI, com as páginas consultadas). Cada referência traz a página de origem — confira o preço na fonte antes de decidir.
+          </p>
+          <form className="pp-form-grid" onSubmit={buscarNaWeb}>
+            <label style={label} className="pp-span">O que pesquisar<input style={input} required minLength={2} maxLength={160} placeholder="Ex.: Pneu 90/90-18 · Troca de pneu de moto · Instalação de box de banheiro" value={busca.termo} onChange={(e) => setBusca({ ...busca, termo: e.target.value })} /></label>
+            <label style={label}>Tipo<select style={input} value={busca.tipo} onChange={(e) => setBusca({ ...busca, tipo: e.target.value === "servico" ? "servico" : "produto" })}>
+              <option value="produto">Produto</option><option value="servico">Serviço / mão de obra</option></select></label>
+            <label style={label}>{busca.tipo === "servico" ? "Cidade (necessária para serviço)" : "Cidade (opcional)"}<input style={input} maxLength={80} placeholder="Ex.: Londrina, PR" value={busca.localidade} onChange={(e) => setBusca({ ...busca, localidade: e.target.value })} /></label>
+            <label style={label} className="pp-span">Comparar com item do Catálogo<select style={input} value={busca.servicoId} onChange={(e) => setBusca({ ...busca, servicoId: e.target.value })}><option value="">Sem comparação</option>{catalogo.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>
+            <div className="pp-span"><button className="pp-btn" disabled={buscando || !token}>{buscando ? "Buscando na web..." : "Buscar referências"}</button></div>
+          </form>
+          {erroBusca && <div style={{ marginTop: 12 }}><Feedback type="erro" message={erroBusca} onClose={() => setErroBusca("")} /></div>}
+
+          {resultado && resumo && <div data-testid="resultado-busca" style={{ marginTop: 16 }}>
+            <div className="pp-resumo">
+              <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Seu preço</span><b>{resumo.seuPrecoCentavos !== null ? R(resumo.seuPrecoCentavos) : resultado.itemCatalogo ? "Sem preço no catálogo" : "—"}</b></div>
+              <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Referências consideradas</span><b>{resumo.consideradas} <small style={{ fontSize: 11, color: "#64748b" }}>de {resultado.referencias.length} · {resumo.fontesDistintas} fonte(s)</small></b></div>
+              <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Faixa observada</span><b>{resumo.minimoCentavos !== null ? `${R(resumo.minimoCentavos)} – ${R(resumo.maximoCentavos)}` : "—"}</b></div>
+              <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Mediana observada</span><b>{R(resumo.medianaCentavos)}</b></div>
+            </div>
+            <p data-testid="motivo-resumo" style={{ fontSize: 12, color: resumo.confiavel ? "#4ade80" : "#fbbf24", margin: "0 0 6px" }}>{resumo.motivo}</p>
+            {resumo.posicaoSeuPreco && <p style={{ fontSize: 12, color: "#cbd5e1", margin: "0 0 10px" }}>
+              Seu preço está {resumo.posicaoSeuPreco === "abaixo" ? "abaixo da faixa encontrada" : resumo.posicaoSeuPreco === "acima" ? "acima da faixa encontrada" : "dentro da faixa encontrada"} — uma referência para sua decisão, não uma recomendação automática.
+            </p>}
+            <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px" }}>
+              Pesquisado em {dataHora(resultado.consulta.pesquisadoEm)} · {resultado.fontesConsultadas} páginas consultadas por {resultado.provedor.nome}
+              {resultado.descartadas.length > 0 && ` · ${resultado.descartadas.reduce((s, d) => s + d.quantidade, 0)} resposta(s) descartada(s) sem preço ou fonte válida`}
+            </p>
+            {resultado.referencias.length === 0 ? <EmptyState icon="🔎" title="Nenhuma referência com preço e fonte verificáveis" description="Tente um nome mais específico (modelo, medida, marca) ou registre cotações manualmente abaixo." compact /> :
+            <div style={{ overflowX: "auto" }}><table className="pp-table"><thead><tr><th>Referência</th><th>Preço</th><th>Fonte</th><th>Comparabilidade</th><th></th></tr></thead><tbody>
+              {resultado.referencias.map((r) => {
+                const foraDaConta = r.comparabilidade === "baixa" || (resultado.consulta.tipo === "servico" && r.mesmaLocalidade !== true);
+                const chave = r.url + r.precoCentavos;
+                return <tr key={chave} style={{ opacity: foraDaConta ? 0.6 : 1 }}>
+                  <td style={{ maxWidth: 320 }}>{r.titulo}{r.localidade && <><br /><span style={{ color: "#64748b" }}>📍 {r.localidade}</span></>}{r.diferenca && <><br /><span style={{ color: "#fbbf24" }}>Diferença: {r.diferenca}</span></>}</td>
+                  <td style={{ fontWeight: 700, color: "#f1f5f9" }}>{R(r.precoCentavos)}</td>
+                  <td><a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: "#4a9bb0" }}>{r.fonte}</a><br /><span style={{ color: "#64748b" }}>{r.confirmacao === "pagina_consultada" ? "página consultada" : "site consultado — confira a página"}</span></td>
+                  <td>{r.comparabilidade === "alta" ? "Alta" : r.comparabilidade === "media" ? "Média" : "Baixa"}{foraDaConta && <><br /><span style={{ color: "#fbbf24" }}>{r.comparabilidade === "baixa" ? "Fora da conta" : "Outra região — fora da conta"}</span></>}</td>
+                  <td><button type="button" className="pp-btn pp-secondary" disabled={salvando || registradas.has(chave)} onClick={() => void registrarReferencia(r)}>{registradas.has(chave) ? "Registrada" : "Registrar no histórico"}</button></td>
+                </tr>;
+              })}
+            </tbody></table></div>}
+          </div>}
+        </section>}
 
         {cargaFalhou ? <section style={card}>
           <p style={{ margin: "0 0 12px", color: "#94a3b8" }}>Seus itens e fontes não puderam ser carregados agora. Nada foi alterado — tente novamente em instantes.</p>
@@ -305,6 +444,7 @@ export default function PesquisaPrecosPage() {
           </div>
         </div>}
       </div>
-    </main>
+    </div>
+    </AdminShell>
   );
 }

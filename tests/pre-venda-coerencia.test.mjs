@@ -23,7 +23,7 @@ const titulosDaRota = h => {
 test("menu: ordem e rótulos finais da demonstração", () => {
   assert.deepEqual(menu.map(x => x.l), [
     "Visão Geral", "Oportunidades", "Dinheiro",
-    "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Serviços contratados", "Receita Perdida",
+    "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Pesquisa de Preços", "Serviços contratados", "Receita Perdida",
     "Agenda", "Agenda Autônoma", "Chatbot IA", "WhatsApp",
     "Google Presença", "Reputação", "Meu Site", "Conteúdo IA",
     "Gerente Comercial AI", "Métricas", "Raio-X da Empresa", "Previsor de Faturamento", "Linha Econômica", "Ads e Atribuição",
@@ -47,8 +47,8 @@ test("menu: todo ícone é um único glifo (sem ZWJ) — o antigo Copiloto quebr
   assert.equal(menu.find(x => x.h === "/copiloto").i, "💼");
 });
 
-test("fora do menu (reversível): Pesquisa de Preços, NotaFácil e Fechamento Contábil — páginas intactas e com shell", () => {
-  assert.deepEqual(ocultos.map(x => x.h), ["/pesquisa-precos", "/notafacil", "/fechamento-contabil"]);
+test("fora do menu (reversível): NotaFácil e Fechamento Contábil — páginas intactas e com shell (Pesquisa de Preços voltou com busca real)", () => {
+  assert.deepEqual(ocultos.map(x => x.h), ["/notafacil", "/fechamento-contabil"]);
   for (const { h } of ocultos) {
     assert.ok(!menu.some(x => x.h === h), `${h} não deveria estar no menu`);
     assert.ok(existe(`app${h}/page.tsx`), `${h}: página preservada`);
