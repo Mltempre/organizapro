@@ -101,10 +101,10 @@ test("Catálogo e Pedidos: sem 'IA' onde não há IA; catálogo na tela; item do
   const p = ler("app/pedidos/page.tsx");
   assert.match(p, /title="Catálogo e Pedidos"/);
   assert.doesNotMatch(p.replace(/\/\/.*$/gm, ""), /E-commerce IA/);
-  assert.match(p, /from\('clinica_servicos'\)\.select\('id, nome, preco_centavos, disponivel'\)\.eq\('clinica_id', cid\)/, "fonte canônica do catálogo");
+  assert.match(p, /from\('clinica_servicos'\)\.select\('id, nome, descricao, imagem_url, icone, ordem, preco_centavos, disponivel'\)\.eq\('clinica_id', cid\)/, "fonte canônica do catálogo");
   assert.match(p, /data-testid="catalogo"/);
   assert.match(p, /onClick=\{\(\) => abrirNovo\(c\.id\)\}[^>]*>\+ Adicionar ao pedido<\/button>/);
-  assert.match(p, /title="Seu catálogo está vazio\."[^>]*onAction=\{\(\) => router\.push\('\/site\/servicos'\)\}/);
+  assert.match(p, /title="Seu catálogo está vazio\."[^>]*actionLabel="\+ Novo item" onAction=\{abrirNovoItem\}/, "catálogo vazio se resolve aqui mesmo");
   assert.match(p, /<option value="" disabled>Escolha um item do catálogo…<\/option>/);
   assert.match(p, /<option value=\{AVULSO\}>Outro item \(fora do catálogo\)<\/option>/);
   assert.match(p, /servicoId: catalogoComPreco\.length > 0 \? '' : AVULSO/);

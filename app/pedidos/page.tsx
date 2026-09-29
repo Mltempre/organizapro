@@ -8,10 +8,16 @@ import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import { ehEstadoTerminal, type PedidoStatus } from '../../lib/motor-pedidos';
+import {
+  FORM_ITEM_VAZIO, formularioDoItem, itemVendavel, salvarItemCatalogo, enviarImagemItem,
+  type ItemCatalogo, type FormItemCatalogo,
+} from '../../lib/catalogo-comercial';
 
 // ── Catálogo e Pedidos (antes "E-commerce IA": não há IA nesta superfície) ─
-// Catálogo = clinica_servicos (o mesmo de Meu Site → Serviços); pedido nasce
-// do catálogo, com "item avulso" só como alternativa.
+// Catálogo Comercial = um só cadastro de itens (produtos, serviços ou ambos),
+// administrado AQUI com a mesma regra de persistência de Meu Site → Serviços
+// (lib/catalogo-comercial.ts); o site consome os mesmos itens na vitrine.
+// Pedido nasce do catálogo, com "item avulso" só como alternativa.
 // Mesma identidade visual e mesmo padrão de segurança de /orcamentos: usa
 // só as APIs já construídas (GET/POST /api/pedidos, POST /api/pedidos/[id]/
 // transicao) — nenhuma query direta a public.pedidos/pedido_itens aqui,
@@ -22,7 +28,7 @@ import { ehEstadoTerminal, type PedidoStatus } from '../../lib/motor-pedidos';
 // homologado em /clientes e /site/servicos).
 
 type ClientePicker = { id: string; nome: string; telefone: string | null; whatsapp: string | null };
-type CatalogoPicker = { id: string; nome: string; preco_centavos: number | null; disponivel: boolean };
+type CatalogoPicker = ItemCatalogo;
 
 type PedidoItem = { id: string; servico_id: string | null; descricao: string; quantidade: number; valor_unitario_centavos: number; valor_total_centavos: number };
 type Pedido = {
@@ -82,6 +88,15 @@ export default function PedidosPage() {
 
   const [transicionando, setTransicionando] = useState<string | null>(null);
 
+  // Cadastro de item do catálogo (Novo item / Editar item)
+  const [modalItem, setModalItem]       = useState<{ item: ItemCatalogo | null } | null>(null);
+  const [formItem, setFormItem]         = useState<FormItemCatalogo>({ ...FORM_ITEM_VAZIO });
+  const [salvandoItem, setSalvandoItem] = useState(false);
+  const [enviandoImg, setEnviandoImg]   = useState(false);
+  const [erroItem, setErroItem]         = useState('');
+  const salvandoItemRef = React.useRef(false);
+  const arquivoRef = React.useRef<HTMLInputElement>(null);
+
   const carregar = useCallback(async () => {
     try {
       setCarregando(true); setErro(''); setCargaValida(false); setPedidos([]); setPacientes([]); setCatalogo([]);
@@ -101,7 +116,7 @@ export default function PedidosPage() {
       const [pedRes, pacRes, catRes] = await Promise.all([
         fetch(`/api/pedidos?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
         supabase.from('pacientes').select('id, nome, telefone, whatsapp').eq('clinica_id', cid).order('nome'),
-        supabase.from('clinica_servicos').select('id, nome, preco_centavos, disponivel').eq('clinica_id', cid).order('nome'),
+        supabase.from('clinica_servicos').select('id, nome, descricao, imagem_url, icone, ordem, preco_centavos, disponivel').eq('clinica_id', cid).order('ordem'),
       ]);
 
       if (!pedRes.ok || pacRes.error || catRes.error) throw new Error(MSG_ERRO_PADRAO);
@@ -123,7 +138,35 @@ export default function PedidosPage() {
   useEffect(() => { carregar(); }, [carregar]);
 
   const catalogoAtivo = catalogo.filter(c => c.disponivel !== false);
-  const catalogoComPreco = catalogoAtivo.filter(c => c.preco_centavos);
+  const catalogoComPreco = catalogo.filter(itemVendavel);
+
+  function abrirNovoItem() {
+    setFormItem({ ...FORM_ITEM_VAZIO }); setErroItem(''); setModalItem({ item: null });
+  }
+  function abrirEditarItem(item: ItemCatalogo) {
+    setFormItem(formularioDoItem(item)); setErroItem(''); setModalItem({ item });
+  }
+  async function enviarImagem(file: File) {
+    if (!accessToken || !clinicaId) return;
+    setEnviandoImg(true); setErroItem('');
+    const r = await enviarImagemItem(accessToken, clinicaId, file);
+    setEnviandoImg(false);
+    if (!r.ok) { setErroItem(r.erro); return; }
+    setFormItem(p => ({ ...p, imagem_url: r.url }));
+  }
+  async function salvarItem() {
+    if (!modalItem || salvandoItemRef.current) return;
+    salvandoItemRef.current = true; setSalvandoItem(true); setErroItem('');
+    try {
+      const ordemNova = catalogo.length ? Math.max(...catalogo.map(c => c.ordem ?? 0)) + 1 : 0;
+      const r = await salvarItemCatalogo(supabase, { clinicaId, form: formItem, itemId: modalItem.item?.id ?? null, ordemNova });
+      if (!r.ok) { setErroItem(r.erro); return; }
+      setModalItem(null);
+      await carregar();
+      setSucesso(r.avisoPreco || (modalItem.item ? 'Item atualizado.' : 'Item adicionado ao catálogo.'));
+      setTimeout(() => setSucesso(''), 3500);
+    } finally { salvandoItemRef.current = false; setSalvandoItem(false); }
+  }
   // Com catálogo precificado, a linha começa pedindo um item do catálogo;
   // sem catálogo, começa como avulso (única alternativa possível).
   const novaLinha = (): LinhaForm => ({ ...linhaVazia, servicoId: catalogoComPreco.length > 0 ? '' : AVULSO });
@@ -218,7 +261,7 @@ export default function PedidosPage() {
   return (
     <AdminShell
       title="Catálogo e Pedidos"
-      subtitle={`${catalogoAtivo.length} ite${catalogoAtivo.length !== 1 ? 'ns' : 'm'} no catálogo · ${pedidos.length} pedido${pedidos.length !== 1 ? 's' : ''}`}
+      subtitle={`${catalogo.length} ite${catalogo.length !== 1 ? 'ns' : 'm'} no catálogo · ${pedidos.length} pedido${pedidos.length !== 1 ? 's' : ''}`}
       actionLabel="+ Novo pedido"
       actionOnClick={() => abrirNovo()}
     >
@@ -236,30 +279,65 @@ export default function PedidosPage() {
       {!carregando && !cargaValida && <button onClick={carregar}>Tentar novamente</button>}
       {!carregando && sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />}
 
-      {/* ── CATÁLOGO — mesma fonte do pedido (clinica_servicos); cadastro fica em Meu Site → Serviços ── */}
+      {/* ── FLUXO — o que esta tela faz, em uma linha ── */}
+      {!carregando && cargaValida && (
+        <div data-testid="fluxo-pedido" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: '#94a3b8' }}>
+            {['Catálogo', 'Montar pedido', 'Total', 'Registrar', 'Acompanhar status'].map((etapa, i) => (
+              <React.Fragment key={etapa}>
+                {i > 0 && <span style={{ color: '#475569' }}>→</span>}
+                <span style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid #2d3148', background: 'rgba(31,78,95,0.12)', color: '#cbd5e1', fontWeight: 600 }}>{i + 1}. {etapa}</span>
+              </React.Fragment>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, color: '#64748b', margin: '8px 0 0' }}>
+            Pedidos registrados aqui alimentam os sinais de pedido parado e de recompra no Gerente Comercial AI, no Follow-up Comercial e na Receita Perdida.
+          </p>
+        </div>
+      )}
+
+      {/* ── CATÁLOGO — cadastro único de itens (produtos e/ou serviços), administrado aqui ── */}
       {!carregando && cargaValida && (
         <section data-testid="catalogo" aria-labelledby="ped-catalogo" style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-            <h2 id="ped-catalogo" style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Catálogo</h2>
-            <a href="/site/servicos" style={{ fontSize: 12, color: '#4a9bb0' }}>Gerenciar em Meu Site → Serviços</a>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div>
+              <h2 id="ped-catalogo" style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Catálogo</h2>
+              <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 0' }}>Produtos e serviços que você vende. Os itens disponíveis também aparecem na vitrine do seu site.</p>
+            </div>
+            <button className="ped-btn" onClick={abrirNovoItem} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #1F4E5F', background: 'rgba(31,78,95,0.18)', color: '#7dd3e8', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Novo item</button>
           </div>
-          {catalogoAtivo.length === 0 ? (
-            <EmptyState compact icon="📦" title="Seu catálogo está vazio." description="Cadastre seus produtos e serviços com nome e preço para registrar pedidos em poucos cliques." actionLabel="➕ Cadastrar produtos e serviços" onAction={() => router.push('/site/servicos')} />
+          {catalogo.length === 0 ? (
+            <EmptyState compact icon="📦" title="Seu catálogo está vazio." description="Cadastre os produtos e serviços que você vende — nome, preço e foto — para montar pedidos em poucos cliques." actionLabel="+ Novo item" onAction={abrirNovoItem} />
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
-              {catalogoAtivo.map(c => (
-                <div key={c.id} className="ped-card" style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 14 }}>{c.nome}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: c.preco_centavos ? '#4ade80' : '#94a3b8' }}>
-                    {c.preco_centavos ? formatarValor(c.preco_centavos) : 'Sem preço'}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 10 }}>
+              {catalogo.map(c => {
+                const vendavel = itemVendavel(c);
+                const indisponivel = c.disponivel === false;
+                return (
+                  <div key={c.id} data-testid="item-catalogo" className="ped-card" style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', opacity: indisponivel ? 0.7 : 1 }}>
+                    {c.imagem_url && (
+                      // eslint-disable-next-line @next/next/no-img-element -- imagem enviada pelo próprio negócio (URL de storage), mesmo padrão de Meu Site
+                      <img src={c.imagem_url} alt={c.nome} loading="lazy" style={{ width: '100%', height: 96, objectFit: 'cover', display: 'block' }} />
+                    )}
+                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 14 }}>{c.nome}</div>
+                        {indisponivel && <span style={{ fontSize: 10, fontWeight: 700, color: '#f87171', background: 'rgba(239,68,68,0.12)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>Indisponível</span>}
+                      </div>
+                      {c.descricao && <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{c.descricao}</div>}
+                      <div style={{ fontSize: 15, fontWeight: 700, color: c.preco_centavos ? '#4ade80' : '#94a3b8' }}>
+                        {c.preco_centavos ? formatarValor(c.preco_centavos) : 'Sem preço'}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
+                        <button className="ped-btn" onClick={() => abrirEditarItem(c)} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 12, cursor: 'pointer' }}>{c.preco_centavos ? 'Editar' : 'Definir preço'}</button>
+                        {vendavel && (
+                          <button className="ped-btn" onClick={() => abrirNovo(c.id)} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Adicionar ao pedido</button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  {c.preco_centavos ? (
-                    <button className="ped-btn" onClick={() => abrirNovo(c.id)} style={{ marginTop: 'auto', padding: '7px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Adicionar ao pedido</button>
-                  ) : (
-                    <a href="/site/servicos" style={{ marginTop: 'auto', fontSize: 11, color: '#4a9bb0' }}>Definir preço em Meu Site → Serviços</a>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -377,8 +455,7 @@ export default function PedidosPage() {
                 deixar só "— Item avulso —" sem contexto. */}
             {catalogoComPreco.length === 0 && (
               <p data-testid="catalogo-vazio" style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 10px', lineHeight: 1.5 }}>
-                Seu catálogo ainda não tem itens com preço. Cadastre nome e preço em{' '}
-                <a href="/site/servicos" style={{ color: '#4a9bb0' }}>Meu Site → Serviços</a>{' '}
+                Seu catálogo ainda não tem itens disponíveis com preço. Cadastre ou edite itens no Catálogo desta página
                 para selecioná-los aqui; enquanto isso, use “Outro item (fora do catálogo)”.
               </p>
             )}
@@ -414,6 +491,45 @@ export default function PedidosPage() {
               <button className="ped-btn-cancelar" onClick={() => setModalNovo(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
               <button className="ped-btn-salvar" onClick={salvar} disabled={salvando} style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
                 {salvando ? 'Salvando...' : 'Registrar pedido'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {modalItem && (
+        <div data-testid="modal-item" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }} onClick={e => { if (e.target === e.currentTarget && !salvandoItem) setModalItem(null); }}>
+          <div style={{ background: '#1e2130', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3148' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 20, marginTop: 0 }}>{modalItem.item ? 'Editar item' : 'Novo item'}</h2>
+            {erroItem && <div style={{ marginBottom: 14 }}><Feedback type="erro" message={erroItem} onClose={() => setErroItem('')} /></div>}
+
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nome do item *</label>
+            <input value={formItem.nome} onChange={e => setFormItem(p => ({ ...p, nome: e.target.value }))} placeholder="Produto ou serviço — ex.: Camiseta, Troca de óleo, Corte" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box', marginBottom: 14 }} />
+
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descrição</label>
+            <textarea value={formItem.descricao} onChange={e => setFormItem(p => ({ ...p, descricao: e.target.value }))} placeholder="O que o cliente recebe, tamanho, duração ou detalhes importantes" rows={3} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box', resize: 'vertical', marginBottom: 14 }} />
+
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Imagem (opcional)</label>
+            <div onClick={() => !enviandoImg && arquivoRef.current?.click()} style={{ border: '2px dashed #2d3148', borderRadius: 10, height: 96, overflow: 'hidden', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f1117', marginBottom: 14 }}>
+              {formItem.imagem_url
+                // eslint-disable-next-line @next/next/no-img-element -- pré-visualização da imagem enviada pelo negócio
+                ? <img src={formItem.imagem_url} alt="Pré-visualização" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: 12, color: '#64748b' }}>Clique para enviar uma foto</span>}
+              {enviandoImg && <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,17,23,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: 12 }}>Enviando...</div>}
+            </div>
+            <input ref={arquivoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) enviarImagem(f); e.target.value = ''; }} />
+
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preço</label>
+            <input value={formItem.preco} onChange={e => setFormItem(p => ({ ...p, preco: e.target.value }))} placeholder="Ex: 49,90 — sem preço, o item não entra em pedidos" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box', marginBottom: 14 }} />
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#cbd5e1', marginBottom: 22, cursor: 'pointer' }}>
+              <input type="checkbox" checked={formItem.disponivel} onChange={e => setFormItem(p => ({ ...p, disponivel: e.target.checked }))} style={{ width: 16, height: 16 }} />
+              Disponível para venda (aparece nos pedidos e no site)
+            </label>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="ped-btn-cancelar" onClick={() => setModalItem(null)} disabled={salvandoItem} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+              <button className="ped-btn-salvar" onClick={salvarItem} disabled={salvandoItem || enviandoImg} style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvandoItem ? 0.7 : 1 }}>
+                {salvandoItem ? 'Salvando...' : modalItem.item ? 'Salvar item' : 'Adicionar ao catálogo'}
               </button>
             </div>
           </div>

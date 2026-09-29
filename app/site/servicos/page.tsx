@@ -4,40 +4,18 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../components/AdminShell";
 import SiteWorkspaceNav from "../SiteWorkspaceNav";
+import {
+  ICONES_CATALOGO, CORES_ICONE_CATALOGO, FORM_ITEM_VAZIO, formularioDoItem, salvarItemCatalogo, enviarImagemItem,
+  type ItemCatalogo, type FormItemCatalogo,
+} from "../../../lib/catalogo-comercial";
 
-type Item = { id: string; icone: string; imagem_url: string|null; nome: string; descricao: string|null; ordem: number; preco_centavos?: number|null; disponivel?: boolean; };
-type Form = { icone: string; imagem_url: string; nome: string; descricao: string; preco: string; disponivel: boolean; };
-
-// Nunca float — mesma convenção de preco_centavos em todo o schema real.
-function parsePrecoParaCentavos(texto: string): number | null {
-  const limpo = texto.trim().replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3},)/g, "").replace(",", ".");
-  if (!limpo) return null;
-  const valor = Number(limpo);
-  if (!Number.isFinite(valor) || valor <= 0) return null;
-  return Math.round(valor * 100);
-}
-function formatarCentavosParaInput(centavos?: number | null): string {
-  if (centavos === null || centavos === undefined) return "";
-  return (centavos / 100).toFixed(2).replace(".", ",");
-}
-
-
-const ICONS = [
-  { key:"tooth",       emoji:"⭐", label:"Destaque"    },
-  { key:"smile",       emoji:"😊", label:"Atendimento" },
-  { key:"gem",         emoji:"💎", label:"Premium"     },
-  { key:"microscope",  emoji:"🔍", label:"Detalhes"    },
-  { key:"shield",      emoji:"🛡️", label:"Garantia"    },
-  { key:"sparkle",     emoji:"✨", label:"Especial"    },
-  { key:"heart",       emoji:"❤️", label:"Cuidado"     },
-  { key:"clinic",      emoji:"🏢", label:"Negocio"     },
-];
-
-const ICON_COLORS: Record<string, string> = {
-  tooth:"#00c896", smile:"#3b82f6", gem:"#8b5cf6",
-  microscope:"#f59e0b", shield:"#ef4444", sparkle:"#06b6d4",
-  heart:"#ec4899", clinic:"#10b981",
-};
+// Mesmo catálogo de Catálogo e Pedidos: a regra de persistência vive em
+// lib/catalogo-comercial.ts (uma só); esta tela mantém a vitrine do site
+// (ícone, ordem e exclusão).
+type Item = ItemCatalogo;
+type Form = FormItemCatalogo;
+const ICONS = ICONES_CATALOGO;
+const ICON_COLORS = CORES_ICONE_CATALOGO;
 
 export default function ServicosAdmin() {
   const router = useRouter();
@@ -45,7 +23,7 @@ export default function ServicosAdmin() {
   const [itens, setItens]         = useState<Item[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modal, setModal]         = useState<{ mode:"add"|"edit"; item?: Item }|null>(null);
-  const [form, setForm]           = useState<Form>({ icone:"tooth", imagem_url:"", nome:"", descricao:"", preco:"", disponivel:true });
+  const [form, setForm]           = useState<Form>({ ...FORM_ITEM_VAZIO });
   const [avisoPreco, setAvisoPreco] = useState("");
   const [uploading, setUploading] = useState(false);
   const [salvando, setSalvando]   = useState(false);
@@ -75,46 +53,21 @@ export default function ServicosAdmin() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session || !clinicaId) return;
     setUploading(true); setErro("");
-    const fd = new FormData();
-    fd.append("file", file); fd.append("tipo", "servico"); fd.append("clinica_id", clinicaId);
-    const res  = await fetch("/api/upload", { method:"POST", headers:{ Authorization:`Bearer ${session.access_token}` }, body:fd });
-    const data = await res.json();
+    const r = await enviarImagemItem(session.access_token, clinicaId, file);
     setUploading(false);
-    if (!res.ok) { setErro(data.error || "Erro no upload."); return; }
-    setForm(p => ({ ...p, imagem_url: data.url }));
+    if (!r.ok) { setErro(r.erro); return; }
+    setForm(p => ({ ...p, imagem_url: r.url }));
   }
 
-  // Decisão de segurança deliberada (mesma da auditoria de
-  // docs/ecommerce-ia-v1-arquitetura.md): o salvamento de preco/disponivel
-  // é uma chamada Supabase SEPARADA e isolada do salvamento principal
-  // (nome/descrição/ícone/imagem/ordem, que permanece byte-a-byte idêntico
-  // ao que já está em produção). Antes da migration 20260920000001 rodar,
-  // essas colunas não existem — essa segunda chamada falha sozinha, exibe
-  // um aviso não-bloqueante, e NUNCA impede nem reverte o salvamento do
-  // serviço em si.
-  async function salvarPreco(id: string) {
-    const precoCentavos = parsePrecoParaCentavos(form.preco);
-    const { error } = await supabase.from("clinica_servicos").update({ preco_centavos: precoCentavos, disponivel: form.disponivel }).eq("id", id).eq("clinica_id", clinicaId);
-    if (error) setAvisoPreco("Preço/disponibilidade ainda não pôde ser salvo (funcionalidade em ativação).");
-    else setAvisoPreco("");
-  }
-
+  // Salvamento principal + preço/disponibilidade em chamada separada e
+  // não-bloqueante — regra única em lib/catalogo-comercial.ts.
   async function salvar() {
-    if (!form.nome.trim()) { setErro("Informe o nome do servico."); return; }
+    if (modal?.mode === "edit" && !modal.item) return;
     setSalvando(true); setErro("");
-    const payload = { clinica_id:clinicaId, icone:form.icone, imagem_url:form.imagem_url||null, nome:form.nome.trim(), descricao:form.descricao.trim()||null };
-    let idParaPreco: string | null = null;
-    if (modal?.mode === "add") {
-      const maxOrdem = itens.length ? Math.max(...itens.map(i => i.ordem)) + 1 : 0;
-      const { data, error } = await supabase.from("clinica_servicos").insert({ ...payload, ordem:maxOrdem }).select("id").single();
-      if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
-      idParaPreco = data.id;
-    } else if (modal?.item) {
-      const { error } = await supabase.from("clinica_servicos").update(payload).eq("id", modal.item.id).eq("clinica_id", clinicaId);
-      if (error) { setErro("Erro ao salvar."); setSalvando(false); return; }
-      idParaPreco = modal.item.id;
-    }
-    if (idParaPreco) await salvarPreco(idParaPreco);
+    const maxOrdem = itens.length ? Math.max(...itens.map(i => i.ordem)) + 1 : 0;
+    const r = await salvarItemCatalogo(supabase, { clinicaId, form, itemId: modal?.mode === "edit" ? modal.item!.id : null, ordemNova: maxOrdem });
+    if (!r.ok) { setErro(r.erro); setSalvando(false); return; }
+    setAvisoPreco(r.avisoPreco);
     setSalvando(false); setModal(null); carregar();
   }
 
@@ -140,7 +93,7 @@ export default function ServicosAdmin() {
   const cor = (icone: string) => ICON_COLORS[icone] ?? "#00c896";
 
   return (
-    <AdminShell title="Serviços" subtitle="Serviços exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ icone:"tooth", imagem_url:"", nome:"", descricao:"", preco:"", disponivel:true }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Serviços" subtitle="Serviços exibidos no site" actionLabel="+ Adicionar Servico" actionOnClick={() => { setForm({ ...FORM_ITEM_VAZIO }); setModal({ mode:"add" }); setErro(""); }}>
 
       <SiteWorkspaceNav />
 
@@ -179,7 +132,7 @@ export default function ServicosAdmin() {
                 <div style={{ display:"flex", gap:5 }}>
                   <button onClick={() => mover(item,-1)} disabled={idx===0} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↑</button>
                   <button onClick={() => mover(item, 1)} disabled={idx===sorted.length-1} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#64748b", fontSize:12, cursor:"pointer" }}>↓</button>
-                  <button onClick={() => { setForm({ icone:item.icone, imagem_url:item.imagem_url??"", nome:item.nome, descricao:item.descricao??"", preco:formatarCentavosParaInput(item.preco_centavos), disponivel:item.disponivel !== false }); setModal({ mode:"edit", item }); setErro(""); setAvisoPreco(""); }} style={{ flex:1, padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#94a3b8", fontSize:12, cursor:"pointer" }}>Editar</button>
+                  <button onClick={() => { setForm(formularioDoItem(item)); setModal({ mode:"edit", item }); setErro(""); setAvisoPreco(""); }} style={{ flex:1, padding:"5px 8px", borderRadius:6, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#94a3b8", fontSize:12, cursor:"pointer" }}>Editar</button>
                   <button onClick={() => excluir(item.id)} style={{ padding:"5px 8px", borderRadius:6, border:"1px solid rgba(239,68,68,0.3)", background:"transparent", color:"#f87171", fontSize:12, cursor:"pointer" }}>✕</button>
                 </div>
               </div>
