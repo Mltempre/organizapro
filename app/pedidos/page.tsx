@@ -291,7 +291,7 @@ export default function PedidosPage() {
             ))}
           </div>
           <p style={{ fontSize: 11, color: '#64748b', margin: '8px 0 0' }}>
-            Pedidos registrados aqui alimentam os sinais de pedido parado e de recompra no Gerente Comercial AI, no Follow-up Comercial e na Receita Perdida.
+            Pedidos registrados aqui alimentam os sinais de pedido parado e de recompra no Gerente Comercial, no Follow-up Comercial e na Receita Perdida.
           </p>
         </div>
       )}

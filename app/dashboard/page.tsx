@@ -478,7 +478,7 @@ export default function Dashboard() {
   const receitaPerdida = agregarReceitaPerdida({
         hoje: hojeStr, agora: agoraIso,
         orcamentosParados: dash.orcamentosParadosRows.map((o) => ({ id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento, valor: o.valor, apresentadoEm: o.apresentado_em })),
-        cobrancasAtrasadas: dash.cobrancasAbertasRows.map((c) => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca' })),
+        cobrancasAtrasadas: dash.cobrancasAbertasRows.map((c) => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca', tratamentoOrigemId: c.tratamento_origem_id })),
         tratamentosSemRetorno: dash.tratamentosAtivosRows.map((t) => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status, proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em, valorEstimado: t.valor_estimado })),
         pedidosNaoConcluidos: dash.pedidosNaoConcluidosRows.map((p) => ({ id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone, descricao: 'pedido', valor: p.valor_centavos / 100, criadoEm: p.criado_em })),
         oportunidadesAbertas: [], // Sem valor financeiro; permanecem na lista canônica de prioridades.

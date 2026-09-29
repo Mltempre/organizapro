@@ -161,7 +161,7 @@ export default function FinanceiroPage() {
       const receitaPerdida = agregarReceitaPerdida({
         hoje, agora,
         orcamentosParados: orcamentosApresentados.map((o) => ({ id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento, valor: o.valor, apresentadoEm: o.apresentado_em })),
-        cobrancasAtrasadas: cobrancasAbertas.map((c) => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca' })),
+        cobrancasAtrasadas: cobrancasAbertas.map((c) => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca', tratamentoOrigemId: c.tratamento_origem_id })),
         tratamentosSemRetorno: tratamentosRisco.map((t) => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status, proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em, valorEstimado: t.valor_estimado })),
         pedidosNaoConcluidos: pedidosRisco.map((p) => ({ id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone, descricao: 'pedido', valor: p.valor_centavos / 100, criadoEm: p.criado_em })),
         oportunidadesAbertas: oportunidadesParaRisco,
@@ -244,9 +244,9 @@ export default function FinanceiroPage() {
               </div>
             </div>
             <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
-              <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Recebido comprovado</div>
+              <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Total recebido · todo o histórico</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#4ade80' }}>{formatarValor(resumo.linhaEconomica.totalComprovado)}</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{resumo.linhaEconomica.quantidadeComprovada} pagamento{resumo.linhaEconomica.quantidadeComprovada !== 1 ? 's' : ''} real{resumo.linhaEconomica.quantidadeComprovada !== 1 ? 'is' : ''}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{resumo.linhaEconomica.quantidadeComprovada} pagamento{resumo.linhaEconomica.quantidadeComprovada !== 1 ? 's' : ''} comprovado{resumo.linhaEconomica.quantidadeComprovada !== 1 ? 's' : ''} (cobranças e pedidos pagos)</div>
             </div>
             <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Previsto até {formatarData(resumo.previsor.horizonteFim)}</div>

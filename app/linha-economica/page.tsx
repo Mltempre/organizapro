@@ -106,7 +106,7 @@ export default function LinhaEconomicaPage() {
   const semDados = resumo && resumo.itens.length === 0;
 
   return (
-    <AdminShell title="Linha Econômica" subtitle="Prova de resultado — comprovado × atribuível, nunca causalidade inventada">
+    <AdminShell title="Linha Econômica" subtitle="Resultado associado às ações registradas no OrganizaPro — com base nos registros, sem afirmar a causa">
       {carregando && <PageLoader title="Reconstruindo cadeias econômicas..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
       {!carregando && erro && <button onClick={carregar}>Tentar novamente</button>}
@@ -132,7 +132,7 @@ export default function LinhaEconomicaPage() {
             <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Recuperado (era atraso, depois pago)</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#fbbf24' }}>{formatarValor(resumo.totalRecuperado)}</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Fato verificado, nunca causalidade da IA</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Pago depois do vencimento. A associação vem dos registros e não prova a causa do pagamento.</div>
             </div>
           </div>
 

@@ -58,7 +58,7 @@ export default function CasaDashboard(props: CasaDashboardProps) {
         </header>
 
         <section className={styles.card} aria-labelledby="casa-agora">
-          <div className={styles.titulo}><h2 id="casa-agora">Precisa da sua atenção</h2><Link href="/copiloto">Abrir Gerente Comercial AI →</Link></div>
+          <div className={styles.titulo}><h2 id="casa-agora">Precisa da sua atenção</h2><Link href="/copiloto">Abrir Gerente Comercial →</Link></div>
           {missaoDoDia.length === 0 ? <p className={styles.muted}>{temDados ? "Nenhuma prioridade identificada nos dados carregados." : "As prioridades aparecerão conforme você registrar a operação."}</p> :
             renderPrioridades(missaoDoDia)}
           {props.outrasPrioridades.length > 0 && <details className={styles.maisPrioridades}><summary>Ver outras {props.outrasPrioridades.length} prioridades</summary>{renderPrioridades(props.outrasPrioridades)}</details>}

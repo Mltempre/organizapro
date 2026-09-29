@@ -46,11 +46,16 @@ export type OportunidadeAbertaInput = {
   orcamentoVinculadoId: string | null;
 };
 
+// Cobrança ABERTA (pendente/em_cobranca) com o vínculo real ao serviço
+// contratado que a originou (cobrancas.tratamento_origem_id). Obrigatório:
+// sem ele não há como evitar a dupla contagem abaixo.
+export type CobrancaAbertaReceitaInput = CobrancaAtrasadaInput & { tratamentoOrigemId: string | null };
+
 export type EntradaReceitaPerdida = {
   hoje: string; // YYYY-MM-DD
   agora: string; // ISO — timestamptz "agora"
   orcamentosParados: OrcamentoParadoInput[];
-  cobrancasAtrasadas: CobrancaAtrasadaInput[];
+  cobrancasAtrasadas: CobrancaAbertaReceitaInput[]; // todas as abertas; o atraso é decidido aqui
   tratamentosSemRetorno: TratamentoSemRetornoComValorInput[];
   pedidosNaoConcluidos: PedidoNaoConcluidoInput[];
   oportunidadesAbertas: OportunidadeAbertaInput[];
@@ -135,7 +140,18 @@ export function agregarReceitaPerdida(input: EntradaReceitaPerdida): ResumoRecei
     });
   }
 
+  // Anti-dupla contagem — mesma regra de precedência de
+  // lib/previsor-faturamento.ts: serviço contratado com cobrança ABERTA
+  // vinculada (tratamento_origem_id) já virou cobrança, o estágio mais
+  // concreto da cadeia; o valor conta só lá (se estiver atrasada). Só o
+  // vínculo real decide — nunca nome/telefone do cliente. O sinal de
+  // "serviço sem retorno" continua no Radar/Follow-up; sai apenas do dinheiro.
+  const tratamentosComCobrancaAberta = new Set(
+    input.cobrancasAtrasadas.map((c) => c.tratamentoOrigemId).filter((id): id is string => !!id)
+  );
+
   for (const t of input.tratamentosSemRetorno) {
+    if (tratamentosComCobrancaAberta.has(t.id)) continue;
     if (t.status === "em_andamento" && precisaRetorno({ status: t.status, proxima_data_prevista: t.proximaDataPrevista }, input.hoje)) {
       itens.push({
         origem: "tratamento_sem_retorno",

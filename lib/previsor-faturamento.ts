@@ -259,7 +259,7 @@ export function gerarPrevisorFaturamento(input: EntradaPrevisor): ResumoPrevisor
     })),
     cobrancasAtrasadas: input.cobrancasAbertas.map((c) => ({
       id: c.id, pacienteNome: c.pacienteNome, telefone: c.telefone, descricao: c.descricao,
-      valor: c.valor, vencimento: c.vencimento, status: c.status,
+      valor: c.valor, vencimento: c.vencimento, status: c.status, tratamentoOrigemId: c.tratamentoOrigemId,
     })),
     tratamentosSemRetorno: input.tratamentos.map((t) => ({
       id: t.id, pacienteNome: t.pacienteNome, telefone: t.telefone, tipoTratamento: t.tipoTratamento,

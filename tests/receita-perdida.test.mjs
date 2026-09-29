@@ -216,3 +216,61 @@ test("receita-perdida: toda a decisão de agregação é delegada a agregarRecei
   assert.match(pagina, /agregarReceitaPerdida\(/);
   assert.doesNotMatch(pagina, /\.reduce\(/);
 });
+
+// ── Decisão 2026-09-29: sem dupla contagem serviço × cobrança vinculada ──
+// Mesma regra de precedência do Previsor: serviço contratado com cobrança
+// ABERTA vinculada (tratamento_origem_id) conta o valor SÓ pela cobrança.
+// Só o vínculo real decide — nunca o nome do cliente.
+
+const servicoSemRetorno = { id: "trat-9", pacienteNome: "Roberto", telefone: null, tipoTratamento: "Instalação", status: "em_andamento", proximaDataPrevista: null, updatedAt: "2026-08-01T12:00:00Z", interrompidoEm: null, valorEstimado: 180 };
+
+test("serviço sem retorno + cobrança ATRASADA vinculada = mesmo valor: conta uma vez, pela cobrança", () => {
+  const r = agregarReceitaPerdida({
+    ...entradaVazia,
+    tratamentosSemRetorno: [servicoSemRetorno],
+    cobrancasAtrasadas: [{ id: "cob-9", pacienteNome: "Roberto", telefone: null, descricao: "Instalação", valor: 180, vencimento: "2026-09-01", status: "pendente", tratamentoOrigemId: "trat-9" }],
+  });
+  assert.equal(r.totalConhecido, 180, "antes: 360 (o mesmo valor em dois estágios)");
+  assert.deepEqual(r.itens.map(i => i.origem), ["cobranca_atrasada"]);
+  assert.equal(r.porOrigem.find(o => o.origem === "tratamento_sem_retorno").itensComValor, 0);
+});
+
+test("serviço com cobrança aberta vinculada AINDA NÃO vencida: não está em risco (valor vive na cobrança a receber)", () => {
+  const r = agregarReceitaPerdida({
+    ...entradaVazia,
+    tratamentosSemRetorno: [servicoSemRetorno],
+    cobrancasAtrasadas: [{ id: "cob-9", pacienteNome: "Roberto", telefone: null, descricao: "Instalação", valor: 180, vencimento: "2026-10-10", status: "pendente", tratamentoOrigemId: "trat-9" }],
+  });
+  assert.equal(r.totalConhecido, 0);
+  assert.equal(r.itens.length, 0);
+});
+
+test("mesmo cliente, SEM vínculo: sinais diferentes continuam contando (nunca deduplica por nome)", () => {
+  const r = agregarReceitaPerdida({
+    ...entradaVazia,
+    tratamentosSemRetorno: [servicoSemRetorno],
+    cobrancasAtrasadas: [{ id: "cob-8", pacienteNome: "Roberto", telefone: null, descricao: "Outra venda", valor: 180, vencimento: "2026-09-01", status: "pendente", tratamentoOrigemId: null }],
+  });
+  assert.equal(r.totalConhecido, 360);
+  assert.deepEqual(r.itens.map(i => i.origem).sort(), ["cobranca_atrasada", "tratamento_sem_retorno"]);
+});
+
+test("cobrança vinculada a OUTRO serviço não esconde este serviço", () => {
+  const r = agregarReceitaPerdida({
+    ...entradaVazia,
+    tratamentosSemRetorno: [servicoSemRetorno],
+    cobrancasAtrasadas: [{ id: "cob-7", pacienteNome: "Roberto", telefone: null, descricao: "Outro serviço", valor: 90, vencimento: "2026-09-01", status: "pendente", tratamentoOrigemId: "trat-outro" }],
+  });
+  assert.equal(r.totalConhecido, 270);
+});
+
+test("todas as telas e o Previsor informam o vínculo real ao motor (sem ele a regra não teria efeito)", () => {
+  const ler = p => fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..", p), "utf8");
+  for (const f of ["app/dashboard/page.tsx", "app/copiloto/page.tsx", "app/financeiro/page.tsx", "app/receita-perdida/page.tsx"]) {
+    const bloco = ler(f).split("agregarReceitaPerdida({")[1] ?? "";
+    assert.match(bloco.slice(0, 2000), /cobrancasAtrasadas: [^\n]*tratamentoOrigemId: c\.tratamento_origem_id/, f);
+  }
+  const prev = ler("lib/previsor-faturamento.ts").split("agregarReceitaPerdida({")[1];
+  assert.match(prev, /status: c\.status, tratamentoOrigemId: c\.tratamentoOrigemId,/);
+  assert.match(ler("lib/receita-perdida.ts"), /cobrancasAtrasadas: CobrancaAbertaReceitaInput\[\]/);
+});

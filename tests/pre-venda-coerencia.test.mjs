@@ -26,7 +26,7 @@ test("menu: ordem e rótulos finais da demonstração", () => {
     "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Pesquisa de Preços", "Serviços contratados", "Receita Perdida",
     "Agenda", "Agenda Autônoma", "Chatbot IA", "WhatsApp",
     "Google Presença", "Reputação", "Meu Site", "Conteúdo IA",
-    "Gerente Comercial AI", "Métricas", "Raio-X da Empresa", "Previsor de Faturamento", "Linha Econômica", "Ads e Atribuição",
+    "Gerente Comercial", "Métricas", "Raio-X da Empresa", "Previsor de Faturamento", "Linha Econômica", "Ads e Atribuição",
   ]);
   assert.equal(new Set(menu.map(x => x.h)).size, menu.length);
 });
@@ -56,9 +56,14 @@ test("fora do menu (reversível): NotaFácil e Fechamento Contábil — páginas
   assert.match(shell, /\.\.\.navForaDoMenuPreVenda\.map\(\(i\) => i\.h\)/, "continuam recebendo o shell por link direto");
 });
 
-test("Gerente Comercial AI em todo lugar visível (nada de 'Copiloto' como nome de tela/atalho)", () => {
+test("Gerente Comercial em todo lugar visível (nada de 'Copiloto' como nome de tela/atalho)", () => {
   const cop = ler("app/copiloto/page.tsx");
-  assert.match(cop, /<AdminShell title="Gerente Comercial AI"/);
+  assert.match(cop, /<AdminShell title="Gerente Comercial" /);
+  // Decisão 2026-09-29: não há IA nesta superfície (regras determinísticas
+  // sobre os motores existentes) — "AI" saiu do nome em todo texto visível.
+  for (const f of ["app/components/CasaDashboard.tsx", "app/components/AdminShellFrame.tsx", "app/copiloto/page.tsx", "app/pedidos/page.tsx"]) {
+    assert.doesNotMatch(ler(f).replace(/\/\/.*$/gm, ""), /Gerente Comercial (AI|IA)\b/, `${f}: "Gerente Comercial AI" residual`);
+  }
   assert.match(cop, />Prioridades comerciais \(\{estado\.atencoes\.length\}\)<\/h2>/);
   for (const f of ["app/components/CasaDashboard.tsx", "app/components/FaixaExecutiva.tsx", "app/components/AdminShellFrame.tsx", "app/copiloto/page.tsx"]) {
     const visivel = ler(f).replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
@@ -69,7 +74,7 @@ test("Gerente Comercial AI em todo lugar visível (nada de 'Copiloto' como nome 
 test("Visão Geral: cada atalho diz o nome da página de destino", () => {
   const casa = ler("app/components/CasaDashboard.tsx");
   for (const [href, texto] of [
-    ["/copiloto", "Abrir Gerente Comercial AI →"], ["/financeiro", "Abrir Dinheiro →"], ["/receita-perdida", "Ver Receita Perdida →"],
+    ["/copiloto", "Abrir Gerente Comercial →"], ["/financeiro", "Abrir Dinheiro →"], ["/receita-perdida", "Ver Receita Perdida →"],
     ["/previsor-faturamento", "Ver Previsor de Faturamento →"], ["/agendamentos", "Abrir agenda →"], ["/orcamentos", "Orçamentos →"],
     ["/oportunidades", "Oportunidades →"], ["/reputacao", "Ver Reputação →"], ["/google-presenca", "Ver Google Presença →"],
     ["/fechamento-contabil", "Ver Fechamento Contábil →"],
@@ -130,4 +135,15 @@ test("SQLs pendentes: propostos, fora das migrations, fail-closed (não executad
   assert.match(seed.replace(/--.*$/gm, ""), /s\.preco_centavos is null;/);
   for (const f of ["limpeza-teste-dono-tenant-oficial-v1.sql", "demo-precos-catalogo-black-crown-v1.sql"])
     assert.ok(!existe(`supabase/migrations/${f}`));
+});
+
+test("Dinheiro e Linha Econômica: período explícito e associação sem prometer causa (decisões 2026-09-29)", () => {
+  const fin = ler("app/financeiro/page.tsx");
+  assert.match(fin, />Total recebido · todo o histórico</);
+  assert.match(fin, /comprovado\{[^}]*\} \(cobranças e pedidos pagos\)/);
+  assert.doesNotMatch(fin, />Recebido comprovado</);
+  const le = ler("app/linha-economica/page.tsx");
+  assert.match(le, /subtitle="Resultado associado às ações registradas no OrganizaPro — com base nos registros, sem afirmar a causa"/);
+  assert.match(le, />Pago depois do vencimento\. A associação vem dos registros e não prova a causa do pagamento\.</);
+  assert.doesNotMatch(le, /causalidade da IA|nunca causalidade inventada/);
 });
