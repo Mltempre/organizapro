@@ -51,6 +51,20 @@ test("Casa apresenta valores com origem cobranças, sem contagem ambígua A rece
   assert.match(casa,/A receber · cobranças/);
   assert.match(casa,/moeda\(indicadoresCobranca.valorEmAberto\)/);
 });
+
+// Revisão final da Casa (2026-09-29): "Em atraso" (valorEmAtraso) e
+// "Cobranças vencidas" (Receita Perdida) são o MESMO cálculo — cobranças
+// abertas com vencimento passado. O card Dinheiro mostra o valor uma vez só,
+// na lista de acompanhamento que leva à Receita Perdida.
+test("Casa · Dinheiro: cobrança vencida aparece uma vez só (sem 'Em atraso' duplicando 'Cobranças vencidas')", () => {
+  const casa = ler("app/components/CasaDashboard.tsx");
+  const semComentarios = casa.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\/.*$/gm, "");
+  assert.doesNotMatch(semComentarios, /<dt>Em atraso<\/dt>|valorEmAtraso/);
+  assert.match(casa, /cobranca_atrasada: "Cobranças vencidas"/);
+  assert.match(casa, /As cobranças vencidas aparecem abaixo e já estão incluídas no valor a receber\./);
+  assert.match(casa, /<Link href="\/receita-perdida">Ver Receita Perdida →<\/Link>/);
+  assert.match(ler("app/components/CasaDashboard.module.css"), /\.numeros \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+});
 test("zero fabricação: OrganizaProTrabalhandoCard nunca lista item com quantidade zero (delegado a calcularAtividadeRecente, que já filtra)", () => {
   assert.doesNotMatch(atividadeCard, /quantidade:\s*0|Math\.random/);
 });

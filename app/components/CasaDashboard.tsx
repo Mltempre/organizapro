@@ -67,11 +67,12 @@ export default function CasaDashboard(props: CasaDashboardProps) {
         <section className={styles.card} aria-labelledby="casa-dinheiro">
           <div className={styles.titulo}><h2 id="casa-dinheiro">Dinheiro</h2><Link href="/financeiro">Abrir Dinheiro →</Link></div>
           {indicadoresCobranca ? <>
-            <p className={styles.muted}>Valores das cobranças registradas. O atraso já está incluído no valor a receber.</p>
+            <p className={styles.muted}>Valores das cobranças registradas. As cobranças vencidas aparecem abaixo e já estão incluídas no valor a receber.</p>
+            {/* "Em atraso" saiu daqui: é o mesmo cálculo de "Cobranças vencidas"
+                (abertas com vencimento passado), já mostrado logo abaixo. */}
             <dl className={styles.numeros}>
               <div><dt>Recebido no mês · cobranças</dt><dd>{moeda(indicadoresCobranca.valorRecebidoMes)}</dd></div>
               <div><dt>A receber · cobranças</dt><dd>{moeda(indicadoresCobranca.valorEmAberto)}</dd></div>
-              <div><dt>Em atraso</dt><dd>{moeda(indicadoresCobranca.valorEmAtraso)}</dd></div>
             </dl>
           </> : <p className={styles.muted}>Nenhuma cobrança registrada. <Link href="/cobrancas">Ver cobranças →</Link></p>}
           <div className={styles.risco}>
