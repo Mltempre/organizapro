@@ -176,3 +176,52 @@ test("Meu Site continua consumindo o MESMO catálogo na vitrine (nenhum segundo 
   const tabelas = [...new Set([...ler("app/pedidos/page.tsx").matchAll(/from\('([a-z_]+)'\)/g)].map(m => m[1]))];
   assert.deepEqual(tabelas.sort(), ["clinica_servicos", "pacientes"]);
 });
+
+// ── Fechamento comercial (2026-09-29): Orçamento montado com o catálogo ───
+// Produto + mão de obra no mesmo orçamento, sem tabela/rota/motor novo: a
+// tela só compõe descrição e valor e envia à MESMA API de orçamentos.
+test("orçamento do catálogo: produto + mão de obra nos 4 cenários, total pela soma dos preços cadastrados", () => {
+  const { lib } = catalogoFake();
+  const casos = [
+    { negocio: "oficina", linhas: [["Pneu 90/90-18", 22990, 1], ["Mão de obra — troca de pneu", 2500, 1]], descricao: "1× Pneu 90/90-18 + 1× Mão de obra — troca de pneu", total: 25490 },
+    { negocio: "câmeras", linhas: [["Câmera Intelbras VHD 1220 B", 20551, 4], ["Instalação e configuração", 45000, 1]], descricao: "4× Câmera Intelbras VHD 1220 B + 1× Instalação e configuração", total: 127204 },
+    { negocio: "vidraçaria", linhas: [["Box vidro temperado 8 mm", 89000, 1], ["Instalação de box", 70000, 1]], descricao: "1× Box vidro temperado 8 mm + 1× Instalação de box", total: 159000 },
+    { negocio: "móveis", linhas: [["Sofá retrátil 3 lugares", 224153, 1]], descricao: "1× Sofá retrátil 3 lugares", total: 224153 },
+  ];
+  for (const c of casos) {
+    const r = plain(lib.comporOrcamentoDoCatalogo(c.linhas.map(([nome, preco_centavos, quantidade]) => ({ nome, preco_centavos, quantidade }))));
+    assert.deepEqual(r, { descricao: c.descricao, totalCentavos: c.total }, c.negocio);
+  }
+  // Linha inválida nunca entra no total (sem preço, quantidade 0/fracionada, nome vazio).
+  const r = plain(lib.comporOrcamentoDoCatalogo([
+    { nome: "Óleo", preco_centavos: 3850, quantidade: 2 },
+    { nome: "Sem preço", preco_centavos: 0, quantidade: 1 },
+    { nome: "Zero", preco_centavos: 1000, quantidade: 0 },
+    { nome: "Fração", preco_centavos: 1000, quantidade: 1.5 },
+    { nome: "  ", preco_centavos: 1000, quantidade: 1 },
+  ]));
+  assert.deepEqual(r, { descricao: "2× Óleo", totalCentavos: 7700 });
+  assert.deepEqual(plain(lib.comporOrcamentoDoCatalogo([])), { descricao: "", totalCentavos: 0 });
+});
+
+test("Orçamentos usa o catálogo único e a MESMA API — sem cadastro paralelo, sem escrita no catálogo", () => {
+  const p = ler("app/orcamentos/page.tsx");
+  const codigo = semComentarios(p);
+  assert.match(codigo, /from '\.\.\/\.\.\/lib\/catalogo-comercial'/);
+  assert.match(codigo, /supabase\.from\('clinica_servicos'\)\.select\('id, nome, preco_centavos, disponivel'\)\.eq\('clinica_id', cid\)/);
+  assert.match(codigo, /\.filter\(itemVendavel\)/, "só itens disponíveis com preço");
+  assert.doesNotMatch(codigo, /from\('[a-z_]+'\)[^;]*\.(insert|update|upsert|delete)\(/, "a tela não escreve em tabela nenhuma diretamente");
+  const tabelas = [...new Set([...codigo.matchAll(/from\('([a-z_]+)'\)/g)].map(m => m[1]))];
+  assert.deepEqual(tabelas.sort(), ["clinica_servicos", "pacientes"]);
+  // Mesmo contrato da API de orçamentos (procedimento + valor), nada novo no body.
+  assert.match(codigo, /fetch\('\/api\/orcamentos', \{\s*method: 'POST'/);
+  assert.match(codigo, /procedimento: form\.procedimento\.trim\(\),\s*valor: valorNumerico,/);
+  assert.doesNotMatch(codigo, /itens: form\.itens|servico_id/, "itens não viajam para a API de orçamentos");
+  assert.match(p, /data-testid="orcamento-itens-catalogo"/);
+  assert.match(p, />Itens do catálogo \(opcional\)</);
+  assert.match(p, /Combine produtos e mão de obra\./);
+  assert.match(p, /<a href="\/pedidos"[^>]*>Cadastrar em Catálogo e Pedidos<\/a>/);
+  assert.doesNotMatch(p, /Consultoria mensal|'Serviço é obrigatório\.'/);
+  // Motor e rotas de orçamento intocados por esta frente.
+  assert.doesNotMatch(ler("app/api/orcamentos/route.ts"), /catalogo|clinica_servicos/);
+});

@@ -64,7 +64,20 @@ export function itemVendavel(item: Pick<ItemCatalogo, "disponivel" | "preco_cent
   return item.disponivel !== false && typeof item.preco_centavos === "number" && item.preco_centavos > 0;
 }
 
-export type ResultadoSalvarItem = { ok: true; id: string; avisoPreco: string } | { ok: false; erro: string };
+// Orçamento montado a partir do catálogo (ex.: peça + mão de obra da troca).
+// Só compõe o texto e o total que a tela de Orçamentos já envia à API
+// existente (procedimento + valor) — nenhuma tabela, rota ou motor novo. O
+// texto é o registro do que foi orçado, mesmo princípio de pedido_itens.
+export type LinhaOrcamentoCatalogo = { nome: string; preco_centavos: number; quantidade: number };
+export function comporOrcamentoDoCatalogo(linhas: LinhaOrcamentoCatalogo[]): { descricao: string; totalCentavos: number } {
+  const validas = linhas.filter(l => l.nome.trim() && Number.isInteger(l.quantidade) && l.quantidade > 0 && Number.isInteger(l.preco_centavos) && l.preco_centavos > 0);
+  return {
+    descricao: validas.map(l => `${l.quantidade}× ${l.nome.trim()}`).join(" + "),
+    totalCentavos: validas.reduce((soma, l) => soma + l.preco_centavos * l.quantidade, 0),
+  };
+}
+
+export type ResultadoSalvarItem ={ ok: true; id: string; avisoPreco: string } | { ok: false; erro: string };
 
 export async function salvarItemCatalogo(db: SupabaseClient, args: {
   clinicaId: string; form: FormItemCatalogo; itemId?: string | null; ordemNova?: number;
