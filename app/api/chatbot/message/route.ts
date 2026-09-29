@@ -838,7 +838,11 @@ export async function POST(req: NextRequest) {
 
     console.log("[CHATBOT] resposta gerada:");
 
-    if (!await consumirCotaIa(supabase, clinica_id, `chatbot:${entidadeIdDeTelefone(clinica_id, telefone)}`, LIMITE_RESPOSTAS_CONTATO_HORA)) {
+    // Pedido explícito de atendimento humano NUNCA é engolido pela cota
+    // anti-loop: o handoff registra o silêncio de 24h e envia no máximo a
+    // resposta de transferência, mesmo com a cota de 15/h já atingida. A cota
+    // continua valendo para todas as respostas normais do bot.
+    if (!handoff && !await consumirCotaIa(supabase, clinica_id, `chatbot:${entidadeIdDeTelefone(clinica_id, telefone)}`, LIMITE_RESPOSTAS_CONTATO_HORA)) {
       console.warn("[CHATBOT] limite de respostas por contato atingido (ou cota indisponível) — sem envio");
       await registrarLogSemResposta(clinica_id, telefone, "limite_por_contato");
       return NextResponse.json({ sucesso: true, ignorado: "limite_por_contato" });

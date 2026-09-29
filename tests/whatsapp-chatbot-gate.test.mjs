@@ -287,6 +287,31 @@ test('anti-loop: auto-respondedor recebe no máximo 15 respostas por hora; exced
   assert.equal(inseridos(f, 'chatbot_logs').filter(l => l.processado_por === 'limite_por_contato').length, 2);
 });
 
+test('anti-loop não engole o pedido de atendimento humano: com cota estourada o handoff registra, responde 1× e cala as seguintes', async () => {
+  const f = cenario();
+  for (let n = 0; n < 15; n++) await receber(f, evento('Olá'));
+  assert.equal(zapi(f).length, 15, 'cota anti-loop atingida');
+
+  // Pedido de humano com a cota esgotada: tem que ser reconhecido, registrado e respondido.
+  await receber(f, evento('quero falar com um atendente'));
+  assert.equal(zapi(f).length, 16, 'resposta de transferência sai mesmo com a cota atingida');
+  assert.match(enviado(zapi(f)[15]).message, /alguém da nossa equipe continuar seu atendimento/);
+  const handoffInserido = () => f.queries.filter(q => q.table === 'eventos_dominio' && q.action === 'insert' && q.value.tipo === 'chatbot.handoff_humano');
+  assert.equal(handoffInserido().length, 1, 'handoff registrado exatamente 1 vez');
+  assert.equal(handoffInserido()[0].value.clinica_id, A);
+
+  // Silêncio de 24h: as mensagens seguintes não respondem e não duplicam handoff.
+  for (const texto of ['oi?', 'alguém aí?']) await receber(f, evento(texto));
+  assert.equal(zapi(f).length, 16, 'bot calado após o handoff');
+  assert.equal(handoffInserido().length, 1, 'nenhuma duplicidade de handoff');
+  assert.equal(inseridos(f, 'chatbot_logs').slice(-2).every(l => l.processado_por === 'handoff_humano_ativo'), true);
+
+  // Regressão do anti-loop normal: contato NOVO na mesma hora segue limitado a 15.
+  for (let n = 0; n < 17; n++) await receber(f, evento('Olá', { phone: '5543999990003' }));
+  assert.equal(zapi(f).length, 31, 'limite de 15/h preservado para respostas normais');
+  assert.equal(inseridos(f, 'chatbot_logs').filter(l => l.processado_por === 'limite_por_contato').length, 2);
+});
+
 test('segredos: tokens Z-API e segredos de rota nunca aparecem em console, respostas HTTP ou logs persistidos', async () => {
   const f = cenario({ fixture: { env: { WEBHOOK_SECRET: 'WEBHOOK_SECRET_VALUE' } } });
   const respostas = [];
