@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ sucesso: false, error: "Não foi possível atualizar o tipo de documento" }, { status: 500 });
   }
   if (!atualizado) {
-    return NextResponse.json({ sucesso: false, error: "Tipo de documento não encontrado nesta clínica" }, { status: 404 });
+    return NextResponse.json({ sucesso: false, error: "Tipo de documento não encontrado neste negócio" }, { status: 404 });
   }
 
   logOperacao({ operacao: "fechamento.tipos.atualizar", clinica_id, entidade_id: id, resultado: "sucesso" });

@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!cliente) {
     logOperacao({ operacao: "fechamento.documento.atualizar", clinica_id, entidade_id: cliente_id, resultado: "rejeitado", motivo: "cliente nao pertence a esta clinica" });
-    return NextResponse.json({ sucesso: false, error: "Cliente não encontrado nesta clínica" }, { status: 404 });
+    return NextResponse.json({ sucesso: false, error: "Cliente não encontrado neste negócio" }, { status: 404 });
   }
 
   const agora = new Date().toISOString();

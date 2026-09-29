@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   const { data: cliente } = await admin.from("pacientes").select("id, nome").eq("id", cliente_id).eq("clinica_id", clinica_id).maybeSingle();
   if (!cliente) {
     logOperacao({ operacao: "fechamento.arquivo.upload", clinica_id, entidade_id: cliente_id, resultado: "rejeitado", motivo: "cliente nao pertence a esta clinica" });
-    return NextResponse.json({ sucesso: false, error: "Cliente não encontrado nesta clínica" }, { status: 404 });
+    return NextResponse.json({ sucesso: false, error: "Cliente não encontrado neste negócio" }, { status: 404 });
   }
 
   if (file.size > TAMANHO_MAXIMO) {

@@ -14,7 +14,7 @@ import MetaAdsSecao from './MetaAdsSecao';
 
 type Dados = Awaited<ReturnType<typeof carregarRelatorioAtribuicao>>;
 const dinheiro = (v: number) => (v / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const labels: Record<string, string> = { google_ads: 'Google Ads', meta_ads: 'Meta Ads', campanha_utm: 'Campanha marcada / plataforma incerta', busca_organica: 'Busca orgânica', referencia: 'Referência', direto: 'Origem não identificada', cliente: 'Cliente', oportunidade: 'Oportunidade', orcamento: 'Orçamento', pedido: 'Pedido', agendamento: 'Agendamento', cobranca: 'Cobrança', tratamento: 'Tratamento' };
+const labels: Record<string, string> = { google_ads: 'Google Ads', meta_ads: 'Meta Ads', campanha_utm: 'Campanha marcada / plataforma incerta', busca_organica: 'Busca orgânica', referencia: 'Referência', direto: 'Origem não identificada', cliente: 'Cliente', oportunidade: 'Oportunidade', orcamento: 'Orçamento', pedido: 'Pedido', agendamento: 'Agendamento', cobranca: 'Cobrança', tratamento: 'Serviço contratado' };
 
 export default function AtribuicaoPage() {
   const router = useRouter();

@@ -122,7 +122,7 @@ test("Atribuição: nenhum id técnico (UUID) exibido ao cliente; etapas por ró
   assert.doesNotMatch(a, /\{t\.nome\} · \{t\.id\} —/);
   assert.doesNotMatch(a, /\{labels\[v\.entidadeTipo\]\} \{v\.entidadeId\}/);
   assert.match(a, /Trilha: \{p\.trilha\.map\(t => labels\[t\.etapa\] \?\? t\.etapa\)\.join\(' → '\)\}/);
-  assert.match(a, /tratamento: 'Tratamento'/);
+  assert.match(a, /tratamento: 'Serviço contratado'/);
 });
 
 test("Modo demonstração se identifica (dados fictícios) sem alterar o Dashboard real", () => {

@@ -34,7 +34,7 @@ async function resolverClinica(req: NextRequest): Promise<
     .eq("ativo", true)
     .maybeSingle();
   if (error || !vinculo?.clinica_id) {
-    return { ok: false, response: NextResponse.json({ error: "Usuário não tem vínculo com uma clínica" }, { status: 403 }) };
+    return { ok: false, response: NextResponse.json({ error: "Usuário não tem vínculo com um negócio" }, { status: 403 }) };
   }
 
   const autorizacao = await autorizarUsuarioNaClinica(req, vinculo.clinica_id);

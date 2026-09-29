@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Não foi possível validar seu vínculo. Tente novamente." }, { status: 500 });
   }
   if (!vinculo?.clinica_id) {
-    return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 404 });
+    return NextResponse.json({ error: "Usuário não tem vínculo com nenhum negócio" }, { status: 404 });
   }
 
   // Colunas explícitas, nunca SELECT * — mesma allowlist já homologada no
@@ -75,14 +75,14 @@ export async function GET(req: NextRequest) {
 
   if (clinicaError) {
     console.error("[minha-clinica/GET] erro ao consultar clinica:", clinicaError.message);
-    return NextResponse.json({ error: "Não foi possível carregar os dados da clínica. Tente novamente." }, { status: 500 });
+    return NextResponse.json({ error: "Não foi possível carregar os dados do negócio. Tente novamente." }, { status: 500 });
   }
 
   // 'organizapro' é literal — nunca lido do cliente. produto ausente (NULL)
   // ou diferente de 'organizapro' reprova com a mesma mensagem do caso
   // "sem vínculo", para não revelar o motivo exato a um chamador não autorizado.
   if (clinica?.produto !== "organizapro") {
-    return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 404 });
+    return NextResponse.json({ error: "Usuário não tem vínculo com nenhum negócio" }, { status: 404 });
   }
 
   return NextResponse.json({
@@ -127,7 +127,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Não foi possível validar seu vínculo. Tente novamente." }, { status: 500 });
     }
     if (!vinculo?.clinica_id) {
-      return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 403 });
+      return NextResponse.json({ error: "Usuário não tem vínculo com nenhum negócio" }, { status: 403 });
     }
 
     // 'organizapro' é literal — nunca lido do cliente. Mesma mensagem do
@@ -139,7 +139,7 @@ export async function PUT(req: NextRequest) {
       .eq("id", vinculo.clinica_id)
       .maybeSingle();
     if (clinicaAtual?.produto !== "organizapro") {
-      return NextResponse.json({ error: "Usuário não tem vínculo com nenhuma clínica" }, { status: 403 });
+      return NextResponse.json({ error: "Usuário não tem vínculo com nenhum negócio" }, { status: 403 });
     }
 
     const body = await req.json().catch(() => null);

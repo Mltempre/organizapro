@@ -49,7 +49,7 @@ export async function autorizarUsuarioNaClinica(
     .maybeSingle();
 
   if (!vinculo) {
-    return { ok: false, status: 403, error: "Usuário não tem vínculo com esta clínica" };
+    return { ok: false, status: 403, error: "Usuário não tem vínculo com este negócio" };
   }
 
   // 'organizapro' é literal — nunca lido do body, query string ou header.
@@ -62,7 +62,7 @@ export async function autorizarUsuarioNaClinica(
     .eq("id", clinicaId)
     .maybeSingle();
   if (clinica?.produto !== "organizapro") {
-    return { ok: false, status: 403, error: "Usuário não tem vínculo com esta clínica" };
+    return { ok: false, status: 403, error: "Usuário não tem vínculo com este negócio" };
   }
 
   return { ok: true, userId: user.id };

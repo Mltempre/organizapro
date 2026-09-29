@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
       const itemCatalogo = catalogoPorId.get(it.servico_id);
       if (!itemCatalogo) {
         logOperacao({ operacao: "pedido.criar", clinica_id, resultado: "rejeitado", motivo: `servico_id ${it.servico_id} nao encontrado nesta clinica` });
-        return NextResponse.json({ sucesso: false, error: `Item de catálogo não encontrado nesta clínica: ${it.servico_id}` }, { status: 400 });
+        return NextResponse.json({ sucesso: false, error: `Item de catálogo não encontrado neste negócio: ${it.servico_id}` }, { status: 400 });
       }
       const valorTotal = capturarValorItem(itemCatalogo, it.quantidade);
       if (valorTotal === null) {

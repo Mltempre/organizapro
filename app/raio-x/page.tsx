@@ -176,7 +176,7 @@ export default function RaioX() {
       icon: "✅", label: "Taxa de Confirmação",
       sub: metricas.gestao.tendencia_confirmacao !== null
         ? `${metricas.gestao.tendencia_confirmacao >= 0 ? "+" : ""}${metricas.gestao.tendencia_confirmacao}% vs semana anterior`
-        : "das consultas",
+        : "dos compromissos",
       value: metricas.gestao.taxa_confirmacao !== null ? `${metricas.gestao.taxa_confirmacao}%` : "—",
       trend: metricas.gestao.tendencia_confirmacao, color: "#22c55e",
     },

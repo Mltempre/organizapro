@@ -161,7 +161,7 @@ export default function OportunidadesPage() {
   async function salvarOrcamento() {
     if (!modalOrcamento) return;
     if (!form.paciente_nome.trim()) { setErro('Cliente é obrigatório.'); return; }
-    if (!form.procedimento.trim()) { setErro('Procedimento é obrigatório.'); return; }
+    if (!form.procedimento.trim()) { setErro('Serviço é obrigatório.'); return; }
     const valorNumerico = Number(form.valor.replace(',', '.'));
     if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) { setErro('Valor deve ser um número maior que zero.'); return; }
 
@@ -293,7 +293,7 @@ export default function OportunidadesPage() {
                 <input value={form.paciente_nome} onChange={e => setForm(prev => ({ ...prev, paciente_nome: e.target.value }))} placeholder="Ex: Maria Silva" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Procedimento</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Serviço</label>
                 <input value={form.procedimento} onChange={e => setForm(prev => ({ ...prev, procedimento: e.target.value }))} placeholder="Ex: Avaliação inicial" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
               </div>
               <div>

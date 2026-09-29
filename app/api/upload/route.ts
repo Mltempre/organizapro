@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       .eq("ativo", true)
       .maybeSingle();
     if (!vinculo) {
-      return NextResponse.json({ error: "Usuário não tem vínculo com esta clínica" }, { status: 403 });
+      return NextResponse.json({ error: "Usuário não tem vínculo com este negócio" }, { status: 403 });
     }
 
     // 'organizapro' é literal — nunca lido do body, query string ou header.
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       .eq("id", clinicaId)
       .maybeSingle();
     if (clinica?.produto !== "organizapro") {
-      return NextResponse.json({ error: "Usuário não tem vínculo com esta clínica" }, { status: 403 });
+      return NextResponse.json({ error: "Usuário não tem vínculo com este negócio" }, { status: 403 });
     }
 
     if (!(VALID_TIPOS as readonly string[]).includes(tipo)) {

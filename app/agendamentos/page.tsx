@@ -443,7 +443,7 @@ export default function AgendamentosPage() {
     setGerandoPdf(true);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user || !clinicaId) throw new Error('Clínica autenticada não identificada.');
+      if (authError || !user || !clinicaId) throw new Error('Negócio autenticado não identificado.');
 
       const { data: cfg, error: configError } = await supabase
         .from('clinica_config')

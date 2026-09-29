@@ -70,7 +70,7 @@ export default function Metricas() {
         supabase.from('agendamentos').select('id, status, data').eq('clinica_id', clinicaId),
       ])
 
-      if (pacError) throw new Error(`Erro ao carregar pacientes: ${pacError.message}`)
+      if (pacError) throw new Error(`Erro ao carregar clientes: ${pacError.message}`)
       if (agError)  throw new Error(`Erro ao carregar agendamentos: ${agError.message}`)
 
       const ags = agData || []

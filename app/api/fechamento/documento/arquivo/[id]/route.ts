@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .eq("clinica_id", clinica_id)
     .maybeSingle();
   if (!arquivo) {
-    return NextResponse.json({ sucesso: false, error: "Arquivo não encontrado nesta clínica" }, { status: 404 });
+    return NextResponse.json({ sucesso: false, error: "Arquivo não encontrado neste negócio" }, { status: 404 });
   }
 
   const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(arquivo.storage_path, EXPIRA_SEGUNDOS);

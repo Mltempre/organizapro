@@ -143,8 +143,8 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         motivo: "Clientes sem retorno agendado tendem a esfriar o relacionamento com o tempo — vale reaproximar antes que isso aconteça.",
         acao: op.acaoSugerida,
         evidencia: op.tempoDecorrido
-          ? `Sem próxima consulta cadastrada, ${op.tempoDecorrido}.`
-          : "Sem próxima consulta cadastrada no sistema.",
+          ? `Sem próximo compromisso cadastrado, ${op.tempoDecorrido}.`
+          : "Sem próximo compromisso cadastrado no sistema.",
         prioridade: op.prioridade,
         destino: "/clientes",
         destinoLabel: "Ver cliente",

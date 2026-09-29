@@ -296,7 +296,7 @@ export default function FechamentoContabilPage() {
 
       {mostrarConfig && (
         <section style={{ marginBottom: 24, background: 'rgba(255,255,255,0.03)', border: '1px solid #2d3148', borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos obrigatórios desta clínica (padrão)</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos obrigatórios deste negócio (padrão)</div>
           {tipos.length === 0 && <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 10 }}>Nenhum tipo de documento configurado ainda — cadastre abaixo (ex.: Extrato bancário, Notas fiscais, Folha, Comprovantes).</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
             {tipos.map(t => (

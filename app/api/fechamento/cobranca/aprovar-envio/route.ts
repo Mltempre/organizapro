@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const { data: cliente } = await admin.from("pacientes").select("id, nome, telefone, whatsapp").eq("id", cliente_id).eq("clinica_id", clinica_id).maybeSingle();
   if (!cliente) {
-    return NextResponse.json({ sucesso: false, error: "Cliente não encontrado nesta clínica" }, { status: 404 });
+    return NextResponse.json({ sucesso: false, error: "Cliente não encontrado neste negócio" }, { status: 404 });
   }
 
   const hoje = hojeStr();

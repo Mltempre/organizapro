@@ -155,15 +155,15 @@ function montarResposta(topico: Topico, config: Config, ehTenantSdrOrganizaPro: 
         : `Para informações sobre endereço, entre em contato:${link}`;
     case "convenios":
       return config.convenios
-        ? `Convênios aceitos:\n\n${config.convenios}`
-        : `Para informações sobre convênios, entre em contato:${link}`;
+        ? `Aceitamos:\n\n${config.convenios}`
+        : `Para saber o que aceitamos (planos, parcerias e formas de pagamento), entre em contato:${link}`;
     case "procedimentos":
       return config.procedimentos
-        ? `Procedimentos realizados:\n\n${config.procedimentos}`
-        : `Para informações sobre procedimentos, entre em contato:${link}`;
+        ? `Serviços que oferecemos:\n\n${config.procedimentos}`
+        : `Para informações sobre nossos serviços, entre em contato:${link}`;
     case "consulta":
       return (
-        `A consulta inicial pode variar conforme a avaliação e o procedimento necessário.` +
+        `O valor pode variar conforme o serviço e a avaliação necessária.` +
         ` Para confirmar o valor certinho, nossa equipe pode te atender.` +
         ` Se quiser falar com a equipe, é só escrever *atendente*.${link}`
       );
@@ -173,7 +173,7 @@ function montarResposta(topico: Topico, config: Config, ehTenantSdrOrganizaPro: 
         : `Para informações sobre valores, entre em contato:${link}`;
     case "agendar":
       return config.link_humano
-        ? `Para agendar sua consulta, fale com nossa equipe:\n\n${config.link_humano}`
+        ? `Para agendar seu horário, fale com nossa equipe:\n\n${config.link_humano}`
         : `Para agendar, entre em contato conosco.${link}`;
     case "humano":
       return config.link_humano
