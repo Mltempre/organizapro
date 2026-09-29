@@ -110,3 +110,48 @@ test('KENSA: "Ver cliente" abre o Cliente 360 só com id real de paciente; "Abri
   const [atencao] = coordenarGerenteComercial(real, null, casos);
   assert.equal(atencao.destinoAcao, '/agendamentos?novo=1');
 });
+
+// Revisão do núcleo econômico (2026-09-29): na tela do Gerente Comercial AI,
+// "Acompanhamentos identificados" repetia as mesmas entidades já listadas em
+// "Prioridades comerciais" (mesmo destino, /follow-up). A tela agora omite o
+// caso de Follow-up cuja entidade já é uma prioridade. Este teste prova, com
+// os motores REAIS, que as chaves usadas pelo filtro coincidem.
+test('Gerente: acompanhamento já priorizado não se repete; segundo caso do mesmo cliente continua visível', async () => {
+  const { gerarFollowUpsComerciais } = await load('follow-up-comercial');
+  const { organizarSinaisCanonicos } = await load('nucleo-inteligente');
+  const op = { id: 'op-9', canal: 'whatsapp', telefone: '(11) 93333-4444', nome_informado: 'Caio', status: 'sinalizada', confianca_classificacao: 'alta', orcamento_vinculado_id: null };
+  const tratamento = { id: 'trat-1', pacienteNome: 'Ana', telefone: '11911112222', tipoTratamento: 'Instalação', status: 'em_andamento', proximaDataPrevista: null, updatedAt: '2026-08-01T12:00:00Z', interrompidoEm: null };
+  const radar = { ...entrada, tratamentosSemRetorno: [tratamento] }; // Ana: orçamento parado + serviço sem retorno
+  const sinaisTela = organizarSinaisCanonicos([
+    ...adaptarOportunidadesClientes(gerarOportunidadesClientes(radar)),
+    ...adaptarOportunidadesDemanda([op]),
+  ]);
+  const casos = gerarFollowUpsComerciais({
+    hoje: entrada.hoje, agora: entrada.agora, entidadesComTentativaHoje: new Set(),
+    oportunidadesParadas: [{ id: op.id, telefone: op.telefone, pacienteNome: 'Caio', status: op.status, orcamentoVinculadoId: null, ultimaInteracaoEm: '2026-08-01T12:00:00Z' }],
+    orcamentosParados: entrada.orcamentosParados, tratamentosSemRetorno: [tratamento],
+    pedidosNaoConcluidos: [], recomprasPossiveis: [], cobrancasAtrasadas: [], casosAgendaAutonoma: [],
+  }).filter(f => f.donoDoFluxo === 'follow-up');
+  assert.deepEqual(casos.map(c => c.tipo).sort(), ['oportunidade_parada', 'orcamento_parado', 'tratamento_sem_retorno']);
+  // Mesma expressão de app/copiloto/page.tsx.
+  const jaPriorizados = new Set(sinaisTela.flatMap(s => [
+    s.entidadeId,
+    s.tipo === 'interesse_sem_orcamento' ? (s.contexto?.telefone || '').replace(/\D/g, '') : undefined,
+  ]).filter(k => !!k));
+  const visiveis = casos.filter(f => !jaPriorizados.has(f.entidadeId));
+  // Oportunidade e orçamento já são prioridade; o serviço sem retorno de Ana
+  // não é (o núcleo mostra um sinal principal por cliente) e continua listado.
+  assert.deepEqual(visiveis.map(c => c.tipo), ['tratamento_sem_retorno']);
+  const pagina = fs.readFileSync(new URL('../app/copiloto/page.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  assert.ok(pagina.includes("s.tipo === 'interesse_sem_orcamento' ? (s.contexto?.telefone || '').replace(/\\D/g, '') : undefined,"), 'mesma chave de oportunidade na tela');
+  assert.match(pagina, /followUps\.filter\(f => f\.donoDoFluxo === 'follow-up' && !jaPriorizados\.has\(f\.entidadeId\)\)/);
+});
+
+test('Núcleo econômico: valor em risco é "registrado" (inclui estimativa e proposta), nunca "comprovado"; plural "itens"', () => {
+  const ler = p => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  for (const f of ['app/copiloto/page.tsx', 'app/financeiro/page.tsx', 'app/receita-perdida/page.tsx']) {
+    assert.doesNotMatch(ler(f), /com valor comprovado/, f);
+    assert.match(ler(f), /'item' : 'itens'\} com valor registrado/, f);
+  }
+  assert.doesNotMatch(ler('app/copiloto/page.tsx'), /item\{[^}]*\? 's' : ''\}/, 'sem "items"');
+});

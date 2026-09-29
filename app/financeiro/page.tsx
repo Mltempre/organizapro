@@ -256,7 +256,7 @@ export default function FinanceiroPage() {
             <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Em risco</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#fbbf24' }}>{formatarValor(resumo.receitaPerdida.totalConhecido)}</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{resumo.receitaPerdida.totalItensComValor} {resumo.receitaPerdida.totalItensComValor === 1 ? 'item' : 'itens'} com valor comprovado</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{resumo.receitaPerdida.totalItensComValor} {resumo.receitaPerdida.totalItensComValor === 1 ? 'item' : 'itens'} com valor registrado</div>
             </div>
           </div>
 

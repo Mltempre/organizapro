@@ -58,8 +58,8 @@ test("Receita Perdida/Oportunidades: status exibido por rótulo da fonte única 
 });
 
 test("Textos: plural/acentos/termos corrigidos (itens, parciais, passaram, Avaliações, sem jargão técnico)", () => {
-  assert.match(ler("app/financeiro/page.tsx"), /'item' : 'itens'\} com valor comprovado/);
-  assert.match(ler("app/receita-perdida/page.tsx"), /'item' : 'itens'\} com valor comprovado/);
+  assert.match(ler("app/financeiro/page.tsx"), /'item' : 'itens'\} com valor registrado/);
+  assert.match(ler("app/receita-perdida/page.tsx"), /'item' : 'itens'\} com valor registrado/);
   assert.match(ler("app/linha-economica/page.tsx"), /'parciais' : 'parcial'/);
   assert.match(ler("lib/recomendacoes.ts"), /plural \? "s passaram" : " passou"/);
   const auto = ler("app/automacao/page.tsx");

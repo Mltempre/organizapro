@@ -118,7 +118,7 @@ export default function ReceitaPerdidaPage() {
             <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Valor conhecido em risco (soma de dados reais)</div>
             <div style={{ fontSize: 32, fontWeight: 800, color: '#f87171' }}>{formatarValor(resumo.totalConhecido)}</div>
             <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
-              {resumo.totalItensComValor} {resumo.totalItensComValor === 1 ? 'item' : 'itens'} com valor comprovado
+              {resumo.totalItensComValor} {resumo.totalItensComValor === 1 ? 'item' : 'itens'} com valor registrado
               {resumo.totalItensSemValor > 0 && <> · {resumo.totalItensSemValor} item{resumo.totalItensSemValor !== 1 ? 's' : ''} sem valor conhecido (não somado{resumo.totalItensSemValor !== 1 ? 's' : ''})</>}
               {resumo.oportunidadesSemComprovacao > 0 && <> · {resumo.oportunidadesSemComprovacao} oportunidade{resumo.oportunidadesSemComprovacao !== 1 ? 's' : ''} sem valor financeiro comprovado (nunca contada{resumo.oportunidadesSemComprovacao !== 1 ? 's' : ''} em dinheiro)</>}
             </div>

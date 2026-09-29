@@ -173,7 +173,16 @@ export default function CopilotoPage() {
         cobrancasAtrasadas: cobrancas.map(c => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca' })),
         casosAgendaAutonoma: [],
       });
-      const followUpsPendentes = followUps.filter(f => f.donoDoFluxo === 'follow-up');
+      // Caso que JÁ aparece como prioridade comercial (mesma entidade) não é
+      // listado de novo: a prioridade já leva ao Follow-up. Ficam só os casos
+      // que o núcleo não mostrou (ex.: segundo caso do mesmo cliente).
+      // Oportunidade parada é chaveada no Follow-up pelo telefone (só
+      // dígitos) e no sinal pelo id da oportunidade.
+      const jaPriorizados = new Set(sinais.flatMap(s => [
+        s.entidadeId,
+        s.tipo === 'interesse_sem_orcamento' ? (s.contexto?.telefone || '').replace(/\D/g, '') : undefined,
+      ]).filter((k): k is string => !!k));
+      const followUpsPendentes = followUps.filter(f => f.donoDoFluxo === 'follow-up' && !jaPriorizados.has(f.entidadeId));
 
       // ── Receita Perdida (mesmo motor real de app/receita-perdida) ────
       const receitaPerdida = agregarReceitaPerdida({
@@ -337,7 +346,7 @@ export default function CopilotoPage() {
               <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📉 Receita Perdida</div>
               <button onClick={() => router.push('/receita-perdida')} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 12, padding: '16px 18px', color: 'inherit', font: 'inherit' }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: '#f87171' }}>{formatarValor(estado.receitaPerdida.totalConhecido)}</div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>{estado.receitaPerdida.totalItensComValor} item{estado.receitaPerdida.totalItensComValor !== 1 ? 's' : ''} com valor comprovado em risco — ver detalhamento →</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>{estado.receitaPerdida.totalItensComValor} {estado.receitaPerdida.totalItensComValor === 1 ? 'item' : 'itens'} com valor registrado em risco — ver detalhamento →</div>
               </button>
             </section>
           )}
