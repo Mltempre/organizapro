@@ -193,11 +193,11 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         motivo: "Continuidade interrompida sem um próximo passo definido é um risco real de abandono — e de receita futura que não vai se realizar.",
         acao: op.acaoSugerida,
         evidencia: op.tempoDecorrido
-          ? `Tratamento real registrado no sistema, ${op.tempoDecorrido}.`
-          : "Tratamento real registrado no sistema.",
+          ? `Serviço contratado registrado no sistema, ${op.tempoDecorrido}.`
+          : "Serviço contratado registrado no sistema.",
         prioridade: op.prioridade,
         destino: "/tratamentos",
-        destinoLabel: "Ver tratamento",
+        destinoLabel: "Ver serviço contratado",
       });
     } else if (sinal.tipo === "pedido_nao_concluido") {
       // E-commerce IA V1 — mesma disciplina: reformula o sinal real do

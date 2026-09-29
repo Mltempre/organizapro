@@ -179,8 +179,8 @@ export function gerarFollowUpsComerciais(input: EntradaFollowUp): CasoFollowUp[]
       tipo: "tratamento_sem_retorno", entidadeTipo: "tratamento", entidadeId: t.id,
       pacienteNome: t.pacienteNome, telefone: t.telefone ?? null,
       motivo: interrompido
-        ? `Tratamento de ${t.tipoTratamento} interrompido há ${dias} dia${dias === 1 ? "" : "s"}.`
-        : `Tratamento de ${t.tipoTratamento} sem retorno definido, ${dias} dia${dias === 1 ? "" : "s"} sem atualização.`,
+        ? `Serviço ${t.tipoTratamento} interrompido há ${dias} dia${dias === 1 ? "" : "s"}.`
+        : `Serviço ${t.tipoTratamento} sem retorno definido, ${dias} dia${dias === 1 ? "" : "s"} sem atualização.`,
       proximaAcao: "Entrar em contato para agendar o retorno",
       destino: "/tratamentos",
       donoDoFluxo: "follow-up",

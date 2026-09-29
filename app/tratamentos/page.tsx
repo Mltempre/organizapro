@@ -150,7 +150,7 @@ export default function TratamentosPage() {
 
   async function salvar() {
     if (!form.paciente_nome.trim()) { setErro('Cliente é obrigatório.'); return; }
-    if (!form.tipo_tratamento.trim()) { setErro('Tipo de tratamento é obrigatório.'); return; }
+    if (!form.tipo_tratamento.trim()) { setErro('Serviço é obrigatório.'); return; }
     if (form.valor_estimado && (!Number.isFinite(Number(form.valor_estimado.replace(',', '.'))) || Number(form.valor_estimado.replace(',', '.')) <= 0)) {
       setErro('Valor estimado deve ser um número maior que zero.'); return;
     }
@@ -176,7 +176,7 @@ export default function TratamentosPage() {
     if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
     setModalNovo(false);
     carregar();
-    setSucesso('Tratamento registrado.');
+    setSucesso('Serviço registrado.');
     setTimeout(() => setSucesso(''), 3500);
   }
 
@@ -193,7 +193,7 @@ export default function TratamentosPage() {
       setModalInterromper(null); setMotivoInterrupcao('');
       setModalRetorno(null); setProximaData('');
       carregar();
-      setSucesso('Tratamento atualizado.');
+      setSucesso('Serviço atualizado.');
       setTimeout(() => setSucesso(''), 3500);
     } catch (e) {
       console.error(e);
@@ -224,7 +224,7 @@ export default function TratamentosPage() {
   const indicadores = calcularIndicadoresTratamento(tratamentos, agora);
 
   function proximaAcao(t: Tratamento): string | null {
-    if (t.status === 'criado') return 'Iniciar o tratamento';
+    if (t.status === 'criado') return 'Iniciar o serviço';
     if (t.status === 'em_andamento') return precisaRetorno(t, hoje) ? 'Agendar o próximo retorno' : 'Aguardar retorno agendado';
     if (t.status === 'retorno_agendado') return 'Concluir após o retorno';
     if (t.status === 'interrompido') return 'Retomar contato antes do abandono';
@@ -233,15 +233,15 @@ export default function TratamentosPage() {
 
   return (
     <AdminShell
-      title="Tratamentos"
+      title="Serviços contratados"
       // "sem acompanhamento" é indicador SEMPRE global (indicadores vem de
       // calcularIndicadoresTratamento(tratamentos), nunca de `filtradas`)
       // — só aparece junto da contagem filtrada quando o filtro ativo é
       // 'todos', para nunca parecer que pertence ao recorte atual (ex.:
       // filtro "Concluídos" mostrando "2 tratamentos · 5 sem
       // acompanhamento" como se os 5 estivessem entre os 2 exibidos).
-      subtitle={`${filtradas.length} tratamento${filtradas.length !== 1 ? 's' : ''}${filtro === 'todos' && indicadores.semAcompanhamento > 0 ? ` · ${indicadores.semAcompanhamento} sem acompanhamento no total` : ''}`}
-      actionLabel="+ Novo tratamento"
+      subtitle={`${filtradas.length} serviço${filtradas.length !== 1 ? 's' : ''}${filtro === 'todos' && indicadores.semAcompanhamento > 0 ? ` · ${indicadores.semAcompanhamento} sem acompanhamento no total` : ''}`}
+      actionLabel="+ Novo serviço"
       actionOnClick={abrirNovo}
     >
       <style>{`
@@ -253,7 +253,7 @@ export default function TratamentosPage() {
         .trat-btn-salvar:hover:not(:disabled) { filter: brightness(1.1); }
       `}</style>
 
-      {carregando && <PageLoader title="Carregando tratamentos..." />}
+      {carregando && <PageLoader title="Carregando serviços contratados..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
       {!carregando && sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />}
 
@@ -326,10 +326,10 @@ export default function TratamentosPage() {
       )}
 
       {!carregando && tratamentos.length === 0 && (
-        <EmptyState icon="🩺" title="Ainda não há tratamentos registrados." description="Registre o primeiro tratamento, avulso ou vinculado a um orçamento aprovado." actionLabel="➕ Registrar tratamento" onAction={abrirNovo} />
+        <EmptyState icon="🧰" title="Ainda não há serviços contratados." description="Registre o primeiro serviço contratado, avulso ou vindo de um orçamento aprovado, e acompanhe até a conclusão." actionLabel="➕ Registrar serviço" onAction={abrirNovo} />
       )}
       {!carregando && tratamentos.length > 0 && filtradas.length === 0 && (
-        <EmptyState compact icon="🔍" title="Nenhum tratamento neste filtro." actionLabel="Ver todos" onAction={() => setFiltro('todos')} />
+        <EmptyState compact icon="🔍" title="Nenhum serviço neste filtro." actionLabel="Ver todos" onAction={() => setFiltro('todos')} />
       )}
 
       {!carregando && filtradas.length > 0 && (
@@ -386,12 +386,12 @@ export default function TratamentosPage() {
       {modalNovo && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }} onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}>
           <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3148' }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Novo tratamento</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Novo serviço contratado</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Orçamento aprovado de origem (opcional)</label>
                 <select value={form.orcamentoId} onChange={e => selecionarOrcamento(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }}>
-                  <option value="">— Tratamento avulso —</option>
+                  <option value="">— Serviço avulso (sem orçamento) —</option>
                   {orcamentosAprovados.map(o => <option key={o.id} value={o.id}>{o.paciente_nome} — {o.procedimento} ({formatarValor(o.valor)})</option>)}
                 </select>
               </div>
@@ -411,8 +411,8 @@ export default function TratamentosPage() {
                 <input value={form.telefone} onChange={e => setForm(prev => ({ ...prev, telefone: e.target.value }))} placeholder="Ex: 11999999999" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tipo de tratamento</label>
-                <input value={form.tipo_tratamento} onChange={e => setForm(prev => ({ ...prev, tipo_tratamento: e.target.value }))} placeholder="Ex: Clareamento dental" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Serviço</label>
+                <input value={form.tipo_tratamento} onChange={e => setForm(prev => ({ ...prev, tipo_tratamento: e.target.value }))} placeholder="Ex: Pacote de 4 cortes" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor estimado (R$, opcional)</label>
@@ -427,7 +427,7 @@ export default function TratamentosPage() {
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button className="trat-btn-cancelar" onClick={() => setModalNovo(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
               <button className="trat-btn-salvar" onClick={salvar} disabled={salvando} style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
-                {salvando ? 'Salvando...' : 'Registrar tratamento'}
+                {salvando ? 'Salvando...' : 'Registrar serviço'}
               </button>
             </div>
           </div>
@@ -453,8 +453,8 @@ export default function TratamentosPage() {
       {modalInterromper && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1020, padding: 16 }} onClick={e => { if (e.target === e.currentTarget) setModalInterromper(null); }}>
           <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 400, border: '1px solid #2d3148' }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', marginBottom: 8, marginTop: 0 }}>Interromper tratamento de {modalInterromper.paciente_nome}</h2>
-            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Um tratamento interrompido pode ser retomado depois marcando-o como abandonado só se de fato não continuar.</p>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', marginBottom: 8, marginTop: 0 }}>Interromper serviço de {modalInterromper.paciente_nome}</h2>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Um serviço interrompido pode ser retomado depois marcando-o como abandonado só se de fato não continuar.</p>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Motivo (opcional)</label>
             <select value={motivoInterrupcao} onChange={e => setMotivoInterrupcao(e.target.value as MotivoInterrupcao | '')} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }}>
               <option value="">— Não informar —</option>

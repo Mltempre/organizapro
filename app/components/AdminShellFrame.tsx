@@ -33,13 +33,13 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
   {
     titulo: "Comercial",
     itens: [
-      { l: "Clientes",        h: "/clientes",        i: "👤" },
-      { l: "Orçamentos",      h: "/orcamentos",       i: "💰" },
-      { l: "Follow-up",       h: "/follow-up",        i: "🔁" },
-      { l: "Cobranças",       h: "/cobrancas",        i: "🧾" },
-      { l: "Pedidos",         h: "/pedidos",          i: "🛒" },
-      { l: "Tratamentos",     h: "/tratamentos",      i: "🩺" },
-      { l: "Receita Perdida", h: "/receita-perdida",  i: "📉" },
+      { l: "Clientes",             h: "/clientes",        i: "👤" },
+      { l: "Orçamentos",           h: "/orcamentos",      i: "💰" },
+      { l: "Follow-up Comercial",  h: "/follow-up",       i: "🔁" },
+      { l: "Cobranças",            h: "/cobrancas",       i: "🧾" },
+      { l: "Catálogo e Pedidos",   h: "/pedidos",         i: "🛒" },
+      { l: "Serviços contratados", h: "/tratamentos",     i: "🧰" },
+      { l: "Receita Perdida",      h: "/receita-perdida", i: "📉" },
     ],
   },
   {
@@ -47,7 +47,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
     itens: [
       { l: "Agenda",          h: "/agendamentos",    i: "📅" },
       { l: "Agenda Autônoma", h: "/agenda-autonoma", i: "🔄" },
-      { l: "Chatbot",         h: "/chatbot",          i: "💬" },
+      { l: "Chatbot IA",      h: "/chatbot",          i: "💬" },
       { l: "WhatsApp",        h: "/automacao",        i: "📲" },
     ],
   },
@@ -55,33 +55,43 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
     titulo: "Presença",
     itens: [
       { l: "Google Presença", h: "/google-presenca", i: "📍" },
-      { l: "Reputação",  h: "/reputacao",        i: "⭐" },
-      { l: "Site",       h: "/site",             i: "🌍" },
-      { l: "Conteúdo IA", h: "/conteudo",        i: "✍️" },
+      { l: "Reputação",       h: "/reputacao",       i: "⭐" },
+      { l: "Meu Site",        h: "/site",            i: "🌍" },
+      { l: "Conteúdo IA",     h: "/conteudo",        i: "✍️" },
     ],
   },
   {
     titulo: "Inteligência",
     itens: [
-      { l: "Gerente Comercial AI",  h: "/copiloto",              i: "💼" },
-      { l: "Métricas",              h: "/metricas",              i: "📈" },
-      { l: "Raio-X",                h: "/raio-x",                i: "🔍" },
+      { l: "Gerente Comercial AI",    h: "/copiloto",             i: "💼" },
+      { l: "Métricas",                h: "/metricas",             i: "📈" },
+      { l: "Raio-X da Empresa",       h: "/raio-x",               i: "🔍" },
       { l: "Previsor de Faturamento", h: "/previsor-faturamento", i: "🔮" },
-      { l: "Linha Econômica",       h: "/linha-economica",       i: "📐" },
-      { l: "Atribuição",            h: "/atribuicao",            i: "🎯" },
-      { l: "Pesquisa de Preços",    h: "/pesquisa-precos",       i: "💲" },
-      { l: "NotaFácil",             h: "/notafacil",             i: "📄" },
-      { l: "Fechamento Contábil",   h: "/fechamento-contabil",   i: "🧮" },
+      { l: "Linha Econômica",         h: "/linha-economica",      i: "📐" },
+      { l: "Ads e Atribuição",        h: "/atribuicao",           i: "🎯" },
     ],
   },
 ];
 
+// Superfícies reais, mas ainda sem dados/fluxo prontos para demonstração —
+// FORA do menu comercial (pré-venda, 2026-09-28). Reversível: mover o item
+// de volta para navGrupos. Páginas, rotas, APIs e motores continuam intactos
+// e com o mesmo shell; o card da Visão Geral (Fechamento) continua levando à
+// página quando o negócio tem a vertical configurada.
+export const navForaDoMenuPreVenda: { l: string; h: string; i: string }[] = [
+  { l: "Pesquisa de Preços",  h: "/pesquisa-precos",     i: "💲" },
+  { l: "NotaFácil",           h: "/notafacil",           i: "📄" },
+  { l: "Fechamento Contábil", h: "/fechamento-contabil", i: "🧮" },
+];
+
 // Rotas que recebem a chrome persistente — derivado de navGrupos (única
-// fonte de verdade, nunca duplicada) + Configurações (fora dos grupos,
-// mesmo padrão de sempre) + dashboard-demo (ferramenta interna de
-// demonstração, não fica no menu, mas usa o mesmo AdminShell/chrome).
+// fonte de verdade, nunca duplicada) + superfícies fora do menu pré-venda +
+// Configurações (fora dos grupos, mesmo padrão de sempre) + dashboard-demo
+// (ferramenta interna de demonstração, não fica no menu, mas usa o mesmo
+// AdminShell/chrome).
 export const ROTAS_COM_SHELL: readonly string[] = [
   ...navGrupos.flatMap((g) => g.itens.map((i) => i.h)),
+  ...navForaDoMenuPreVenda.map((i) => i.h),
   "/configuracoes",
   "/dashboard-demo",
 ];

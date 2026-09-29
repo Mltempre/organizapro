@@ -171,8 +171,8 @@ export function gerarCliente360(input: EntradaCliente360): ResumoCliente360 {
     if (o.decididoEm) timeline.push({ tipo: "orcamento", data: o.decididoEm, descricao: `Orçamento ${o.status}: ${o.procedimento}`, valor: o.valor, destino: "/orcamentos" });
   }
   for (const t of tratamentos) {
-    timeline.push({ tipo: "tratamento", data: t.iniciadoEm, descricao: `Tratamento iniciado: ${t.tipoTratamento}`, valor: t.valorEstimado, destino: "/tratamentos" });
-    if (t.concluidoEm) timeline.push({ tipo: "tratamento", data: t.concluidoEm, descricao: `Tratamento concluído: ${t.tipoTratamento}`, valor: t.valorEstimado, destino: "/tratamentos" });
+    timeline.push({ tipo: "tratamento", data: t.iniciadoEm, descricao: `Serviço iniciado: ${t.tipoTratamento}`, valor: t.valorEstimado, destino: "/tratamentos" });
+    if (t.concluidoEm) timeline.push({ tipo: "tratamento", data: t.concluidoEm, descricao: `Serviço concluído: ${t.tipoTratamento}`, valor: t.valorEstimado, destino: "/tratamentos" });
   }
   for (const c of cobrancas) {
     timeline.push({ tipo: "cobranca", data: c.vencimento, descricao: `Cobrança registrada: ${c.descricao}`, valor: c.valor, destino: "/cobrancas" });

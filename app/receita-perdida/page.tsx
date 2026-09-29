@@ -28,7 +28,7 @@ type OportunidadeRow = { id: string; nome_informado: string | null; telefone: st
 const ORIGEM_LABELS: Record<OrigemReceitaPerdida, { label: string; icon: string }> = {
   orcamento_parado:       { label: 'Orçamento parado',   icon: '💰' },
   cobranca_atrasada:      { label: 'Cobrança atrasada',  icon: '🧾' },
-  tratamento_sem_retorno: { label: 'Tratamento sem retorno', icon: '🩺' },
+  tratamento_sem_retorno: { label: 'Serviço sem retorno', icon: '🧰' },
   pedido_nao_concluido:   { label: 'Pedido não concluído', icon: '🛒' },
 };
 
@@ -106,7 +106,7 @@ export default function ReceitaPerdidaPage() {
   }) : [];
 
   return (
-    <AdminShell title="Receita Perdida AI" subtitle="Dinheiro real em risco, consolidado dos motores já existentes">
+    <AdminShell title="Receita Perdida" subtitle="Dinheiro real em risco, consolidado dos motores já existentes">
       {carregando && <PageLoader title="Consolidando receita em risco..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
       {!carregando && erro && <button onClick={carregar}>Tentar novamente</button>}
@@ -141,7 +141,7 @@ export default function ReceitaPerdidaPage() {
           </div>
 
           {itensOrdenados.length === 0 && resumo.oportunidades.length === 0 && (
-            <EmptyState icon="✅" title="Nenhuma receita em risco no momento." description="Nenhum orçamento parado, cobrança atrasada, tratamento sem retorno ou pedido não concluído identificado." />
+            <EmptyState icon="✅" title="Nenhuma receita em risco no momento." description="Nenhum orçamento parado, cobrança atrasada, serviço sem retorno ou pedido não concluído identificado." />
           )}
 
           {itensOrdenados.length > 0 && (

@@ -25,14 +25,14 @@ atendimento humano e conferir logs com segurança.
 Ordem segura, igual ao comportamento do código. Detalhes de cada passo nas fases abaixo.
 
 1. **Negócio (tenant)** — login criado; no 1º acesso, “Criar meu negócio e continuar”. *(Fase A)*
-2. **Dados** — Configurações: nome, **WhatsApp do negócio**, endereço, horário → Salvar. Site → “Área de Atuação” (segmento). *(Fase A)*
-3. **Chatbot** — menu Chatbot: nome, horário, endereço, link humano (opcional), treinamentos. **Deixe “Chatbot Ativo” desligado** se o número já recebe clientes reais. *(Fase F)*
+2. **Dados** — Configurações: nome, **WhatsApp do negócio**, endereço, horário → Salvar. Meu Site → “Área de Atuação” (segmento). *(Fase A)*
+3. **Chatbot** — menu Chatbot IA: nome, horário, endereço, link humano (opcional), treinamentos. **Deixe “Chatbot Ativo” desligado** se o número já recebe clientes reais. *(Fase F)*
 4. **Z-API + QR + webhook** — instância nova na conta do OrganizaPro, QR lido, webhook “Ao receber” com `?token=`, credenciais salvas em Configurações. *(Fases B–E)*
 5. **Automações OFF** — nada a fazer: já nascem desativadas. Conferir no painel: `Automações: ○ Desativadas`.
 6. **Teste de entrada** — ligar “Chatbot Ativo”; celular externo manda “Olá” → 1 resposta. *(Fase G)*
 7. **Teste de atendimento humano** — “quero falar com um atendente” → 1 resposta; próximas mensagens sem resposta do bot. *(Fase H)*
 8. **Teste de saída** — “Enviar mensagem de teste” → chega no WhatsApp do negócio. *(Fase I)*
-9. **Logs** — Chatbot → Histórico e menu WhatsApp (histórico de envios). *(Fase K)*
+9. **Logs** — Chatbot IA → Histórico e menu WhatsApp (histórico de envios). *(Fase K)*
 10. **Só então** — “▶ Ativar automações”, se o cliente quiser lembretes/avaliações. *(Fase J)*
 
 > Atenção à ordem 3→6: o chatbot responde **clientes reais** assim que estiver
@@ -76,7 +76,7 @@ duas** (proteção fail-closed) até a duplicidade ser desfeita.
    vinculado: informar o **nome do negócio** e clicar **“Criar meu negócio e
    continuar”**. Isso cria o negócio no produto OrganizaPro com o usuário como
    dono. (Um login já vinculado a outro produto ou inativo é bloqueado e pede suporte.)
-3. Menu **Site** → **Área de Atuação**: informar o segmento (ex.: barbearia,
+3. Menu **Meu Site** → **Área de Atuação**: informar o segmento (ex.: barbearia,
    clínica, oficina). O segmento define as respostas específicas do chatbot.
 4. Abrir **Configurações**. Preencher:
    Nome do Negócio, **WhatsApp** (o número do negócio, com DDD), Email,
@@ -124,7 +124,7 @@ duas** (proteção fail-closed) até a duplicidade ser desfeita.
 
 ## FASE F — Chatbot
 
-Menu **Chatbot** → aba Configuração:
+Menu **Chatbot IA** → aba Configuração:
 
 1. Nome do Negócio (aparece na saudação).
 2. **Link WhatsApp Humano**: opcional. Se preenchido (ex.: `https://wa.me/<número-da-recepção>`),
@@ -146,7 +146,7 @@ Ligar **Chatbot Ativo** e salvar (Configurações passa a mostrar `Chatbot: ● 
 Do **celular de teste externo**, mandar “Olá” para o número do negócio.
 
 - Esperado: 1 resposta automática com o nome do negócio.
-- Chatbot → Histórico: aparece a conversa (conteúdo omitido por privacidade).
+- Chatbot IA → Histórico: aparece a conversa (conteúdo omitido por privacidade).
 - Perguntar “qual o endereço?” e “qual o horário?” — respostas iguais ao cadastrado.
 
 ## FASE H — Teste de atendimento humano (handoff)
@@ -203,7 +203,7 @@ automações desativadas (são resposta a uma mensagem do próprio cliente).
 
 ## FASE K — Verificar logs
 
-- **Chatbot → Histórico**: cada resposta do bot, handoffs e “limite de respostas/hora”.
+- **Chatbot IA → Histórico**: cada resposta do bot, handoffs e “limite de respostas/hora”.
 - **Menu WhatsApp** (histórico de automações e envios): cada envio (teste,
   lembretes, avaliações, respostas do bot) e cada entrada processada, sempre
   sem o conteúdo da mensagem.
@@ -217,11 +217,11 @@ automações desativadas (são resposta a uma mensagem do próprio cliente).
 | Envio falhou | Menu WhatsApp → ❌ erro |
 | Entrada processada (SIM/NÃO, número oculto) | Menu WhatsApp → 📥 recebido |
 | Número oculto (`@lid`) | Menu WhatsApp → 📥 recebido, “Número oculto pelo WhatsApp — …” |
-| Chatbot respondeu | Chatbot → Histórico (selo Treinamento / Regras / IA) |
-| Chatbot desligado | Configurações → `Chatbot: ○ Desativado`; Chatbot → “Chatbot Inativo” (nenhum registro novo no histórico) |
-| Handoff ocorreu | Chatbot → Histórico → “👤 Passou para a equipe · bot pausado 24h” |
-| Bot pausado por handoff | Chatbot → Histórico → “👤 Equipe atendendo · sem resposta do bot” |
-| Anti-loop atingido | Chatbot → Histórico → “Limite de respostas/hora · sem resposta” |
+| Chatbot respondeu | Chatbot IA → Histórico (selo Treinamento / Regras / IA) |
+| Chatbot desligado | Configurações → `Chatbot: ○ Desativado`; Chatbot IA → “Chatbot Inativo” (nenhum registro novo no histórico) |
+| Handoff ocorreu | Chatbot IA → Histórico → “👤 Passou para a equipe · bot pausado 24h” |
+| Bot pausado por handoff | Chatbot IA → Histórico → “👤 Equipe atendendo · sem resposta do bot” |
+| Anti-loop atingido | Chatbot IA → Histórico → “Limite de respostas/hora · sem resposta” |
 | Automações desligadas | Configurações → `Automações: ○ Desativadas` |
 | Z-API incompleta | Configurações → `WhatsApp (Z-API): ○ Não configurado`; botão de teste desabilitado |
 
@@ -232,7 +232,7 @@ Explicar ao cliente, em 5 minutos:
 1. O bot responde dúvidas simples e passa para a equipe quando pedem atendente.
 2. Depois do pedido de atendente, o bot fica **24h em silêncio** com aquele
    cliente — a equipe precisa responder pelo aparelho.
-3. Onde ligar/desligar o chatbot (Chatbot → Chatbot Ativo) e as automações
+3. Onde ligar/desligar o chatbot (Chatbot IA → Chatbot Ativo) e as automações
    (Configurações → Desativar automações).
 4. Áudio e foto não são respondidos pelo bot — a equipe responde.
 5. Nunca desconectar o WhatsApp Web da Z-API no aparelho.
@@ -279,7 +279,7 @@ conversando com o nosso.
    (nunca enviar segredos).
 
 ### Como desativar o chatbot
-Chatbot → aba Configuração → desligar **Chatbot Ativo** → salvar. Mensagens
+Chatbot IA → aba Configuração → desligar **Chatbot Ativo** → salvar. Mensagens
 continuam chegando; nenhuma resposta automática.
 
 ### Como desativar as automações
@@ -307,10 +307,10 @@ Use um celular externo **sem compromisso pendente** no OrganizaPro Oficial e
 
 | Teste | Passos | Esperado |
 |---|---|---|
-| **A — Entrada + resposta** | Celular externo 1 manda “Olá” para (43) 98412-8591 | Exatamente 1 resposta (saudação do OrganizaPro); Chatbot → Histórico com 1 registro; menu WhatsApp com 1 ✅ enviado |
+| **A — Entrada + resposta** | Celular externo 1 manda “Olá” para (43) 98412-8591 | Exatamente 1 resposta (saudação do OrganizaPro); Chatbot IA → Histórico com 1 registro; menu WhatsApp com 1 ✅ enviado |
 | **B — Saída controlada** | Configurações do OrganizaPro Oficial: campo WhatsApp = número autorizado pelo Marcos → Salvar → “Enviar mensagem de teste” **uma vez** | Exatamente 1 mensagem de teste no número autorizado; 1 ✅ enviado; repetir na mesma hora → aviso “Já houve um teste nesta hora…”, nada enviado |
 | **C — Handoff + silêncio** | Celular externo 2 manda “quero falar com um atendente”, depois “oi?” e “alguém aí?” | 1 resposta de encaminhamento; as 2 seguintes sem resposta; selos “Passou para a equipe…” e 2× “Equipe atendendo…” |
-| **D — Chatbot desligado** | Chatbot → desligar “Chatbot Ativo” → salvar; celular externo 1 manda “Olá” | Zero resposta automática; nenhum registro novo no Chatbot → Histórico; religar e salvar ao final |
+| **D — Chatbot desligado** | Chatbot IA → desligar “Chatbot Ativo” → salvar; celular externo 1 manda “Olá” | Zero resposta automática; nenhum registro novo no Chatbot IA → Histórico; religar e salvar ao final |
 | **E — Automações desligadas** | Confirmar `Automações: ○ Desativadas`; na véspera de um compromisso de teste (telefone autorizado), aguardar o ciclo das 18h (Brasília) | Zero lembrete enviado; menu WhatsApp sem novo envio. (Equivalente automatizado: gate `E — crons` nos testes.) |
 
 **Ao final:** restaurar o estado inicial anotado (chatbot, automações e campo

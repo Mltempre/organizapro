@@ -45,7 +45,7 @@ type FatoRow = { id: string; criado_em: string; payload: { tipo_fato: string; co
 type DecisaoRow = { id: string; tipo: 'auditoria.decisao' | 'auditoria.resultado_posterior'; criado_em: string; payload: { decisao?: string; motor?: string; fato_observado?: string } };
 
 const TIPO_LABELS: Record<TipoEventoTimeline, string> = {
-  agendamento: '📅', oportunidade: '📡', orcamento: '💰', tratamento: '🩺',
+  agendamento: '📅', oportunidade: '📡', orcamento: '💰', tratamento: '🧰',
   cobranca: '🧾', pagamento_cobranca: '✅', pedido: '🛒', pagamento_pedido: '✅', avaliacao: '⭐',
 };
 
@@ -223,7 +223,7 @@ export default function Cliente360Page() {
 
           {/* TIMELINE */}
           {resumo.timeline.length === 0 && (
-            <EmptyState icon="📋" title="Nenhum histórico real encontrado para este cliente." description="Nenhum agendamento, oportunidade, orçamento, tratamento, cobrança, pedido ou avaliação vinculado até agora." />
+            <EmptyState icon="📋" title="Nenhum histórico real encontrado para este cliente." description="Nenhum agendamento, oportunidade, orçamento, serviço contratado, cobrança, pedido ou avaliação vinculado até agora." />
           )}
           {resumo.timeline.length > 0 && (
             <div>

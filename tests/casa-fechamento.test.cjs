@@ -10,7 +10,7 @@ const resumo = (clientes=[],documentos=[]) => gerarResumoFechamento(competencia,
 test('sem configuração ou tipos ativos a vertical não ocupa a Casa nem busca resumo',async()=>{
  for(const fechamentoTipos of [[],[{...tipos[0],ativo:false}]]){
   const r=await carregar({fechamentoTipos});
-  assert.doesNotMatch(r.html,/Fechamento contábil|Ver fechamentos/);
+  assert.doesNotMatch(r.html,/Fechamento contábil|Ver Fechamento Contábil/);
   assert.ok(!r.calls.some(c=>c.url.startsWith('/api/fechamento?')));
  }
 });
@@ -32,7 +32,7 @@ test('card usa os totais retornados pelo motor existente e contexto da competên
 });
 test('configurado sem clientes mostra vazio útil em vez de contagens inventadas',async()=>{
  const r=await carregar({fechamentoTipos:tipos,fechamentoResumo:resumo()});
- assert.match(r.html,/Nenhum cliente ativo/);assert.match(r.html,/Ver fechamentos/);assert.doesNotMatch(r.html,/<dt>Prontos/);
+ assert.match(r.html,/Nenhum cliente ativo/);assert.match(r.html,/Ver Fechamento Contábil/);assert.doesNotMatch(r.html,/<dt>Prontos/);
 });
 test('sem documentos registrados os clientes são pendentes reais, revisão zero fica oculta',async()=>{
  const r=await carregar({fechamentoTipos:tipos,fechamentoResumo:resumo([{id:'a',nome:'A'}])});

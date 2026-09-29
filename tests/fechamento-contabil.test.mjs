@@ -209,7 +209,7 @@ test("wiring: a tela não calcula prontidão localmente — sempre usa resumo.pe
   assert.match(codigo, /c\.status/);
 });
 
-test("wiring: item de navegação real em Inteligência (AdminShellFrame) — nunca 'existe no código' sem estar no menu", () => {
+test("wiring: rota declarada na navegação (AdminShellFrame; fora do menu na pré-venda, com shell) — nunca órfã", () => {
   const codigo = ler("app/components/AdminShellFrame.tsx");
   assert.match(codigo, /h: "\/fechamento-contabil"/);
 });

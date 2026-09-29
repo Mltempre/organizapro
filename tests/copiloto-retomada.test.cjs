@@ -14,7 +14,7 @@ test('Copiloto: loading, vazio real e acesso canônico sem fabricar prioridade',
   await h.load();
   assert.match(h.html(), /Nada pedindo atenção agora/);
   assert.match(h.html(), /href="\/pedidos"/);
-  assert.match(h.html(), /🛒 Pedidos →/);
+  assert.match(h.html(), /🛒 Catálogo e Pedidos →/);
   assert.doesNotMatch(h.html(), /copiloto-card-topo/);
 });
 

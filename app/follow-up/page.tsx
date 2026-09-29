@@ -30,7 +30,7 @@ type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: strin
 const TIPO_LABELS: Record<string, { label: string; icon: string }> = {
   oportunidade_parada: { label: 'Oportunidade parada', icon: '📡' },
   orcamento_parado: { label: 'Orçamento parado', icon: '💰' },
-  tratamento_sem_retorno: { label: 'Tratamento sem retorno', icon: '🩺' },
+  tratamento_sem_retorno: { label: 'Serviço sem retorno', icon: '🧰' },
   pedido_nao_concluido: { label: 'Pedido não concluído', icon: '🛒' },
   recompra_possivel: { label: 'Recompra possível', icon: '🔁' },
   cobranca_atrasada: { label: 'Cobrança atrasada', icon: '🧾' },
@@ -209,7 +209,7 @@ export default function FollowUpPage() {
       {!carregando && sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />}
 
       {!carregando && casos.length === 0 && (
-        <EmptyState icon="✅" title="Nenhum follow-up pendente agora." description="Nenhum orçamento parado, tratamento sem retorno, pedido não concluído ou cliente para recompra identificado." />
+        <EmptyState icon="✅" title="Nenhum follow-up pendente agora." description="Nenhum orçamento parado, serviço sem retorno, pedido não concluído ou cliente para recompra identificado." />
       )}
 
       {!carregando && casosProprios.length > 0 && (

@@ -18,7 +18,7 @@ const moeda = (valor: number | null) => valor === null ? "Valor não informado" 
 const rotulosRisco = {
   orcamento_parado: "Orçamentos sem resposta",
   cobranca_atrasada: "Cobranças vencidas",
-  tratamento_sem_retorno: "Tratamentos sem retorno (valor estimado)",
+  tratamento_sem_retorno: "Serviços sem retorno (valor estimado)",
   pedido_nao_concluido: "Pedidos não concluídos",
 };
 
@@ -38,7 +38,7 @@ export default function CasaDashboard(props: CasaDashboardProps) {
                   <p><strong>Próxima ação:</strong> {sinal.acaoSugerida}</p>
                 </div>
                 {(sinal.destinoAcao || sinal.destino) && <Link className={styles.acao} href={sinal.destinoAcao || sinal.destino!}>
-                  {sinal.destinoAcao ? "Abrir acompanhamento" : sinal.destinoLabel || "Ver detalhes"} →
+                  {sinal.destinoAcao ? (sinal.destinoAcao.startsWith("/follow-up") ? "Abrir Follow-up Comercial" : "Abrir ação") : sinal.destinoLabel || "Ver detalhes"} →
                 </Link>}
               </li>
             ))}</ol>
@@ -58,14 +58,14 @@ export default function CasaDashboard(props: CasaDashboardProps) {
         </header>
 
         <section className={styles.card} aria-labelledby="casa-agora">
-          <div className={styles.titulo}><h2 id="casa-agora">Precisa da sua atenção</h2><Link href="/copiloto">Acompanhar clientes →</Link></div>
+          <div className={styles.titulo}><h2 id="casa-agora">Precisa da sua atenção</h2><Link href="/copiloto">Abrir Gerente Comercial AI →</Link></div>
           {missaoDoDia.length === 0 ? <p className={styles.muted}>{temDados ? "Nenhuma prioridade identificada nos dados carregados." : "As prioridades aparecerão conforme você registrar a operação."}</p> :
             renderPrioridades(missaoDoDia)}
           {props.outrasPrioridades.length > 0 && <details className={styles.maisPrioridades}><summary>Ver outras {props.outrasPrioridades.length} prioridades</summary>{renderPrioridades(props.outrasPrioridades)}</details>}
         </section>
 
         <section className={styles.card} aria-labelledby="casa-dinheiro">
-          <div className={styles.titulo}><h2 id="casa-dinheiro">Dinheiro</h2><Link href="/financeiro">Abrir financeiro →</Link></div>
+          <div className={styles.titulo}><h2 id="casa-dinheiro">Dinheiro</h2><Link href="/financeiro">Abrir Dinheiro →</Link></div>
           {indicadoresCobranca ? <>
             <p className={styles.muted}>Valores das cobranças registradas. O atraso já está incluído no valor a receber.</p>
             <dl className={styles.numeros}>
@@ -76,22 +76,22 @@ export default function CasaDashboard(props: CasaDashboardProps) {
           </> : <p className={styles.muted}>Nenhuma cobrança registrada. <Link href="/cobrancas">Ver cobranças →</Link></p>}
           <div className={styles.risco}>
             <h3>Valores que merecem acompanhamento</h3>
-            {riscos.length === 0 ? <p className={styles.muted}>Nenhum orçamento, cobrança, tratamento ou pedido em risco identificado.</p> : <>
+            {riscos.length === 0 ? <p className={styles.muted}>Nenhum orçamento, cobrança, serviço ou pedido em risco identificado.</p> : <>
               <p className={styles.muted}>Cada categoria tem seu próprio valor. Não representa receita recebida nem um total a somar.</p>
               <ul>{riscos.map(r => <li key={r.origem}><span>{rotulosRisco[r.origem]}</span><strong>{r.itensComValor > 0 ? moeda(r.totalConhecido) : "Valor não informado"}</strong>
                 {r.itensSemValor > 0 && <small>{r.itensSemValor} registro(s) sem valor informado</small>}
               </li>)}</ul>
             </>}
             <nav className={styles.links} aria-label="Acompanhar dinheiro">
-              <Link href="/receita-perdida">Ver valores em risco →</Link>
-              <Link href="/previsor-faturamento">Ver previsão →</Link>
+              <Link href="/receita-perdida">Ver Receita Perdida →</Link>
+              <Link href="/previsor-faturamento">Ver Previsor de Faturamento →</Link>
             </nav>
           </div>
         </section>
 
         {props.fechamento && (props.fechamento.resumo ? (
           <section className={styles.card} aria-labelledby="casa-fechamento">
-            <div className={styles.titulo}><h2 id="casa-fechamento">Fechamento contábil</h2><Link href="/fechamento-contabil">Ver fechamentos →</Link></div>
+            <div className={styles.titulo}><h2 id="casa-fechamento">Fechamento contábil</h2><Link href="/fechamento-contabil">Ver Fechamento Contábil →</Link></div>
             <p className={styles.muted}>Competência {props.fechamento.competencia.split("-").reverse().join("/")}</p>
             {props.fechamento.resumo.clientes.length === 0 ? <p className={styles.muted}>Nenhum cliente ativo para acompanhar nesta competência.</p> :
               props.fechamento.resumo.clientes.every(cliente => cliente.checklist.length === 0) ? <p className={styles.muted}>Nenhum documento obrigatório definido para os clientes. Revise a configuração em Ver fechamentos.</p> : (
@@ -103,7 +103,7 @@ export default function CasaDashboard(props: CasaDashboardProps) {
                 </dl>
               )}
           </section>
-        ) : <p role="status" className={styles.muted}>Resumo do fechamento contábil indisponível. <Link href="/fechamento-contabil">Ver fechamentos →</Link></p>)}
+        ) : <p role="status" className={styles.muted}>Resumo do fechamento contábil indisponível. <Link href="/fechamento-contabil">Ver Fechamento Contábil →</Link></p>)}
 
         <div className={styles.duasColunas}>
           <section className={styles.card} aria-labelledby="casa-agenda">
@@ -118,11 +118,11 @@ export default function CasaDashboard(props: CasaDashboardProps) {
           <section className={styles.card} aria-labelledby="casa-comercial">
             <h2 id="casa-comercial">Comercial e presença</h2>
             <p>{orcamentosParadosCount > 0 ? `${orcamentosParadosCount} orçamento(s) apresentado(s) aguardando resposta.` : "Nenhum orçamento apresentado aguardando resposta."}</p>
-            <nav className={styles.links} aria-label="Comercial"><Link href="/orcamentos">Orçamentos →</Link><Link href="/pedidos" aria-describedby="casa-ecommerce-descricao">Pedidos →</Link><Link href="/oportunidades">Oportunidades →</Link></nav>
-            <p id="casa-ecommerce-descricao" className={styles.muted}>Pedidos (E-commerce IA): catálogo, pedidos online e inteligência comercial.</p>
+            <nav className={styles.links} aria-label="Comercial"><Link href="/orcamentos">Orçamentos →</Link><Link href="/pedidos" aria-describedby="casa-ecommerce-descricao">Catálogo e Pedidos →</Link><Link href="/oportunidades">Oportunidades →</Link></nav>
+            <p id="casa-ecommerce-descricao" className={styles.muted}>Catálogo e Pedidos: seus produtos e serviços com preço, e os pedidos feitos no painel e no site.</p>
             <div className={styles.risco}><h3>Avaliações solicitadas</h3>
               <p>{indicadores.avaliacoesPendentes > 0 ? `${indicadores.avaliacoesPendentes} solicitação(ões) aguardando resposta do cliente.` : "Nenhuma solicitação de avaliação aguardando resposta."}</p>
-              <nav className={styles.links} aria-label="Presença"><Link href="/reputacao">Ver avaliações →</Link><Link href="/google-presenca">Presença no Google →</Link></nav>
+              <nav className={styles.links} aria-label="Presença"><Link href="/reputacao">Ver Reputação →</Link><Link href="/google-presenca">Ver Google Presença →</Link></nav>
             </div>
           </section>
         </div>

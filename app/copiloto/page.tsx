@@ -42,7 +42,7 @@ type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: strin
 
 const TIPO_FOLLOWUP_LABELS: Record<string, string> = {
   oportunidade_parada: 'Oportunidade parada', orcamento_parado: 'Orçamento parado',
-  tratamento_sem_retorno: 'Tratamento sem retorno', pedido_nao_concluido: 'Pedido não concluído',
+  tratamento_sem_retorno: 'Serviço sem retorno', pedido_nao_concluido: 'Pedido não concluído',
   recompra_possivel: 'Recompra possível',
 };
 
@@ -233,7 +233,7 @@ export default function CopilotoPage() {
     <AdminShell title="Gerente Comercial AI" subtitle="Prioridades comerciais e próximos passos para cuidar do seu negócio">
       <div className="copiloto">
       <nav className="copiloto-acessos" aria-label="Acessos comerciais">
-        <a href="/pedidos">🛒 Pedidos →</a>
+        <a href="/pedidos">🛒 Catálogo e Pedidos →</a>
       </nav>
       {carregando && <PageLoader title="Consolidando o que precisa da sua atenção..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}

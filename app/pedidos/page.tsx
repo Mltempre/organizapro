@@ -9,7 +9,9 @@ import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import { ehEstadoTerminal, type PedidoStatus } from '../../lib/motor-pedidos';
 
-// ── Superfície operacional de Pedidos — E-commerce IA V1 ─────────────────
+// ── Catálogo e Pedidos (antes "E-commerce IA": não há IA nesta superfície) ─
+// Catálogo = clinica_servicos (o mesmo de Meu Site → Serviços); pedido nasce
+// do catálogo, com "item avulso" só como alternativa.
 // Mesma identidade visual e mesmo padrão de segurança de /orcamentos: usa
 // só as APIs já construídas (GET/POST /api/pedidos, POST /api/pedidos/[id]/
 // transicao) — nenhuma query direta a public.pedidos/pedido_itens aqui,
@@ -31,7 +33,11 @@ type Pedido = {
 };
 
 type LinhaForm = { servicoId: string; descricaoManual: string; valorManualReais: string; quantidade: string };
+// servicoId: '' = ainda sem escolha; id do catálogo; ou AVULSO (fora do catálogo).
+const AVULSO = '__avulso__';
 const linhaVazia: LinhaForm = { servicoId: '', descricaoManual: '', valorManualReais: '', quantidade: '1' };
+const ehCatalogo = (l: LinhaForm) => !!l.servicoId && l.servicoId !== AVULSO;
+const ehAvulso = (l: LinhaForm) => l.servicoId === AVULSO;
 
 const STATUS_CONFIG: Record<PedidoStatus, { label: string; color: string; bg: string }> = {
   criado:                           { label: 'Aguardando confirmação', color: '#38bdf8', bg: 'rgba(14,165,233,0.14)' },
@@ -116,9 +122,16 @@ export default function PedidosPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  function abrirNovo() {
+  const catalogoAtivo = catalogo.filter(c => c.disponivel !== false);
+  const catalogoComPreco = catalogoAtivo.filter(c => c.preco_centavos);
+  // Com catálogo precificado, a linha começa pedindo um item do catálogo;
+  // sem catálogo, começa como avulso (única alternativa possível).
+  const novaLinha = (): LinhaForm => ({ ...linhaVazia, servicoId: catalogoComPreco.length > 0 ? '' : AVULSO });
+
+  function abrirNovo(servicoId?: string) {
     if (!cargaValida) { setErro('Carregue os pedidos, clientes e catálogo antes de registrar um pedido.'); return; }
-    setPacienteId(''); setNomeCliente(''); setTelefone(''); setLinhas([{ ...linhaVazia }]);
+    setPacienteId(''); setNomeCliente(''); setTelefone('');
+    setLinhas([servicoId ? { ...linhaVazia, servicoId } : novaLinha()]);
     idempotencyKeyRef.current = crypto.randomUUID();
     setErro(''); setModalNovo(true);
   }
@@ -135,24 +148,25 @@ export default function PedidosPage() {
 
   const totalEstimado = linhas.reduce((soma, l) => {
     const qtd = Number(l.quantidade) || 0;
-    if (l.servicoId) {
+    if (ehCatalogo(l)) {
       const item = catalogo.find(c => c.id === l.servicoId);
       return soma + (item?.preco_centavos ? item.preco_centavos * qtd : 0);
     }
+    if (!ehAvulso(l)) return soma;
     const valorManual = parseReaisParaCentavos(l.valorManualReais) ?? 0;
     return soma + valorManual * qtd;
   }, 0);
 
   async function salvar() {
     if (!nomeCliente.trim()) { setErro('Cliente é obrigatório.'); return; }
-    const itensValidos = linhas.filter(l => l.servicoId || (l.descricaoManual.trim() && l.valorManualReais.trim()));
+    const itensValidos = linhas.filter(l => ehCatalogo(l) || (ehAvulso(l) && l.descricaoManual.trim() && l.valorManualReais.trim()));
     if (itensValidos.length === 0) { setErro('Adicione ao menos 1 item válido.'); return; }
     for (const l of itensValidos) {
       if (!Number.isInteger(Number(l.quantidade)) || Number(l.quantidade) <= 0) { setErro('Quantidade deve ser um número inteiro maior que zero.'); return; }
     }
 
     setSalvando(true); setErro('');
-    const itens = itensValidos.map(l => l.servicoId
+    const itens = itensValidos.map(l => ehCatalogo(l)
       ? { servico_id: l.servicoId, quantidade: Number(l.quantidade) }
       : { descricao: l.descricaoManual.trim(), valor_unitario_centavos: parseReaisParaCentavos(l.valorManualReais), quantidade: Number(l.quantidade) }
     );
@@ -203,10 +217,10 @@ export default function PedidosPage() {
 
   return (
     <AdminShell
-      title="Pedidos"
-      subtitle={`${filtrados.length} pedido${filtrados.length !== 1 ? 's' : ''} · E-commerce IA: pedidos do catálogo e do site`}
+      title="Catálogo e Pedidos"
+      subtitle={`${catalogoAtivo.length} ite${catalogoAtivo.length !== 1 ? 'ns' : 'm'} no catálogo · ${pedidos.length} pedido${pedidos.length !== 1 ? 's' : ''}`}
       actionLabel="+ Novo pedido"
-      actionOnClick={abrirNovo}
+      actionOnClick={() => abrirNovo()}
     >
       <style>{`
         .ped-card { transition: background 0.15s, border-color 0.15s; }
@@ -221,6 +235,39 @@ export default function PedidosPage() {
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
       {!carregando && !cargaValida && <button onClick={carregar}>Tentar novamente</button>}
       {!carregando && sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />}
+
+      {/* ── CATÁLOGO — mesma fonte do pedido (clinica_servicos); cadastro fica em Meu Site → Serviços ── */}
+      {!carregando && cargaValida && (
+        <section data-testid="catalogo" aria-labelledby="ped-catalogo" style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <h2 id="ped-catalogo" style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Catálogo</h2>
+            <a href="/site/servicos" style={{ fontSize: 12, color: '#4a9bb0' }}>Gerenciar em Meu Site → Serviços</a>
+          </div>
+          {catalogoAtivo.length === 0 ? (
+            <EmptyState compact icon="📦" title="Seu catálogo está vazio." description="Cadastre seus produtos e serviços com nome e preço para registrar pedidos em poucos cliques." actionLabel="➕ Cadastrar produtos e serviços" onAction={() => router.push('/site/servicos')} />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+              {catalogoAtivo.map(c => (
+                <div key={c.id} className="ped-card" style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 14 }}>{c.nome}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: c.preco_centavos ? '#4ade80' : '#94a3b8' }}>
+                    {c.preco_centavos ? formatarValor(c.preco_centavos) : 'Sem preço'}
+                  </div>
+                  {c.preco_centavos ? (
+                    <button className="ped-btn" onClick={() => abrirNovo(c.id)} style={{ marginTop: 'auto', padding: '7px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Adicionar ao pedido</button>
+                  ) : (
+                    <a href="/site/servicos" style={{ marginTop: 'auto', fontSize: 11, color: '#4a9bb0' }}>Definir preço em Meu Site → Serviços</a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {!carregando && cargaValida && (
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', margin: '0 0 12px' }}>Pedidos</h2>
+      )}
 
       {!carregando && pedidos.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -246,7 +293,7 @@ export default function PedidosPage() {
       )}
 
       {!carregando && cargaValida && pedidos.length === 0 && (
-        <EmptyState icon="🛒" title="Ainda não há pedidos registrados." description="Registre o primeiro pedido a partir do seu catálogo de serviços." actionLabel="➕ Registrar pedido" onAction={abrirNovo} />
+        <EmptyState compact icon="🛒" title="Ainda não há pedidos registrados." description="Escolha um item do catálogo acima (“Adicionar ao pedido”) ou registre um pedido." actionLabel="➕ Registrar pedido" onAction={() => abrirNovo()} />
       )}
       {!carregando && pedidos.length > 0 && filtrados.length === 0 && (
         <EmptyState compact icon="🔍" title="Nenhum pedido neste filtro." actionLabel="Ver todos" onAction={() => setFiltro('todos')} />
@@ -328,11 +375,11 @@ export default function PedidosPage() {
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Itens</label>
             {/* Catálogo vazio não é erro: explica de onde vêm os itens em vez de
                 deixar só "— Item avulso —" sem contexto. */}
-            {catalogo.filter(c => c.disponivel !== false && c.preco_centavos).length === 0 && (
+            {catalogoComPreco.length === 0 && (
               <p data-testid="catalogo-vazio" style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 10px', lineHeight: 1.5 }}>
-                Seu catálogo ainda não tem serviços com preço. Cadastre nome e preço em{' '}
-                <a href="/site/servicos" style={{ color: '#4a9bb0' }}>Site → Serviços</a>{' '}
-                para selecioná-los aqui; enquanto isso, use um item avulso.
+                Seu catálogo ainda não tem itens com preço. Cadastre nome e preço em{' '}
+                <a href="/site/servicos" style={{ color: '#4a9bb0' }}>Meu Site → Serviços</a>{' '}
+                para selecioná-los aqui; enquanto isso, use “Outro item (fora do catálogo)”.
               </p>
             )}
             {linhas.map((l, idx) => {
@@ -340,12 +387,13 @@ export default function PedidosPage() {
               return (
                 <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <select value={l.servicoId} onChange={e => atualizarLinha(idx, { servicoId: e.target.value })} style={{ flex: 2, minWidth: 140, padding: '8px 10px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 12 }}>
-                    <option value="">— Item avulso —</option>
-                    {catalogo.filter(c => c.disponivel !== false).map(c => (
+                    {catalogoComPreco.length > 0 && <option value="" disabled>Escolha um item do catálogo…</option>}
+                    {catalogoAtivo.map(c => (
                       <option key={c.id} value={c.id} disabled={!c.preco_centavos}>{c.nome}{c.preco_centavos ? ` (${formatarValor(c.preco_centavos)})` : ' (sem preço)'}</option>
                     ))}
+                    <option value={AVULSO}>Outro item (fora do catálogo)</option>
                   </select>
-                  {!l.servicoId && (
+                  {ehAvulso(l) && (
                     <>
                       <input placeholder="Descrição" value={l.descricaoManual} onChange={e => atualizarLinha(idx, { descricaoManual: e.target.value })} style={{ flex: 2, minWidth: 100, padding: '8px 10px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 12 }} />
                       <input placeholder="R$" value={l.valorManualReais} onChange={e => atualizarLinha(idx, { valorManualReais: e.target.value })} style={{ width: 70, padding: '8px 10px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 12 }} />
@@ -357,7 +405,7 @@ export default function PedidosPage() {
                 </div>
               );
             })}
-            <button onClick={() => setLinhas(prev => [...prev, { ...linhaVazia }])} style={{ marginTop: 4, marginBottom: 16, padding: '6px 12px', borderRadius: 8, border: '1px dashed #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 12, cursor: 'pointer' }}>+ Adicionar item</button>
+            <button onClick={() => setLinhas(prev => [...prev, novaLinha()])} style={{ marginTop: 4, marginBottom: 16, padding: '6px 12px', borderRadius: 8, border: '1px dashed #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 12, cursor: 'pointer' }}>+ Adicionar item</button>
 
             <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 16, textAlign: 'right' }}>Total: {formatarValor(totalEstimado)}</div>
 

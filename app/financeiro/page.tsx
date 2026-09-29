@@ -50,7 +50,7 @@ type OportunidadeRow = {
 const ORIGEM_LABELS: Record<OrigemReceitaPerdida, { label: string; icon: string }> = {
   orcamento_parado:       { label: 'Orçamento parado',       icon: '💰' },
   cobranca_atrasada:      { label: 'Cobrança atrasada',      icon: '🧾' },
-  tratamento_sem_retorno: { label: 'Tratamento sem retorno', icon: '🩺' },
+  tratamento_sem_retorno: { label: 'Serviço sem retorno', icon: '🧰' },
   pedido_nao_concluido:   { label: 'Pedido não concluído',   icon: '🛒' },
 };
 
@@ -272,7 +272,7 @@ export default function FinanceiroPage() {
           {/* Próxima ação financeira — toda ação exibida tem motivo, evidência, valor (quando comprovável) e CTA real */}
           <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎯 Próxima ação financeira</div>
           {proximasAcoes.length === 0 && (
-            <EmptyState compact icon="✅" title="Nenhuma ação financeira prioritária agora." description="Nenhum orçamento parado, cobrança atrasada, tratamento sem retorno ou pedido não concluído identificado." />
+            <EmptyState compact icon="✅" title="Nenhuma ação financeira prioritária agora." description="Nenhum orçamento parado, cobrança atrasada, serviço sem retorno ou pedido não concluído identificado." />
           )}
           {proximasAcoes.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

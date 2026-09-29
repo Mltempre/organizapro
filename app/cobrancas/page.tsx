@@ -402,7 +402,7 @@ export default function CobrancasPage() {
       )}
 
       {!carregando && cobrancas.length === 0 && (
-        <EmptyState icon="🧾" title="Ainda não há cobranças registradas." description="Registre a primeira cobrança, avulsa ou vinculada a um tratamento." actionLabel="➕ Registrar cobrança" onAction={abrirNovo} />
+        <EmptyState icon="🧾" title="Ainda não há cobranças registradas." description="Registre a primeira cobrança, avulsa ou vinculada a um serviço contratado." actionLabel="➕ Registrar cobrança" onAction={abrirNovo} />
       )}
       {!carregando && cobrancas.length > 0 && filtradas.length === 0 && (
         <EmptyState compact icon="🔍" title="Nenhuma cobrança neste filtro." actionLabel="Ver todas" onAction={() => setFiltro('todos')} />
@@ -461,7 +461,7 @@ export default function CobrancasPage() {
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Nova cobrança</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tratamento de origem (opcional)</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Serviço contratado de origem (opcional)</label>
                 <select value={form.tratamentoId} onChange={e => selecionarTratamento(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }}>
                   <option value="">— Cobrança avulsa —</option>
                   {tratamentos.map(t => <option key={t.id} value={t.id}>{t.paciente_nome} — {t.tipo_tratamento}{t.valor_estimado ? ` (${formatarValor(t.valor_estimado)})` : ''}</option>)}

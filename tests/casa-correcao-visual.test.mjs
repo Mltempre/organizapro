@@ -45,7 +45,7 @@ test("AdminShell: TODA rota citada na navegação lateral corresponde a uma page
   }
 });
 
-test("AdminShell: páginas antes reais mas ausentes de qualquer menu (Follow-up, Google Presença, Agenda Autônoma, Previsor de Faturamento, Linha Econômica, NotaFácil) agora estão alcançáveis pela lateral", () => {
+test("AdminShell: páginas reais continuam declaradas na navegação (menu, ou lista pré-venda fora do menu no caso do NotaFácil) — nunca órfãs sem shell", () => {
   for (const href of ["/follow-up", "/google-presenca", "/agenda-autonoma", "/previsor-faturamento", "/linha-economica", "/notafacil"]) {
     assert.match(adminShell, new RegExp(`h: "${href.replace("/", "\\/")}"`), `${href} deveria estar na navegação agora`);
   }

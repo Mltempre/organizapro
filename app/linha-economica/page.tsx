@@ -137,7 +137,7 @@ export default function LinhaEconomicaPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 16, marginBottom: 24, fontSize: 12, color: '#94a3b8' }}>
-            <span>🔗 {resumo.cadeiasCompletas} cadeia{resumo.cadeiasCompletas !== 1 ? 's' : ''} completa{resumo.cadeiasCompletas !== 1 ? 's' : ''} (oportunidade → orçamento → tratamento → pagamento)</span>
+            <span>🔗 {resumo.cadeiasCompletas} cadeia{resumo.cadeiasCompletas !== 1 ? 's' : ''} completa{resumo.cadeiasCompletas !== 1 ? 's' : ''} (oportunidade → orçamento → serviço contratado → pagamento)</span>
             <span>⏳ {resumo.cadeiasParciais} cadeia{resumo.cadeiasParciais !== 1 ? 's' : ''} {resumo.cadeiasParciais !== 1 ? 'parciais' : 'parcial'} (rastreável, ainda sem pagamento comprovado)</span>
           </div>
 

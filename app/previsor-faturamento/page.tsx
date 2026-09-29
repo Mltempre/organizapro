@@ -30,7 +30,7 @@ type OportunidadeRow = { id: string; nome_informado: string | null; telefone: st
 const ORIGEM_LABELS: Record<OrigemPrevisor, { label: string; icon: string }> = {
   cobranca_a_vencer:     { label: 'Cobrança a vencer',        icon: '🧾' },
   orcamento_apresentado: { label: 'Orçamento em decisão',     icon: '💰' },
-  tratamento_agendado:   { label: 'Tratamento com retorno',   icon: '🩺' },
+  tratamento_agendado:   { label: 'Serviço com retorno',      icon: '🧰' },
   pedido_em_andamento:   { label: 'Pedido em andamento',      icon: '🛒' },
 };
 
@@ -150,7 +150,7 @@ export default function PrevisorFaturamentoPage() {
           )}
 
           {semDados && (
-            <EmptyState icon="📊" title="Ainda não há dados suficientes para uma previsão." description="Nenhuma cobrança a vencer, orçamento em decisão, tratamento com retorno ou pedido em andamento identificado." />
+            <EmptyState icon="📊" title="Ainda não há dados suficientes para uma previsão." description="Nenhuma cobrança a vencer, orçamento em decisão, serviço com retorno ou pedido em andamento identificado." />
           )}
 
           {itensConfirmados.length > 0 && (
