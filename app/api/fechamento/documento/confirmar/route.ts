@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     .eq("clinica_id", clinica_id)
     .maybeSingle();
   if (!arquivo) {
-    return NextResponse.json({ sucesso: false, error: "Arquivo não encontrado neste negócio" }, { status: 404 });
+    return NextResponse.json({ sucesso: false, error: "Arquivo não encontrado nesta clínica" }, { status: 404 });
   }
   if (arquivo.classificacao_status !== "pendente_confirmacao") {
     logOperacao({ operacao: "fechamento.arquivo.confirmar", clinica_id, entidade_id: arquivo_id, resultado: "rejeitado", motivo: `status já é ${arquivo.classificacao_status}` });

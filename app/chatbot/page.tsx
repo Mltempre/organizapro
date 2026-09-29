@@ -538,9 +538,9 @@ export default function ChatbotPage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Parcerias e Serviços" icon="💳">
+            <SectionCard title="Convênios e Serviços" icon="💳">
               <div className="cb-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <Field label="Planos, parcerias e formas de pagamento aceitos" hint="Um por linha">
+                <Field label="Convênios ou Parcerias" hint="Um por linha">
                   <textarea style={ta(110)} value={config.convenios ?? ''} onChange={e => setConfig(c => ({ ...c, convenios: e.target.value }))} placeholder={'Empresa Parceira X\nDesconto para associados\nParticular'} />
                 </Field>
                 <Field label="Serviços Oferecidos" hint="Um por linha">

@@ -67,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (erroBusca || !tratamento) {
     logOperacao({ operacao: "tratamento.transicao", clinica_id, entidade_id: id, resultado: "rejeitado", motivo: "tratamento nao encontrado nesta clinica" });
-    return NextResponse.json({ sucesso: false, error: "Serviço contratado não encontrado" }, { status: 404 });
+    return NextResponse.json({ sucesso: false, error: "Tratamento não encontrado" }, { status: 404 });
   }
 
   if (tratamento.status === novo_status) {
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   if (!atualizado) {
     logOperacao({ operacao: "tratamento.transicao", clinica_id, entidade_id: id, resultado: "rejeitado", motivo: "estado mudou entre leitura e escrita (concorrência)" });
-    return NextResponse.json({ sucesso: false, error: "O serviço contratado foi alterado por outra requisição — tente novamente" }, { status: 409 });
+    return NextResponse.json({ sucesso: false, error: "O tratamento foi alterado por outra requisição — tente novamente" }, { status: 409 });
   }
 
   const { error: erroEvento } = await admin.from("eventos_dominio").insert({

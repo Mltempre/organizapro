@@ -20,7 +20,7 @@ async function obterClinica(req: NextRequest) {
   const { data: { user } } = await supabaseAnon.auth.getUser(bearer);
   if (!user) return { error: NextResponse.json({ error: "Sessão inválida ou expirada" }, { status: 401 }) };
   const { data: vinculo } = await supabase.from("clinica_usuarios").select("clinica_id").eq("usuario_id", user.id).eq("ativo", true).maybeSingle();
-  if (!vinculo?.clinica_id) return { error: NextResponse.json({ error: "Usuário não tem vínculo com um negócio" }, { status: 403 }) };
+  if (!vinculo?.clinica_id) return { error: NextResponse.json({ error: "Usuário não tem vínculo com uma clínica" }, { status: 403 }) };
   const auth = await autorizarUsuarioNaClinica(req, vinculo.clinica_id);
   if (!auth.ok) return { error: NextResponse.json({ error: auth.error }, { status: auth.status }) };
   return { clinicaId: vinculo.clinica_id, userId: auth.userId };

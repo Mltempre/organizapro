@@ -45,7 +45,7 @@ async function resolverClinica(req: NextRequest): Promise<
     .eq("ativo", true)
     .maybeSingle();
   if (error || !vinculo?.clinica_id) {
-    return { ok: false, response: NextResponse.json({ error: "Usuário não tem vínculo com um negócio" }, { status: 403 }) };
+    return { ok: false, response: NextResponse.json({ error: "Usuário não tem vínculo com uma clínica" }, { status: 403 }) };
   }
 
   const autorizacao = await autorizarUsuarioNaClinica(req, vinculo.clinica_id);
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     .maybeSingle<OportunidadeLinha>();
 
   if (erroBusca || !oportunidade) {
-    logOperacao({ operacao: "oportunidade.gerar_orcamento", clinica_id: auth.clinicaId, entidade_id: id, resultado: "rejeitado", motivo: "oportunidade não encontrada neste negócio" });
+    logOperacao({ operacao: "oportunidade.gerar_orcamento", clinica_id: auth.clinicaId, entidade_id: id, resultado: "rejeitado", motivo: "oportunidade não encontrada nesta clínica" });
     return NextResponse.json({ sucesso: false, error: "Oportunidade não encontrada" }, { status: 404 });
   }
 

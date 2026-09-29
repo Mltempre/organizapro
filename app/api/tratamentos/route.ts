@@ -58,12 +58,12 @@ export async function POST(req: NextRequest) {
 
   if (paciente_id !== undefined && paciente_id !== null) {
     if (typeof paciente_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paciente_id)) {
-      return NextResponse.json({ sucesso: false, error: "Cliente inválido para este negócio" }, { status: 400 });
+      return NextResponse.json({ sucesso: false, error: "Paciente inválido para esta clínica" }, { status: 400 });
     }
     const { data: paciente, error: erroPaciente } = await admin.from("pacientes")
       .select("id").eq("id", paciente_id).eq("clinica_id", clinica_id.toLowerCase()).maybeSingle();
-    if (erroPaciente) return NextResponse.json({ sucesso: false, error: "Não foi possível validar o cliente" }, { status: 503 });
-    if (!paciente) return NextResponse.json({ sucesso: false, error: "Cliente inválido para este negócio" }, { status: 400 });
+    if (erroPaciente) return NextResponse.json({ sucesso: false, error: "Não foi possível validar o paciente" }, { status: 503 });
+    if (!paciente) return NextResponse.json({ sucesso: false, error: "Paciente inválido para esta clínica" }, { status: 400 });
   }
 
   // Snapshot do valor do orçamento de origem — só na criação, nunca
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
   if (erroInsert) {
     logOperacao({ operacao: "tratamento.criar", clinica_id, resultado: "erro", motivo: erroInsert.message });
-    return NextResponse.json({ sucesso: false, error: "Não foi possível criar o serviço contratado" }, { status: 500 });
+    return NextResponse.json({ sucesso: false, error: "Não foi possível criar o tratamento" }, { status: 500 });
   }
 
   const { error: erroEvento } = await admin.from("eventos_dominio").insert({
@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) {
     logOperacao({ operacao: "tratamento.listar", clinica_id, resultado: "erro", motivo: error.message });
-    return NextResponse.json({ sucesso: false, error: "Não foi possível listar os serviços contratados" }, { status: 500 });
+    return NextResponse.json({ sucesso: false, error: "Não foi possível listar tratamentos" }, { status: 500 });
   }
 
   return NextResponse.json({ sucesso: true, tratamentos: data ?? [] });
