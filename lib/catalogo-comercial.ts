@@ -33,7 +33,7 @@ export const ICONES_CATALOGO = [
   { key: "shield",     emoji: "🛡️", label: "Garantia"    },
   { key: "sparkle",    emoji: "✨", label: "Especial"    },
   { key: "heart",      emoji: "❤️", label: "Cuidado"     },
-  { key: "clinic",     emoji: "🏢", label: "Negocio"     },
+  { key: "clinic",     emoji: "🏢", label: "Negócio"     },
 ] as const;
 export const CORES_ICONE_CATALOGO: Record<string, string> = {
   tooth: "#00c896", smile: "#3b82f6", gem: "#8b5cf6",

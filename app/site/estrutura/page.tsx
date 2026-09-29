@@ -92,7 +92,7 @@ export default function EstruturaAdmin() {
   const sorted = [...itens].sort((a,b) => a.ordem - b.ordem);
 
   return (
-    <AdminShell title="Estrutura do Negocio" subtitle="Ambientes e instalacoes exibidos no site" actionLabel="+ Adicionar Ambiente" actionOnClick={() => { setForm({ imagem_url:"", titulo:"", descricao:"", categoria:"Espaco de Atendimento" }); setModal({ mode:"add" }); setErro(""); }}>
+    <AdminShell title="Estrutura do Negócio" subtitle="Ambientes e instalações exibidos no site" actionLabel="+ Adicionar Ambiente" actionOnClick={() => { setForm({ imagem_url:"", titulo:"", descricao:"", categoria:"Espaco de Atendimento" }); setModal({ mode:"add" }); setErro(""); }}>
 
       <SiteWorkspaceNav />
 

@@ -396,16 +396,21 @@ export default function RaioX() {
           Perfil da Empresa
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))", gap: 10 }}>
+          {/* Os campos de metricas.site reaproveitam nomes antigos do construtor de
+              site (app/api/raio-x/route.ts): has_hero = e-mail, has_slug = link de
+              avaliação do Google, galeria = modelos de mensagem configurados (0-4),
+              equipe = telefone, servicos = horário. Cada rótulo aqui diz o que o
+              campo REALMENTE mede. depoimentos/antes_depois são sempre 0 e não medem
+              nada; endereço e nome não são devolvidos pela API — por isso não viram
+              indicador. WhatsApp vem de automacao.has_zapi (instância + token). */}
           {[
-            { l: "Logo",       ok: metricas.site.has_logo                                          },
-            { l: "E-mail",     ok: metricas.site.has_hero                                          },
-            { l: "Google",     ok: metricas.site.has_slug                                          },
-            { l: "Mensagens",  ok: metricas.site.galeria     > 0, cnt: metricas.site.galeria        },
-            { l: "Telefone",   ok: metricas.site.equipe      > 0                                   },
-            { l: "Horário",    ok: metricas.site.servicos    > 0                                   },
-            { l: "Endereço",   ok: metricas.site.depoimentos > 0                                   },
-            { l: "WhatsApp",   ok: metricas.site.antes_depois > 0                                  },
-            { l: "Nome",       ok: metricas.site.estrutura   > 0                                   },
+            { l: "Logo",                      ok: metricas.site.has_logo                                   },
+            { l: "E-mail",                    ok: metricas.site.has_hero                                   },
+            { l: "Link de avaliação Google",  ok: metricas.site.has_slug                                   },
+            { l: "Mensagens automáticas",     ok: metricas.site.galeria > 0, cnt: metricas.site.galeria    },
+            { l: "Telefone",                  ok: metricas.site.equipe > 0                                 },
+            { l: "Horário",                   ok: metricas.site.servicos > 0                               },
+            { l: "WhatsApp",                  ok: metricas.automacao.has_zapi                              },
           ].map(item => (
             <div key={item.l} style={{
               display: "flex", alignItems: "center", gap: 8,
@@ -417,7 +422,7 @@ export default function RaioX() {
               <div>
                 <div style={{ fontSize: 11, color: item.ok ? "#00c896" : "#64748b", fontWeight: 600 }}>{item.l}</div>
                 {item.cnt !== undefined && item.cnt > 0 && (
-                  <div style={{ fontSize: 10, color: "#334155" }}>{item.cnt} item{item.cnt > 1 ? "s" : ""}</div>
+                  <div style={{ fontSize: 10, color: "#334155" }}>{item.cnt} de 4 modelos</div>
                 )}
               </div>
             </div>
