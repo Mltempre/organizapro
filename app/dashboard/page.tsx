@@ -81,6 +81,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [erroCarga, setErroCarga] = useState("");
   const [fechamento, setFechamento] = useState<CasaDashboardProps["fechamento"]>(null);
+  const [estoqueBaixo, setEstoqueBaixo] = useState(0);
   const [clinicaId, setClinicaId] = useState("");
   const [dash, setDash] = useState<DashData>({
     compromissosHoje: 0, pendentes: 0, atrasados: 0,
@@ -102,6 +103,7 @@ export default function Dashboard() {
     setLoading(true);
     setErroCarga("");
     setFechamento(null);
+    setEstoqueBaixo(0);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
@@ -137,6 +139,17 @@ export default function Dashboard() {
           return { competencia, resumo };
         } catch {
           return { competencia, resumo: null };
+        }
+      })();
+      // Estoque V1 — só a contagem de itens em estoque baixo, para um alerta
+      // resumido. Leitura opcional: falha ou estoque não ativado = sem alerta.
+      const estoqueBaixoPromise = (async (): Promise<number> => {
+        try {
+          const r = await fetch(`/api/estoque?clinica_id=${encodeURIComponent(cid)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+          const dados = r.ok ? await r.json() : null;
+          return dados?.estoqueAtivo === true && Number.isInteger(dados.estoqueBaixo) && dados.estoqueBaixo > 0 ? dados.estoqueBaixo : 0;
+        } catch {
+          return 0;
         }
       })();
       const [ano, mes, dia] = hoje.split("-").map(Number);
@@ -325,6 +338,7 @@ export default function Dashboard() {
       const horariosVagosHoje = obterHorariosVagos(lista, cfg?.horario_funcionamento).length;
 
       setFechamento(await fechamentoPromise);
+      setEstoqueBaixo(await estoqueBaixoPromise);
       setDash({
         compromissosHoje: ativos.length,
         pendentes:        pendentesHoje.length,
@@ -529,6 +543,7 @@ export default function Dashboard() {
   return (
     <CasaDashboard
       fechamento={fechamento}
+      estoqueBaixo={estoqueBaixo}
       outrasPrioridades={estadoComercial.sinais.slice(missaoDoDia.length)}
       agendaHoje={dash.agendaHoje}
       receitaPerdida={receitaPerdida}

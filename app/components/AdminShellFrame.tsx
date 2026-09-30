@@ -38,6 +38,7 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Follow-up Comercial",  h: "/follow-up",       i: "🔁" },
       { l: "Cobranças",            h: "/cobrancas",       i: "🧾" },
       { l: "Catálogo e Pedidos",   h: "/pedidos",         i: "🛒" },
+      { l: "Estoque",              h: "/estoque",         i: "📦" },
       { l: "Pesquisa de Preços",   h: "/pesquisa-precos", i: "💲" },
       { l: "Serviços contratados", h: "/tratamentos",     i: "🧰" },
       { l: "Receita Perdida",      h: "/receita-perdida", i: "📉" },

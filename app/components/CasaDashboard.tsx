@@ -13,6 +13,8 @@ export type CasaDashboardProps = Pick<DashboardViewProps, "clinicaId" | "dataStr
   agendaHoje: AgItem[];
   receitaPerdida: ResumoReceitaPerdida;
   fechamento?: { competencia: string; resumo: ResumoFechamento | null } | null;
+  /** Estoque V1: quantidade de itens com saldo no mínimo ou abaixo (0 = sem alerta). */
+  estoqueBaixo?: number;
 };
 
 const moeda = (valor: number | null) => valor === null ? "Valor não informado" : valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -92,6 +94,12 @@ export default function CasaDashboard(props: CasaDashboardProps) {
             </nav>
           </div>
         </section>
+
+        {!!props.estoqueBaixo && props.estoqueBaixo > 0 && (
+          <p role="status" className={styles.muted} data-testid="alerta-estoque-baixo">
+            <strong>Estoque baixo:</strong> {props.estoqueBaixo} {props.estoqueBaixo === 1 ? "produto chegou" : "produtos chegaram"} ao estoque mínimo. <Link href="/estoque">Abrir Estoque →</Link>
+          </p>
+        )}
 
         {props.fechamento && (props.fechamento.resumo ? (
           <section className={styles.card} aria-labelledby="casa-fechamento">

@@ -5,7 +5,10 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const root = path.resolve(__dirname, '../..');
 
-function fixture() {
+// options.rpc: funções do banco simuladas por nome. Qualquer outra função
+// (exceto site_publico_por_slug_v2) responde "função inexistente" — o
+// estado do banco ANTES de uma migration pendente.
+function fixture(options = {}) {
   const tables = { pedidos: [], pedido_itens: [], eventos_dominio: [], pacientes: [{ id: 'client-a', clinica_id: 'a' }],
     clinica_servicos: [{ id: 'service-a', clinica_id: 'a', nome: 'Serviço local A', preco_centavos: 1500, disponivel: true },
       { id: 'service-b', clinica_id: 'b', nome: 'Serviço local B', preco_centavos: 700, disponivel: true }] };
@@ -14,7 +17,7 @@ function fixture() {
     const q = { table, action: 'select', filters: [], value: null }; calls.push(q);
     let single = false;
     const chain = {
-      select() { return chain; }, order() { return chain; },
+      select() { return chain; }, order() { return chain; }, limit() { return chain; },
       eq(k, v) { q.filters.push([k, v]); return chain; },
       in(k, vs) { q.filters.push([k, vs]); return chain; },
       insert(v) { q.action = 'insert'; q.value = v; return chain; },
@@ -42,7 +45,12 @@ function fixture() {
     }
     return chain;
   }
-  const db = { from: table => query(table), rpc: (_name, args) => query('rpc', args) };
+  const db = { from: table => query(table), rpc: (name, args) => {
+    if (name === 'site_publico_por_slug_v2') return query('rpc', args);
+    calls.push({ table: 'rpc:' + name, action: 'rpc', filters: [], value: args });
+    if (options.rpc?.[name]) return Promise.resolve(options.rpc[name](args, tables));
+    return Promise.resolve({ data: null, error: { code: 'PGRST202', message: 'Could not find the function public.' + name } });
+  } };
   function load(relative) {
     const file = path.resolve(root, relative);
     if (cache.has(file)) return cache.get(file).exports;

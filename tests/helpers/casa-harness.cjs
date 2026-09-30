@@ -49,6 +49,7 @@ async function carregar(options = {}) {
     if (options.networkError === route) throw Error('Falha de rede local');
     if (route === '/api/minha-clinica') return { ok: !options.semTenant, json: async () => ({ clinica_id: 'tenant-teste' }) };
     if (route === '/api/fechamento/tipos') return { ok: options.apiError !== route, json: async () => options.invalidBody === route ? {} : { sucesso:true, tipos:options.fechamentoTipos ?? [] } };
+    if (route === '/api/estoque') return { ok: options.apiError !== route, json: async () => options.estoque ?? { sucesso: true, estoqueAtivo: false, itens: [], estoqueBaixo: 0 } };
     if (route === '/api/fechamento') return { ok: options.apiError !== route, json: async () => options.invalidBody === route ? {} : { sucesso:true, resumo:options.fechamentoResumo } };
     const key = { '/api/orcamentos': 'orcamentos', '/api/pedidos': 'pedidos', '/api/tratamentos': 'tratamentos', '/api/cobrancas': 'cobrancas', '/api/oportunidades': 'data' }[route];
     if (!key) throw Error('Acesso não previsto: '+url);

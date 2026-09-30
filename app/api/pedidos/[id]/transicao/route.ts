@@ -15,6 +15,7 @@ import { autorizarUsuarioNaClinica } from "../../../../../lib/auth-clinica";
 import { logOperacao } from "../../../../../lib/log-estruturado";
 import { aplicarEvento, type EventoPedido, type Pedido, type PedidoStatus } from "../../../../../lib/motor-pedidos";
 import { registrarResultadoSeHouveDecisao } from "../../../../../lib/auditoria-resultado-persistencia";
+import { efeitoEstoqueDoEvento, estoqueIndisponivelNoBanco, mensagemEstoqueInsuficiente, STATUS_NOVO_POR_EFEITO } from "../../../../../lib/motor-estoque";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,14 +82,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (evento === "cliente_informou_pagamento") atualizacao.pagamento_informado_em = agora;
   if (evento === "pagamento_confirmado") atualizacao.pagamento_confirmado_em = agora;
 
-  const { data: atualizado, error: erroUpdate } = await admin
-    .from("pedidos")
-    .update(atualizacao)
-    .eq("id", id)
-    .eq("clinica_id", clinica_id) // defesa em profundidade — nenhuma escrita fica sem filtro de tenant
-    .eq("status", pedido.status) // guarda otimista contra concorrência
-    .select()
-    .maybeSingle();
+  // Estoque V1 — confirmar (baixa) e cancelar (estorno) mudam status e
+  // estoque na MESMA transação do banco, com a mesma guarda otimista de
+  // status. Sem a migration aplicada (função inexistente), segue o caminho
+  // original abaixo — não havia estoque a mexer.
+  const efeitoEstoque = efeitoEstoqueDoEvento(evento);
+  let atualizado: Record<string, unknown> | null = null;
+  let erroUpdate: { message: string } | null = null;
+  let viaEstoque = false;
+  if (efeitoEstoque) {
+    const { data: rEstoque, error: erroEstoque } = await admin.rpc("pedido_transicionar_com_estoque_v1", {
+      p_clinica_id: clinica_id, p_pedido_id: id, p_status_esperado: pedido.status, p_status_novo: STATUS_NOVO_POR_EFEITO[efeitoEstoque],
+    });
+    if (!estoqueIndisponivelNoBanco(erroEstoque)) {
+      viaEstoque = true;
+      const r = rEstoque as { ok?: boolean; erro?: string; pedido?: Record<string, unknown>; itens?: { nome: string; saldo: number; necessario: number }[] } | null;
+      if (erroEstoque || !r || typeof r.ok !== "boolean") {
+        logOperacao({ operacao: "pedido.transicao", clinica_id, entidade_id: id, resultado: "erro", motivo: `estoque: ${erroEstoque?.message ?? "resposta inválida"}` });
+        return NextResponse.json({ sucesso: false, error: "Não foi possível processar a transição" }, { status: 503 });
+      }
+      if (!r.ok && r.erro === "estoque_insuficiente") {
+        logOperacao({ operacao: "pedido.transicao", clinica_id, entidade_id: id, resultado: "rejeitado", motivo: "estoque insuficiente" });
+        return NextResponse.json({ sucesso: false, error: mensagemEstoqueInsuficiente(r.itens ?? []), estoque_insuficiente: r.itens ?? [] }, { status: 409 });
+      }
+      if (r.ok) atualizado = r.pedido ?? null;
+    }
+  }
+  if (!viaEstoque) {
+    const resultadoUpdate = await admin
+      .from("pedidos")
+      .update(atualizacao)
+      .eq("id", id)
+      .eq("clinica_id", clinica_id) // defesa em profundidade — nenhuma escrita fica sem filtro de tenant
+      .eq("status", pedido.status) // guarda otimista contra concorrência
+      .select()
+      .maybeSingle();
+    atualizado = resultadoUpdate.data;
+    erroUpdate = resultadoUpdate.error;
+  }
 
   if (erroUpdate) {
     logOperacao({ operacao: "pedido.transicao", clinica_id, entidade_id: id, resultado: "erro", motivo: erroUpdate.message });

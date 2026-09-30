@@ -23,7 +23,7 @@ const titulosDaRota = h => {
 test("menu: ordem e rótulos finais da demonstração", () => {
   assert.deepEqual(menu.map(x => x.l), [
     "Visão Geral", "Oportunidades", "Dinheiro",
-    "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Pesquisa de Preços", "Serviços contratados", "Receita Perdida",
+    "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Estoque", "Pesquisa de Preços", "Serviços contratados", "Receita Perdida",
     "Agenda", "Agenda Autônoma", "Chatbot IA", "WhatsApp",
     "Google Presença", "Reputação", "Meu Site", "Conteúdo IA",
     "Gerente Comercial", "Métricas", "Raio-X da Empresa", "Previsor de Faturamento", "Linha Econômica", "Ads e Atribuição",
