@@ -85,10 +85,10 @@ function automacaoPausada(clinicaId: string | null | undefined): boolean {
 // ─── Templates padrão de resposta automática ─────────────────────────────────
 
 const MSG_CONFIRMACAO_PADRAO =
-  "Perfeito, {nome}! ✅\n\nSua consulta do dia *{data}* às *{horario}* está confirmada.\n\nEsperamos você! 😊";
+  "Perfeito, {nome}! ✅\n\nSeu compromisso do dia *{data}* às *{horario}* está confirmado.\n\nEsperamos você! 😊";
 
 const MSG_REAGENDAMENTO_PADRAO =
-  "Entendemos, {nome}! 📅\n\nVamos reagendar sua consulta. Nossa equipe entrará em contato em breve para definir a melhor data para você.\n\nObrigado pela atenção! 😊";
+  "Entendemos, {nome}! 📅\n\nVamos reagendar seu compromisso. Nossa equipe entrará em contato em breve para definir a melhor data para você.\n\nObrigado pela atenção! 😊";
 
 // ─── Handler do webhook ──────────────────────────────────────────────────────
 
@@ -504,7 +504,7 @@ export async function POST(req: NextRequest) {
         nome:         ag.paciente_nome || "",
         data:         ag.data ? ag.data.split("-").reverse().join("/") : "",
         horario:      ag.hora?.substring(0, 5) || "",
-        clinica_nome: clinicaConfig?.nome_clinica || "nossa clínica",
+        clinica_nome: clinicaConfig?.nome_clinica || "nossa empresa",
       });
 
       const baseUrl = new URL(req.url).origin;

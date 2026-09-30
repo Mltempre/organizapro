@@ -44,6 +44,23 @@ const TRANSICOES: Record<OportunidadeStatus, readonly OportunidadeStatus[]> = {
   expirada: [],
 };
 
+// ── Prazo de primeiro contato (expira_em) ────────────────────────────────
+// Toda oportunidade nasce com expira_em (janela para o primeiro contato;
+// renovada a cada nova interação do canal). A máquina de estados já prevê
+// sinalizada → expirada, mas nenhum processo grava essa transição — sem
+// esta regra, um interesse nunca atendido continuava "Agora" para sempre
+// no Gerente Comercial, Follow-up e Receita Perdida. Só "sinalizada"
+// expira por prazo: em_contato/agendada já têm alguém agindo e continuam
+// dependendo de decisão humana. Leitura derivada; o banco não é alterado.
+export function statusEfetivoOportunidade(
+  op: { status: OportunidadeStatus; expira_em?: string | null },
+  agoraMs: number = Date.now()
+): OportunidadeStatus {
+  if (op.status !== "sinalizada" || !op.expira_em) return op.status;
+  const expiraMs = Date.parse(op.expira_em);
+  return Number.isFinite(expiraMs) && expiraMs <= agoraMs ? "expirada" : op.status;
+}
+
 export function transicaoPermitida(
   atual: OportunidadeStatus,
   proximo: OportunidadeStatus

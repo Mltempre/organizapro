@@ -81,7 +81,7 @@ export async function GET(request: Request) {
         .select("nome")
         .eq("id", clinica.clinica_id)
         .maybeSingle();
-      nomeClinica = clinicaInfo?.nome || "sua clínica";
+      nomeClinica = clinicaInfo?.nome || "nossa empresa";
     }
 
     for (const ag of agendamentos) {

@@ -11,6 +11,7 @@ import {
   gerarFollowUpsComerciais, type TipoFollowUpProprio, type CasoFollowUp,
 } from "./follow-up-comercial";
 import { agregarClientesElegiveisRecompra } from "./motor-pedidos";
+import { statusEfetivoOportunidade } from "./oportunidades-demanda";
 
 /**
  * Relê a entidade real do banco (nunca confia no que o client mandou) e
@@ -37,11 +38,11 @@ export async function reavaliarCasoFollowUp(
     // sinalizações do mesmo telefone contam como o mesmo caso de
     // follow-up, mesma decisão já usada em recompra_possivel).
     const { data } = await admin.from("oportunidades_demanda")
-      .select("id, telefone, nome_informado, status, orcamento_vinculado_id, ultima_interacao_em")
+      .select("id, telefone, nome_informado, status, orcamento_vinculado_id, ultima_interacao_em, expira_em")
       .eq("clinica_id", clinica_id).eq("telefone_normalizado", entidadeId)
       .order("ultima_interacao_em", { ascending: false }).limit(1).maybeSingle();
     if (!data) return null;
-    const resultado = gerarFollowUpsComerciais({ ...entradaBase, oportunidadesParadas: [{ id: data.id, telefone: data.telefone, pacienteNome: data.nome_informado || data.telefone, status: data.status, orcamentoVinculadoId: data.orcamento_vinculado_id, ultimaInteracaoEm: data.ultima_interacao_em }] });
+    const resultado = gerarFollowUpsComerciais({ ...entradaBase, oportunidadesParadas: [{ id: data.id, telefone: data.telefone, pacienteNome: data.nome_informado || data.telefone, status: statusEfetivoOportunidade(data), orcamentoVinculadoId: data.orcamento_vinculado_id, ultimaInteracaoEm: data.ultima_interacao_em }] });
     return resultado[0] ?? null;
   }
 

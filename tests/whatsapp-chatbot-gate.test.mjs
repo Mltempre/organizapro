@@ -213,7 +213,7 @@ test('SIM confirma o agendamento do tenant e responde 1 vez; NÃO marca reagenda
   const upd = updatesAgenda(f).map(q => q.value);
   assert.ok(upd.some(v => v.status === 'confirmado' && v.confirmado === true));
   assert.equal(zapi(f).length, 1);
-  assert.match(enviado(zapi(f)[0]).message, /está confirmada/);
+  assert.match(enviado(zapi(f)[0]).message, /Seu compromisso do dia .* está confirmado/);
   assert.match(zapi(f)[0].url, /inst-A/);
 
   const g = cenario({ agendamento: true });

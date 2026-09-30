@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { autorizarUsuarioNaClinica } from "../../../lib/auth-clinica";
 import {
   normalizarTelefone,
+  statusEfetivoOportunidade,
   validarNovaOportunidade,
   type NovaOportunidade,
 } from "../../../lib/oportunidades-demanda";
@@ -47,15 +48,19 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const status = new URL(req.url).searchParams.get("status");
-  let query = supabase
+  const query = supabase
     .from("oportunidades_demanda")
     .select("id, clinica_id, canal, identificador_canal, telefone, nome_informado, status, confianca_classificacao, evidencia_bruta, contexto_classificacao, jornada, paciente_vinculado_id, agendamento_vinculado_id, orcamento_vinculado_id, receita_atribuida, receita_fonte, criado_em, atualizado_em, ultima_interacao_em, expira_em, resolvido_em")
     .eq("clinica_id", auth.clinicaId)
     .order("ultima_interacao_em", { ascending: false });
-  if (status) query = query.eq("status", status);
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Não foi possível consultar oportunidades" }, { status: 500 });
-  return NextResponse.json({ data });
+  // status devolvido é o efetivo (prazo de primeiro contato aplicado) —
+  // mesma leitura para todas as telas; status_registrado preserva o valor
+  // gravado. O filtro ?status= usa o efetivo.
+  const agoraMs = Date.now();
+  const efetivas = (data ?? []).map(op => ({ ...op, status_registrado: op.status, status: statusEfetivoOportunidade(op, agoraMs) }));
+  return NextResponse.json({ data: status ? efetivas.filter(op => op.status === status) : efetivas });
 }
 
 export async function POST(req: NextRequest) {
