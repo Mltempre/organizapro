@@ -2,7 +2,6 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import AdminShell from "../components/AdminShell";
 import PageLoader from "../components/PageLoader";
@@ -110,17 +109,14 @@ export default function PesquisaPrecosPage() {
   const [erroBusca, setErroBusca] = useState("");
   const [registradas, setRegistradas] = useState<Set<string>>(new Set());
   const buscandoRef = useRef(false);
-  const [veioDoCatalogo, setVeioDoCatalogo] = useState(false);
 
   // Vindo do Catálogo ("Pesquisar preço"): consulta já preparada com o item.
-  // O link do Catálogo sempre traz servico_id — é o que liga o botão Voltar.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const termo = q.get("termo")?.slice(0, 160) ?? "";
     const servicoId = q.get("servico_id") ?? "";
     const tipo = q.get("tipo") === "servico" ? "servico" : "produto";
     if (termo || servicoId) setBusca((b) => ({ ...b, termo, servicoId, tipo }));
-    setVeioDoCatalogo(!!servicoId);
   }, []);
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }), [token]);
@@ -327,26 +323,6 @@ export default function PesquisaPrecosPage() {
         .pp-kpi{background:#0f1117;border:1px solid #252b3a;border-radius:10px;padding:10px 12px}.pp-kpi b{display:block;font-size:17px;color:#f1f5f9;margin-top:4px}
         @media(max-width:800px){.pp-grid,.pp-form-grid{grid-template-columns:1fr}.pp-span{grid-column:auto}.pp-table{display:block;overflow-x:auto;white-space:nowrap}}
       `}</style>
-      {/* Voltar ao Catálogo — fixo no topo (alinhado ao cabeçalho, à direita)
-          durante a rolagem. Link direto para /pedidos: não depende do histórico
-          do navegador e não mexe em dado nenhum (o Catálogo recarrega do banco). */}
-      {veioDoCatalogo && (
-        <>
-          <style>{`
-            .pp-voltar{position:fixed;top:23px;right:32px;z-index:45;display:inline-flex;align-items:center;gap:8px;
-              padding:8px 16px;border-radius:999px;border:1px solid rgba(212,175,55,.5);background:rgba(20,17,8,.92);
-              color:#e3c05c;font-size:13px;font-weight:600;letter-spacing:.01em;text-decoration:none;
-              box-shadow:0 4px 14px rgba(0,0,0,.35);transition:background .15s,border-color .15s,color .15s}
-            .pp-voltar:hover{background:rgba(212,175,55,.14);border-color:#d4af37;color:#f2d98a}
-            .pp-voltar:focus-visible{outline:2px solid #d4af37;outline-offset:2px}
-            .ash-header{padding-right:150px !important}
-            @media(max-width:767px){.pp-voltar{top:15px;right:16px;padding:7px 12px;font-size:12px}.ash-header{padding-right:112px !important}}
-          `}</style>
-          <Link href="/pedidos" className="pp-voltar" data-testid="voltar-catalogo" aria-label="Voltar para Catálogo e Pedidos">
-            <span aria-hidden="true">←</span> Voltar
-          </Link>
-        </>
-      )}
       <div className="pp-wrap">
         <p style={{ color: "#64748b", margin: "0 0 18px", maxWidth: 820, fontSize: 13 }}>
           Busque referências reais na web para um produto ou para a mão de obra de um serviço, compare com o seu preço e, se quiser, registre as referências no histórico. Nada altera seus preços de venda.

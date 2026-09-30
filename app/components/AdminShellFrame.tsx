@@ -15,9 +15,12 @@
 // como antes (ver AdminShell.tsx) — só o título/subtítulo/ação viajam via
 // Context (AdminShellContext) para esta chrome persistente atualizar,
 // nunca remontando o <aside>.
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import {
+  CHAVE_ATUAL, CHAVE_PILHA, CHAVE_VOLTANDO, caminhoDe, destinoVoltar, lerPilha, mostrarVoltar, nomeDaTela, registrarVisita,
+} from "../../lib/navegacao-voltar";
 import { AdminShellContext, type AdminShellHeader } from "./AdminShellContext";
 import NegocioNaoVinculado from "./NegocioNaoVinculado";
 
@@ -100,6 +103,24 @@ export const ROTAS_COM_SHELL: readonly string[] = [
 
 const DEFAULT_HEADER: AdminShellHeader = { title: "" };
 
+// Pilha do "← Voltar" como store externo (sessionStorage da aba, com cópia
+// em memória se o navegador bloquear o armazenamento). O React lê via
+// useSyncExternalStore; quem grava avisa pelo evento — sem setState em efeito.
+const EVENTO_PILHA_VOLTAR = "organizapro:voltar:pilha-mudou";
+let pilhaVoltarEmMemoria = "[]";
+function assinarPilhaVoltar(aviso: () => void) {
+  window.addEventListener(EVENTO_PILHA_VOLTAR, aviso);
+  return () => window.removeEventListener(EVENTO_PILHA_VOLTAR, aviso);
+}
+function lerPilhaVoltarBruta(): string {
+  try { return sessionStorage.getItem(CHAVE_PILHA) ?? pilhaVoltarEmMemoria; } catch { return pilhaVoltarEmMemoria; }
+}
+function gravarPilhaVoltar(pilha: string[]) {
+  pilhaVoltarEmMemoria = JSON.stringify(pilha);
+  try { sessionStorage.setItem(CHAVE_PILHA, pilhaVoltarEmMemoria); } catch { /* fica só em memória */ }
+  window.dispatchEvent(new Event(EVENTO_PILHA_VOLTAR));
+}
+
 export default function AdminShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
@@ -146,6 +167,47 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
     setSidebarOpen(false);
   };
 
+  // ── "← Voltar" — padrão de navegação de todas as telas internas ────────
+  // Um só ponto (esta chrome persistente). Registra a tela anterior a cada
+  // troca de rota numa pilha da aba (sessionStorage; também sobrevive a
+  // recarregamento e a links <a> comuns). Destino: última tela interna
+  // visitada; sem origem (acesso direto), o pai canônico da tela. Nunca
+  // sai do OrganizaPro e nunca depende do histórico do navegador — regra em
+  // lib/navegacao-voltar.ts.
+  const pilhaVoltarBruta = useSyncExternalStore(assinarPilhaVoltar, lerPilhaVoltarBruta, () => "[]");
+  const pilhaVoltar = useMemo(() => lerPilha(pilhaVoltarBruta, ROTAS_COM_SHELL), [pilhaVoltarBruta]);
+  const anteriorRef = useRef<string | null>(null);
+  const voltandoRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const atual = window.location.pathname + window.location.search;
+    let anterior = anteriorRef.current;
+    let voltando = voltandoRef.current;
+    try {
+      anterior = sessionStorage.getItem(CHAVE_ATUAL) ?? anterior;
+      voltando = sessionStorage.getItem(CHAVE_VOLTANDO) ?? voltando;
+    } catch { /* sem sessionStorage: segue só com a memória desta aba */ }
+    const pilha = lerPilha(lerPilhaVoltarBruta(), ROTAS_COM_SHELL);
+    const chegouPeloVoltar = !!voltando && caminhoDe(voltando) === caminhoDe(atual);
+    gravarPilhaVoltar(chegouPeloVoltar ? pilha : registrarVisita(pilha, anterior, atual, ROTAS_COM_SHELL));
+    try {
+      sessionStorage.setItem(CHAVE_ATUAL, atual);
+      sessionStorage.removeItem(CHAVE_VOLTANDO);
+    } catch { /* idem */ }
+    anteriorRef.current = atual;
+    voltandoRef.current = null;
+  }, [pathname]);
+
+  const alvoVoltar = destinoVoltar(pathname, pilhaVoltar, ROTAS_COM_SHELL);
+  const nomeAlvoVoltar = nomeDaTela(alvoVoltar.destino, [...navGrupos.flatMap((g) => g.itens), ...navForaDoMenuPreVenda, { l: "Configurações", h: "/configuracoes" }]);
+  const voltar = () => {
+    const { destino, pilha } = destinoVoltar(window.location.pathname + window.location.search, pilhaVoltar, ROTAS_COM_SHELL);
+    voltandoRef.current = destino;
+    try { sessionStorage.setItem(CHAVE_VOLTANDO, destino); } catch { /* idem */ }
+    gravarPilhaVoltar(pilha);
+    navigate(destino);
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/login");
@@ -182,7 +244,31 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
             flex-direction: column;
             min-height: 100vh;
             overflow-x: hidden;
+            /* clip corta o transbordo sem virar contêiner de rolagem: é o que
+               deixa o cabeçalho (position: sticky) grudar no topo de verdade —
+               com hidden ele rolava junto e o "← Voltar" sumia no scroll.
+               Navegador sem suporte a clip mantém o hidden acima. */
+            overflow-x: clip;
           }
+          .ash-voltar {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            flex-shrink: 0;
+            padding: 7px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            background: rgba(20, 17, 8, 0.92);
+            color: #e3c05c;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+          }
+          .ash-voltar:hover { background: rgba(212, 175, 55, 0.14); border-color: #d4af37; color: #f2d98a; }
+          .ash-voltar:focus-visible { outline: 2px solid #d4af37; outline-offset: 2px; }
           .ash-header {
             padding: 20px 32px;
           }
@@ -225,6 +311,11 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
             .ash-content {
               padding: 16px;
             }
+            .ash-voltar {
+              padding: 6px 11px;
+              font-size: 12px;
+              gap: 5px;
+            }
             .ash-hamburger {
               display: flex !important;
               align-items: center;
@@ -237,6 +328,13 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
             .ash-backdrop.open {
               display: block;
             }
+          }
+          /* Celular estreito com botão de ação no cabeçalho: o Voltar fica só
+             com a seta (o nome acessível "Voltar para …" continua) para não
+             espremer o título da tela. */
+          @media (max-width: 419px) {
+            .ash-header:has(.ash-action-btn) .ash-voltar-texto { display: none; }
+            .ash-header:has(.ash-action-btn) .ash-voltar { padding: 6px 10px; }
           }
         `}</style>
 
@@ -410,6 +508,24 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
               >
                 ☰
               </button>
+
+              {mostrarVoltar(pathname) && (
+                <a
+                  href={alvoVoltar.destino}
+                  className="ash-voltar"
+                  data-testid="voltar"
+                  aria-label={`Voltar para ${nomeAlvoVoltar ?? "a tela anterior"}`}
+                  title={`Voltar para ${nomeAlvoVoltar ?? "a tela anterior"}`}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // nova aba: segue o href
+                    e.preventDefault();
+                    voltar();
+                  }}
+                >
+                  <span aria-hidden="true">←</span>
+                  <span className="ash-voltar-texto">Voltar</span>
+                </a>
+              )}
 
               <div style={{ minWidth: 0 }}>
                 <h1 style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
