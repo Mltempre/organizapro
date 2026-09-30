@@ -5,6 +5,7 @@ import AdminShell from "./AdminShell";
 import type { AgItem, DashboardViewProps } from "./DashboardView";
 import type { ResumoReceitaPerdida } from "../../lib/receita-perdida";
 import type { ResumoFechamento } from "../../lib/fechamento-contabil";
+import { DIAS_PARA_CONSIDERAR_PARADO } from "../../lib/motor-orcamentos";
 import styles from "./CasaDashboard.module.css";
 
 export type CasaDashboardProps = Pick<DashboardViewProps, "clinicaId" | "dataStr" | "saudacaoCard" | "temDados" | "missaoDoDia" | "indicadores" | "indicadoresCobranca" | "orcamentosParadosCount" | "onboarding"> & {
@@ -16,7 +17,9 @@ export type CasaDashboardProps = Pick<DashboardViewProps, "clinicaId" | "dataStr
 
 const moeda = (valor: number | null) => valor === null ? "Valor não informado" : valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const rotulosRisco = {
-  orcamento_parado: "Orçamentos sem resposta",
+  // Só os parados (mesmo predicado da Receita Perdida); o total de
+  // apresentados fica em "Comercial e presença".
+  orcamento_parado: `Orçamentos parados (sem resposta há ${DIAS_PARA_CONSIDERAR_PARADO}+ dias)`,
   cobranca_atrasada: "Cobranças vencidas",
   tratamento_sem_retorno: "Serviços sem retorno (valor estimado)",
   pedido_nao_concluido: "Pedidos não concluídos",
@@ -118,7 +121,7 @@ export default function CasaDashboard(props: CasaDashboardProps) {
           </section>
           <section className={styles.card} aria-labelledby="casa-comercial">
             <h2 id="casa-comercial">Comercial e presença</h2>
-            <p>{orcamentosParadosCount > 0 ? `${orcamentosParadosCount} orçamento(s) apresentado(s) aguardando resposta.` : "Nenhum orçamento apresentado aguardando resposta."}</p>
+            <p>{orcamentosParadosCount > 0 ? `${orcamentosParadosCount} orçamento(s) apresentado(s) aguardando resposta (todos, inclusive os enviados há menos de ${DIAS_PARA_CONSIDERAR_PARADO} dias).` : "Nenhum orçamento apresentado aguardando resposta."}</p>
             <nav className={styles.links} aria-label="Comercial"><Link href="/orcamentos">Orçamentos →</Link><Link href="/pedidos" aria-describedby="casa-ecommerce-descricao">Catálogo e Pedidos →</Link><Link href="/oportunidades">Oportunidades →</Link></nav>
             <p id="casa-ecommerce-descricao" className={styles.muted}>Catálogo e Pedidos: seus produtos e serviços com preço, e os pedidos feitos no painel e no site.</p>
             <div className={styles.risco}><h3>Avaliações solicitadas</h3>

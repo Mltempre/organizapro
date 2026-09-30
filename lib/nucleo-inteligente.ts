@@ -11,7 +11,7 @@
 // Melhor Ação e Missão do Dia). Nenhuma consulta ao banco aqui — tudo entra
 // por parâmetro, já carregado por quem chama.
 
-import type { OportunidadeCliente } from "./oportunidades-clientes";
+import type { OportunidadeCliente, TipoSinal } from "./oportunidades-clientes";
 import type { CategoriaRecomendacao, CentralOportunidades, Recomendacao } from "./recomendacoes";
 import { oportunidadeElegivelParaOrcamento, type OportunidadeStatus } from "./oportunidades-demanda";
 
@@ -84,6 +84,32 @@ const ORIGEM_POR_TIPO: Partial<Record<OportunidadeCliente["sinais"][number]["tip
   cancelamento_sem_reagendamento:  { evidencia: "no cancelamento real registrado", destino: "/agendamentos", destinoLabel: "Reagendar" },
 };
 const ORIGEM_PADRAO = { evidencia: "no histórico real de agendamentos", destino: "/clientes" as string | undefined, destinoLabel: "Ver cliente" as string | undefined };
+
+// ── Agregado × cards de cliente ──────────────────────────────────────────
+// "Percebi 3 compromissos de hoje sem confirmação" e os cards "Fulano —
+// Confirmar presença" são duas representações do mesmo fato na mesma lista
+// (chaves de deduplicação diferentes: rec:<id> × cliente). O agregado só sai
+// quando os cards cobrem TODOS os seus casos pelo sinal que exibem (o
+// principal) — nunca esconde um caso que nenhum card mostra.
+const FATO_DO_AGREGADO: Record<string, { tipo: TipoSinal; soHoje?: boolean }> = {
+  "confirmacao-pendente-hoje": { tipo: "confirmacao_pendente" },
+  "cancelamento-hoje":         { tipo: "cancelamento_sem_reagendamento", soHoje: true },
+  "clientes-sem-movimentacao": { tipo: "sem_proximo_compromisso" },
+};
+
+export function removerAgregadosCobertosPorClientes(
+  recomendacoes: Recomendacao[],
+  oportunidades: OportunidadeCliente[]
+): Recomendacao[] {
+  return recomendacoes.filter(r => {
+    const fato = FATO_DO_AGREGADO[r.id];
+    if (!fato) return true;
+    const casosVisiveis = oportunidades
+      .filter(op => op.sinais[0]?.tipo === fato.tipo)
+      .reduce((n, op) => n + op.sinais.filter(s => s.tipo === fato.tipo && (!fato.soHoje || s.diasDesdeEvento === 0)).length, 0);
+    return casosVisiveis < r.quantidade;
+  });
+}
 
 export function adaptarOportunidadesClientes(oportunidades: OportunidadeCliente[]): SinalCanonico[] {
   return oportunidades.map(op => {

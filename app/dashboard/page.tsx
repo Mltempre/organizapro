@@ -19,6 +19,7 @@ import {
   adaptarOportunidadesClientes,
   adaptarRecomendacoes,
   adaptarOportunidadesDemanda,
+  removerAgregadosCobertosPorClientes,
   existemDadosComerciaisReais,
   gerarEstadoComercialCanonico,
   type SinalCanonico,
@@ -503,7 +504,8 @@ export default function Dashboard() {
   const sinaisCanonicos = temDadosComerciais
     ? [
         ...adaptarOportunidadesClientes(oportunidadesClientes),
-        ...adaptarRecomendacoes(todasRecomendacoesAcionaveis),
+        // Agregado cujo fato já aparece inteiro nos cards de cliente sai da lista.
+        ...adaptarRecomendacoes(removerAgregadosCobertosPorClientes(todasRecomendacoesAcionaveis, oportunidadesClientes)),
         ...adaptarOportunidadesDemanda(dash.oportunidadesDemandaRows),
       ]
     : [];
