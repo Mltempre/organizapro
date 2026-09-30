@@ -9,7 +9,8 @@ function fixture(settings = {}) {
   const queries = [], network = [], clients = [], cache = new Map();
   const tables = { clinica_usuarios: [{usuario_id:'user-a',clinica_id:A,ativo:settings.active !== false,papel:'colaborador'}],
     clinicas: [{id:A,produto:settings.product || 'organizapro'}, {id:B,produto:'organizapro'}], ...settings.tables };
-  const db = { auth:{ getUser:async t => ({data:{user:t==='session-a'?{id:'user-a'}:null},error:null}) },
+  const sessoes = { 'session-a':'user-a', ...settings.sessions };
+  const db = { auth:{ getUser:async t => ({data:{user:sessoes[t]?{id:sessoes[t]}:null},error:null}) },
     from(table) { return query(table); }, rpc(name) { throw Error('Unexpected RPC ' + name); },
     storage:{from(){throw Error('Storage forbidden');},createBucket(){throw Error('Storage forbidden');}} };
   function query(table) {
