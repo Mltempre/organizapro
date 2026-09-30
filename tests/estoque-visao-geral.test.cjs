@@ -59,13 +59,17 @@ test('Estoque V1 é só operacional: nenhum termo fiscal/tributário/contábil',
 test('migration: tabelas novas fechadas, SKU/código únicos por negócio, funções só do servidor', () => {
   const sql = ler('supabase/migrations/20261001000001_estoque_basico_v1.sql');
   assert.match(sql, /^-- PREPARADA PARA REVISAO\. NAO APLICADA AO SUPABASE\./);
-  for (const t of ['estoque_saldos', 'estoque_movimentos']) {
+  for (const t of ['estoque_saldos', 'estoque_movimentos', 'estoque_identificadores']) {
     assert.match(sql, new RegExp(`alter table public\\.${t} enable row level security;`));
     assert.match(sql, new RegExp(`revoke all on table public\\.${t} from public, anon, authenticated;`));
   }
   assert.doesNotMatch(sql, /create policy/i, 'sem policies: acesso só via service role');
-  assert.match(sql, /on public\.clinica_servicos \(clinica_id, lower\(sku\)\) where sku is not null/);
-  assert.match(sql, /on public\.clinica_servicos \(clinica_id, codigo_barras\) where codigo_barras is not null/);
+  // SKU/EAN são internos: nunca em clinica_servicos (lida pelo site público).
+  const blocoCatalogo = sql.slice(sql.indexOf('-- ── 1. Catálogo'), sql.indexOf('-- ── 1b.'));
+  assert.doesNotMatch(blocoCatalogo, /sku|codigo_barras/i);
+  assert.doesNotMatch(sql, /alter table public\.clinica_servicos[^;]*add column[^;]*(sku|codigo_barras)/i);
+  assert.match(sql, /on public\.estoque_identificadores \(clinica_id, lower\(sku\)\) where sku is not null/);
+  assert.match(sql, /on public\.estoque_identificadores \(clinica_id, codigo_barras\) where codigo_barras is not null/);
   assert.match(sql, /on public\.estoque_movimentos \(pedido_id, servico_id, tipo\) where pedido_id is not null/);
   assert.match(sql, /foreign key \(servico_id, clinica_id\) references public\.clinica_servicos\(id, clinica_id\)/);
   assert.match(sql, /revoke all on function public\.pedido_transicionar_com_estoque_v1\(uuid, uuid, text, text\) from public, anon, authenticated;/);

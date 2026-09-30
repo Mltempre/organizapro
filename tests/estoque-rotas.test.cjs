@@ -96,9 +96,14 @@ test('negócio B não confirma pedido de A (nem chega à função de estoque)', 
 // ── APIs de estoque ─────────────────────────────────────────────────────
 function comEstoque(opts) {
   const f = fixture(opts);
-  Object.assign(f.tables.clinica_servicos[0], { tipo_item: 'produto', sku: 'CAM-M', codigo_barras: '789', controla_estoque: true, estoque_minimo: 2 });
-  Object.assign(f.tables.clinica_servicos[1], { tipo_item: 'produto', sku: null, codigo_barras: null, controla_estoque: true, estoque_minimo: 5 });
-  f.tables.clinica_servicos.push({ id: 'service-a2', clinica_id: 'a', nome: 'Corte', preco_centavos: 500, disponivel: true, tipo_item: 'servico', sku: null, codigo_barras: null, controla_estoque: false, estoque_minimo: null });
+  // SKU/código de barras ficam em estoque_identificadores (privada), nunca no catálogo público.
+  Object.assign(f.tables.clinica_servicos[0], { tipo_item: 'produto', controla_estoque: true, estoque_minimo: 2 });
+  Object.assign(f.tables.clinica_servicos[1], { tipo_item: 'produto', controla_estoque: true, estoque_minimo: 5 });
+  f.tables.clinica_servicos.push({ id: 'service-a2', clinica_id: 'a', nome: 'Corte', preco_centavos: 500, disponivel: true, tipo_item: 'servico', controla_estoque: false, estoque_minimo: null });
+  f.tables.estoque_identificadores = [
+    { servico_id: 'service-a', clinica_id: 'a', sku: 'CAM-M', codigo_barras: '789' },
+    { servico_id: 'service-b', clinica_id: 'b', sku: 'SEGREDO-B', codigo_barras: '999' },
+  ];
   f.tables.estoque_saldos = [{ servico_id: 'service-a', clinica_id: 'a', saldo: 2 }, { servico_id: 'service-b', clinica_id: 'b', saldo: 1 }];
   f.tables.estoque_movimentos = [
     { id: 'm1', clinica_id: 'a', servico_id: 'service-a', tipo: 'entrada', quantidade: 3, saldo_apos: 3 },
@@ -117,7 +122,10 @@ test('GET /api/estoque: só itens e saldos do próprio negócio; serviço sem sa
   assert.equal(cam.saldo, 2); assert.equal(cam.baixo, true);
   assert.equal(r.body.itens.find(i => i.id === 'service-a2').saldo, null);
   assert.equal(r.body.estoqueBaixo, 1);
-  assert.ok(f.calls.filter(c => ['clinica_servicos', 'estoque_saldos'].includes(c.table)).every(c => c.filters.some(([k, v]) => k === 'clinica_id' && v === 'a')));
+  assert.equal(cam.sku, 'CAM-M'); assert.equal(cam.codigo_barras, '789', 'tenant correto lê SKU/código');
+  assert.equal(r.body.itens.find(i => i.id === 'service-a2').sku, null);
+  assert.doesNotMatch(JSON.stringify(r.body), /SEGREDO-B|"999"/, 'SKU/código de B nunca aparecem para A');
+  assert.ok(f.calls.filter(c => ['clinica_servicos', 'estoque_saldos', 'estoque_identificadores'].includes(c.table)).every(c => c.filters.some(([k, v]) => k === 'clinica_id' && v === 'a')));
   assert.equal((await get(f, ESTOQUE, 'https://local.invalid/api/estoque?clinica_id=a', 'b')).status, 403);
 });
 
@@ -128,10 +136,20 @@ test('PUT /api/estoque: valida, grava só no próprio negócio e não acha item 
   const ok = await put({ clinica_id: 'a', servico_id: 'service-a', tipo_item: 'produto', sku: ' CAM-P ', codigo_barras: '', controla_estoque: true, estoque_minimo: '3' });
   assert.equal(ok.status, 200);
   assert.deepEqual(JSON.parse(JSON.stringify(ok.body.config)), { tipo_item: 'produto', sku: 'CAM-P', codigo_barras: null, controla_estoque: true, estoque_minimo: 3 });
-  assert.equal(f.tables.clinica_servicos[0].sku, 'CAM-P');
-  const alheio = await put({ clinica_id: 'a', servico_id: 'service-b', tipo_item: 'produto', controla_estoque: false });
+  const idA = f.tables.estoque_identificadores.find(x => x.servico_id === 'service-a');
+  assert.equal(idA.sku, 'CAM-P'); assert.equal(idA.codigo_barras, null); assert.equal(idA.clinica_id, 'a');
+  assert.equal(f.tables.clinica_servicos[0].sku, undefined, 'SKU nunca é gravado no catálogo público');
+  assert.equal(f.tables.clinica_servicos[0].estoque_minimo, 3);
+  const upserts = f.calls.filter(c => c.table === 'estoque_identificadores' && c.action === 'upsert');
+  assert.equal(upserts[0].onConflict, 'servico_id');
+  const novo = await put({ clinica_id: 'a', servico_id: 'service-a2', tipo_item: 'produto', sku: 'NOVO-1', codigo_barras: '123', controla_estoque: false });
+  assert.equal(novo.status, 200);
+  assert.equal(f.tables.estoque_identificadores.find(x => x.servico_id === 'service-a2').sku, 'NOVO-1');
+  const alheio = await put({ clinica_id: 'a', servico_id: 'service-b', tipo_item: 'produto', sku: 'X', controla_estoque: false });
   assert.equal(alheio.status, 404);
   assert.equal(f.tables.clinica_servicos[1].controla_estoque, true, 'item de B intacto');
+  assert.equal(f.tables.estoque_identificadores.find(x => x.servico_id === 'service-b').sku, 'SEGREDO-B', 'SKU de B intacto');
+  assert.equal(f.calls.filter(c => c.table === 'estoque_identificadores' && c.action === 'upsert').length, 2, 'item alheio não chega a gravar');
   assert.equal((await put({ clinica_id: 'b', servico_id: 'service-b', tipo_item: 'produto' }, 'a')).status, 403);
 });
 

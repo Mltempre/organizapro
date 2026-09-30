@@ -22,6 +22,7 @@ function fixture(options = {}) {
       in(k, vs) { q.filters.push([k, vs]); return chain; },
       insert(v) { q.action = 'insert'; q.value = v; return chain; },
       update(v) { q.action = 'update'; q.value = v; return chain; },
+      upsert(v, opts) { q.action = 'upsert'; q.value = v; q.onConflict = opts?.onConflict; return chain; },
       delete() { q.action = 'delete'; return chain; },
       single() { single = true; return run(); }, maybeSingle() { single = true; return run(); },
       then(ok, fail) { return run().then(ok, fail); },
@@ -37,6 +38,11 @@ function fixture(options = {}) {
         const input = Array.isArray(q.value) ? q.value : [q.value];
         if (table === 'eventos_dominio' && input.some(r => tables[table].some(e => e.clinica_id === r.clinica_id && e.chave_idempotencia === r.chave_idempotencia))) return { data: null, error: { message: 'unique' } };
         rows = input.map(r => ({ id: `id-${++serial}`, ...r })); tables[table].push(...rows);
+      }
+      if (q.action === 'upsert') {
+        const existente = tables[table].find(r => r[q.onConflict] === q.value[q.onConflict]);
+        if (existente) Object.assign(existente, q.value); else tables[table].push({ ...q.value });
+        rows = [existente ?? q.value];
       }
       if (q.action === 'update') rows.forEach(r => Object.assign(r, q.value));
       if (q.action === 'delete') tables[table] = tables[table].filter(r => !matches(r));

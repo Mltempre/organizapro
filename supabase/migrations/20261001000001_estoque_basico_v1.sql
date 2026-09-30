@@ -6,6 +6,8 @@
 -- 1. Catálogo (public.clinica_servicos): campos novos, todos opcionais e
 --    com padrão que deixa cada item existente exatamente como hoje
 --    (tipo 'servico', estoque não controlado).
+-- 1b. public.estoque_identificadores: SKU e código de barras do item —
+--    dados internos, fora de clinica_servicos (lida pelo site público).
 -- 2. public.estoque_saldos: saldo atual por item controlado.
 -- 3. public.estoque_movimentos: histórico append-only (entrada, ajuste,
 --    venda, estorno_venda), com motivo, autor e pedido de origem.
@@ -18,32 +20,43 @@
 -- (mesmo padrão homologado de pedidos/pedido_itens — acesso só via service
 -- role, com autorização por negócio feita na API) e FKs compostas
 -- (servico_id, clinica_id) que impedem apontar item de outro negócio.
--- SKU e código de barras são únicos DENTRO do negócio, nunca globalmente.
+-- SKU e código de barras são únicos DENTRO do negócio, nunca globalmente,
+-- e nunca expostos publicamente.
 -- Transacional: qualquer falha desfaz tudo.
 begin;
 
 -- ── 1. Catálogo ─────────────────────────────────────────────────────────
 alter table public.clinica_servicos
   add column if not exists tipo_item text not null default 'servico',
-  add column if not exists sku text,
-  add column if not exists codigo_barras text,
   add column if not exists controla_estoque boolean not null default false,
   add column if not exists estoque_minimo integer;
 
 alter table public.clinica_servicos
   add constraint clinica_servicos_tipo_item_chk check (tipo_item in ('produto', 'servico')),
-  add constraint clinica_servicos_sku_chk check (sku is null or (sku = btrim(sku) and length(sku) between 1 and 60)),
-  add constraint clinica_servicos_codigo_barras_chk check (codigo_barras is null or codigo_barras ~ '^[0-9A-Za-z-]{1,64}$'),
   add constraint clinica_servicos_estoque_minimo_chk check (estoque_minimo is null or estoque_minimo >= 0),
   add constraint clinica_servicos_controla_so_produto_chk check (not controla_estoque or tipo_item = 'produto');
 
-create unique index if not exists clinica_servicos_sku_por_negocio_uidx
-  on public.clinica_servicos (clinica_id, lower(sku)) where sku is not null;
-create unique index if not exists clinica_servicos_codigo_barras_por_negocio_uidx
-  on public.clinica_servicos (clinica_id, codigo_barras) where codigo_barras is not null;
-
 comment on column public.clinica_servicos.tipo_item is 'Estoque V1: produto físico ou serviço. Padrão servico (itens existentes inalterados).';
 comment on column public.clinica_servicos.controla_estoque is 'Estoque V1: só produto. true = pedidos confirmados baixam saldo em estoque_saldos.';
+
+-- ── 1b. SKU e código de barras — dados internos, NUNCA públicos ─────────
+-- clinica_servicos é lida pelo site público; por isso SKU/EAN ficam numa
+-- tabela à parte, fechada como as demais tabelas de estoque (RLS sem
+-- policy, acesso só via servidor). Únicos DENTRO do negócio, nunca globais.
+create table if not exists public.estoque_identificadores (
+  servico_id    uuid primary key,
+  clinica_id    uuid not null references public.clinicas(id),
+  sku           text check (sku is null or (sku = btrim(sku) and length(sku) between 1 and 60)),
+  codigo_barras text check (codigo_barras is null or codigo_barras ~ '^[0-9A-Za-z-]{1,64}$'),
+  atualizado_em timestamptz not null default now(),
+  foreign key (servico_id, clinica_id) references public.clinica_servicos(id, clinica_id) on delete cascade
+);
+create unique index if not exists estoque_identificadores_sku_por_negocio_uidx
+  on public.estoque_identificadores (clinica_id, lower(sku)) where sku is not null;
+create unique index if not exists estoque_identificadores_codigo_barras_por_negocio_uidx
+  on public.estoque_identificadores (clinica_id, codigo_barras) where codigo_barras is not null;
+alter table public.estoque_identificadores enable row level security;
+revoke all on table public.estoque_identificadores from public, anon, authenticated;
 
 -- ── 2. Saldo atual ──────────────────────────────────────────────────────
 create table if not exists public.estoque_saldos (
@@ -232,6 +245,7 @@ revoke all on function public.pedido_transicionar_com_estoque_v1(uuid, uuid, tex
 grant execute on function public.estoque_registrar_movimento_v1(uuid, uuid, text, integer, text, uuid, text) to service_role;
 grant execute on function public.pedido_transicionar_com_estoque_v1(uuid, uuid, text, text) to service_role;
 grant select, insert, update on table public.estoque_saldos to service_role;
+grant select, insert, update on table public.estoque_identificadores to service_role;
 grant select, insert on table public.estoque_movimentos to service_role;
 
 commit;
@@ -244,17 +258,12 @@ commit;
 -- drop function if exists public.estoque_movimentos_somente_insercao();
 -- drop table if exists public.estoque_movimentos;
 -- drop table if exists public.estoque_saldos;
--- drop index if exists public.clinica_servicos_codigo_barras_por_negocio_uidx;
--- drop index if exists public.clinica_servicos_sku_por_negocio_uidx;
+-- drop table if exists public.estoque_identificadores;
 -- alter table public.clinica_servicos
 --   drop constraint if exists clinica_servicos_controla_so_produto_chk,
 --   drop constraint if exists clinica_servicos_estoque_minimo_chk,
---   drop constraint if exists clinica_servicos_codigo_barras_chk,
---   drop constraint if exists clinica_servicos_sku_chk,
 --   drop constraint if exists clinica_servicos_tipo_item_chk,
 --   drop column if exists estoque_minimo,
 --   drop column if exists controla_estoque,
---   drop column if exists codigo_barras,
---   drop column if exists sku,
 --   drop column if exists tipo_item;
 -- commit;
