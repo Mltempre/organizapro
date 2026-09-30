@@ -1,109 +1,115 @@
-// "← Voltar" — padrão global de navegação das telas internas do OrganizaPro.
-// Regra pura (lib/navegacao-voltar.ts) + ligação única no shell persistente
-// (app/components/AdminShellFrame.tsx), cobrindo todas as telas do menu.
+// "← Voltar" — histórico de navegação INTERNA do OrganizaPro: cada clique
+// volta exatamente um passo da sequência percorrida nesta aba. Regra pura
+// (lib/navegacao-voltar.ts) + ligação única no shell persistente.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {
-  destinoVoltar, registrarVisita, paiCanonico, mostrarVoltar, rotaInternaValida, nomeDaTela, lerPilha, LIMITE_PILHA,
-} from "../lib/navegacao-voltar.ts";
+import { destinoVoltar, registrarVisita, rotaInternaValida, nomeDaTela, lerPilha, LIMITE_PILHA } from "../lib/navegacao-voltar.ts";
 
 const ler = p => fs.readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const shell = ler("app/components/AdminShellFrame.tsx");
 const menu = [...shell.matchAll(/\{ l: "([^"]+)",\s+h: "([^"]+)"/g)].map(m => ({ l: m[1], h: m[2] }));
 const ROTAS = [...menu.map(i => i.h), "/configuracoes", "/dashboard-demo"];
 
-// Simula a navegação como o shell faz: a cada tela, registra a anterior.
-function navegar(caminhos) {
-  let pilha = [], anterior = null;
-  for (const c of caminhos) { pilha = registrarVisita(pilha, anterior, c, ROTAS); anterior = c; }
-  return pilha;
+// Simula a aba como o shell faz: abrir tela registra a anterior; Voltar
+// usa o topo da pilha e NÃO registra a chegada (não empilha de volta).
+function aba() {
+  let pilha = [], atual = null;
+  return {
+    abrir(rota) { pilha = registrarVisita(pilha, atual, rota, ROTAS); atual = rota; },
+    voltar() {
+      const r = destinoVoltar(atual, pilha, ROTAS);
+      if (r.destino) { pilha = r.pilha; atual = r.destino; }
+      return r.destino;
+    },
+    get atual() { return atual; },
+  };
 }
 
-test("menu lido do shell tem as telas esperadas", () => {
-  for (const h of ["/dashboard", "/oportunidades", "/financeiro", "/clientes", "/orcamentos", "/follow-up", "/cobrancas", "/pedidos", "/estoque",
-    "/pesquisa-precos", "/tratamentos", "/receita-perdida", "/agendamentos", "/agenda-autonoma", "/chatbot", "/automacao", "/google-presenca",
-    "/reputacao", "/site", "/conteudo", "/copiloto", "/metricas", "/raio-x", "/previsor-faturamento", "/linha-economica", "/atribuicao"]) {
-    assert.ok(menu.some(i => i.h === h), h);
-  }
+test("exemplo 1: Visão Geral → Oportunidades → Follow-up → Orçamentos: cada ← volta uma etapa", () => {
+  const a = aba();
+  for (const r of ["/dashboard", "/oportunidades", "/follow-up", "/orcamentos"]) a.abrir(r);
+  assert.equal(a.voltar(), "/follow-up");
+  assert.equal(a.voltar(), "/oportunidades");
+  assert.equal(a.voltar(), "/dashboard");
+  assert.equal(a.voltar(), null, "sem mais histórico: nenhum destino inventado");
+  assert.equal(a.atual, "/dashboard");
 });
 
-test("Catálogo e Pedidos → Pesquisa de Preços → Voltar → Catálogo e Pedidos", () => {
-  const pilha = navegar(["/dashboard", "/pedidos", "/pesquisa-precos?termo=Pneu&servico_id=abc"]);
-  const r = destinoVoltar("/pesquisa-precos?termo=Pneu&servico_id=abc", pilha, ROTAS);
-  assert.equal(r.destino, "/pedidos"); assert.equal(r.origem, "historico");
+test("exemplo 2: Clientes → Orçamentos → Pesquisa de Preços → Catálogo", () => {
+  const a = aba();
+  for (const r of ["/clientes", "/orcamentos", "/pesquisa-precos?termo=Pneu&servico_id=abc", "/pedidos"]) a.abrir(r);
+  assert.equal(a.voltar(), "/pesquisa-precos?termo=Pneu&servico_id=abc", "volta com a mesma consulta aberta");
+  assert.equal(a.voltar(), "/orcamentos");
+  assert.equal(a.voltar(), "/clientes");
+  assert.equal(a.voltar(), null);
 });
 
-test("Visão Geral → Gerente Comercial → Voltar → Visão Geral", () => {
-  const r = destinoVoltar("/copiloto", navegar(["/dashboard", "/copiloto"]), ROTAS);
-  assert.equal(r.destino, "/dashboard");
+test("vale também na Visão Geral quando há histórico anterior", () => {
+  const a = aba();
+  for (const r of ["/clientes", "/dashboard"]) a.abrir(r);
+  assert.equal(a.voltar(), "/clientes");
 });
 
-test("voltar em sequência percorre o caminho feito, sem pular nem repetir", () => {
-  const pilha = navegar(["/dashboard", "/clientes", "/clientes/123", "/orcamentos?status=apresentado"]);
-  const a = destinoVoltar("/orcamentos?status=apresentado", pilha, ROTAS);
-  assert.equal(a.destino, "/clientes/123");
-  const b = destinoVoltar("/clientes/123", a.pilha, ROTAS);
-  assert.equal(b.destino, "/clientes");
-  const c = destinoVoltar("/clientes", b.pilha, ROTAS);
-  assert.equal(c.destino, "/dashboard");
-  assert.equal(destinoVoltar("/dashboard", c.pilha, ROTAS).origem, "pai");
+test("revisitar uma tela não pula nem inventa etapas (como um histórico real)", () => {
+  const a = aba();
+  for (const r of ["/dashboard", "/clientes", "/dashboard", "/copiloto"]) a.abrir(r);
+  assert.deepEqual([a.voltar(), a.voltar(), a.voltar(), a.voltar()], ["/dashboard", "/clientes", "/dashboard", null]);
 });
 
-test("acesso direto pela URL (sem origem): pai canônico, nunca fora do produto", () => {
-  assert.equal(destinoVoltar("/pesquisa-precos", [], ROTAS).destino, "/pedidos");
-  assert.equal(destinoVoltar("/estoque", [], ROTAS).destino, "/pedidos");
-  assert.equal(destinoVoltar("/agenda-autonoma", [], ROTAS).destino, "/agendamentos");
-  assert.equal(destinoVoltar("/clientes/abc", [], ROTAS).destino, "/clientes");
-  assert.equal(destinoVoltar("/site/servicos", [], ROTAS).destino, "/site");
-  for (const h of ROTAS.filter(h => !["/pesquisa-precos", "/estoque", "/agenda-autonoma"].includes(h))) {
-    assert.equal(destinoVoltar(h, [], ROTAS).destino, "/dashboard", h);
-  }
+test("voltar e seguir por outro caminho: a nova sequência substitui o que ficou à frente", () => {
+  const a = aba();
+  for (const r of ["/dashboard", "/clientes", "/orcamentos"]) a.abrir(r);
+  assert.equal(a.voltar(), "/clientes");
+  a.abrir("/cobrancas");
+  assert.equal(a.voltar(), "/clientes");
+  assert.equal(a.voltar(), "/dashboard");
 });
 
-test("origem externa ou pública nunca vira destino", () => {
+test("sem histórico (acesso direto / aba nova): nenhum destino fixo, nenhum 'pai'", () => {
+  for (const h of ROTAS) assert.equal(destinoVoltar(h, [], ROTAS).destino, null, h);
+});
+
+test("nunca sai do OrganizaPro: externos e páginas públicas não entram no histórico", () => {
   for (const ruim of ["https://golpe.com/x", "//golpe.com", "/\\golpe.com", "javascript:alert(1)", "/login", "/empresa/slug", "/", "", null]) {
     assert.equal(rotaInternaValida(ruim, ROTAS), false, String(ruim));
   }
-  const pilha = lerPilha(JSON.stringify(["https://golpe.com", "/login", "//x.com", "/pedidos"]), ROTAS);
-  assert.deepEqual(pilha, ["/pedidos"], "pilha adulterada é saneada");
-  assert.equal(destinoVoltar("/estoque", ["https://golpe.com"], ROTAS).destino, "/pedidos");
+  assert.deepEqual(lerPilha(JSON.stringify(["https://golpe.com", "/login", "//x.com", "/pedidos"]), ROTAS), ["/pedidos"]);
+  assert.equal(destinoVoltar("/estoque", ["https://golpe.com", "//x.com"], ROTAS).destino, null);
   assert.deepEqual(lerPilha("{quebrado", ROTAS), []);
+  const a = aba();
+  a.abrir("/login"); a.abrir("/clientes");
+  assert.equal(a.voltar(), null, "/login não vira destino");
 });
 
-test("recarregar a mesma tela não empilha; pilha tem limite", () => {
-  assert.deepEqual(navegar(["/pedidos", "/pedidos", "/pedidos?x=1"]), []);
-  const muitas = navegar(Array.from({ length: 80 }, (_, i) => (i % 2 ? "/clientes" : "/pedidos")));
-  assert.ok(muitas.length <= LIMITE_PILHA);
-});
-
-test("Voltar aparece em todas as telas internas, exceto a Visão Geral (ponto de partida)", () => {
-  assert.equal(mostrarVoltar("/dashboard"), false);
-  for (const h of ROTAS.filter(h => h !== "/dashboard")) assert.equal(mostrarVoltar(h), true, h);
-  for (const h of ["/clientes/abc", "/site/faq"]) assert.equal(mostrarVoltar(h), true, h);
+test("recarregar a mesma tela não cria etapa; histórico tem limite", () => {
+  const a = aba();
+  for (const r of ["/pedidos", "/pedidos", "/pedidos?x=1"]) a.abrir(r);
+  assert.equal(a.voltar(), null);
+  const b = aba();
+  for (let i = 0; i < 120; i++) b.abrir(i % 2 ? "/clientes" : "/pedidos");
+  assert.ok(destinoVoltar("/pedidos", [], ROTAS).pilha.length <= LIMITE_PILHA);
 });
 
 test("rótulo acessível diz para onde volta", () => {
   assert.equal(nomeDaTela("/pedidos", menu), "Catálogo e Pedidos");
   assert.equal(nomeDaTela("/clientes/abc", menu), "Clientes");
   assert.equal(nomeDaTela("/dashboard", menu), "Visão Geral");
-  assert.equal(paiCanonico("/qualquer"), "/dashboard");
 });
 
-test("ligação única no shell: link real, sem history.back, sessionStorage, estilo dourado", () => {
-  assert.match(shell, /import \{\s*CHAVE_ATUAL, CHAVE_PILHA, CHAVE_VOLTANDO, caminhoDe, destinoVoltar, lerPilha, mostrarVoltar, nomeDaTela, registrarVisita,\s*\} from "\.\.\/\.\.\/lib\/navegacao-voltar";/);
-  assert.match(shell, /\{mostrarVoltar\(pathname\) && \(\s*<a\s+href=\{alvoVoltar\.destino\}\s+className="ash-voltar"/);
-  assert.match(shell, /aria-label=\{`Voltar para \$\{nomeAlvoVoltar \?\? "a tela anterior"\}`\}/);
-  assert.match(shell, /<span aria-hidden="true">←<\/span>\s*<span className="ash-voltar-texto">Voltar<\/span>/);
+test("shell: UMA seta no canto direito do cabeçalho, em todas as telas, sem destino fixo", () => {
+  const cabecalho = shell.slice(shell.indexOf('className="ash-header"'), shell.indexOf("</header>"));
+  assert.equal((cabecalho.match(/className="ash-voltar"/g) || []).length, 1, "uma única seta");
+  assert.ok(cabecalho.indexOf('className="ash-voltar"') > cabecalho.indexOf('className="ash-action-btn"'), "à direita, depois da ação da tela");
+  assert.doesNotMatch(shell, /mostrarVoltar|paiCanonico|INICIO/);
+  assert.match(cabecalho, /aria-disabled=\{alvoVoltar\.destino \? undefined : true\}/);
+  assert.match(cabecalho, /<span aria-hidden="true">←<\/span>\s*<span className="ash-voltar-texto">Voltar<\/span>/);
   assert.doesNotMatch(shell, /router\.back\(|history\.back\(|history\.go\(|document\.referrer/);
-  assert.match(shell, /sessionStorage\.setItem\(CHAVE_PILHA/);
+  assert.match(shell, /if \(!destino\) return; \/\/ sem histórico interno/);
   assert.match(shell, /\.ash-voltar \{[^}]*color: #e3c05c;/);
-  assert.match(shell, /\.ash-voltar:hover \{/);
-  assert.match(shell, /\.ash-voltar:focus-visible \{/);
-  assert.match(shell, /overflow-x: hidden;[\s\S]{0,400}overflow-x: clip;/, "cabeçalho sticky passa a grudar");
+  assert.match(shell, /overflow-x: hidden;[\s\S]{0,400}overflow-x: clip;/, "cabeçalho fixo no topo durante a rolagem");
 });
 
-test("nenhuma página mantém um Voltar próprio de navegação (padrão é do shell)", () => {
-  const pesquisa = ler("app/pesquisa-precos/page.tsx");
-  assert.doesNotMatch(pesquisa, /pp-voltar|veioDoCatalogo/);
+test("nenhuma página tem botão Voltar próprio", () => {
+  assert.doesNotMatch(ler("app/pesquisa-precos/page.tsx"), /pp-voltar|veioDoCatalogo/);
 });

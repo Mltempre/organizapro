@@ -1,33 +1,22 @@
 // ── Navegação "← Voltar" do OrganizaPro — regra pura ──────────────────────
-// Padrão global de navegação das telas internas (renderizado uma única vez
-// pelo shell persistente, app/components/AdminShellFrame.tsx). Sem React,
-// sem DOM: só decide PARA ONDE voltar.
+// Histórico de navegação INTERNA do sistema (renderizado uma única vez pelo
+// shell persistente, app/components/AdminShellFrame.tsx). Sem React, sem
+// DOM: só decide PARA ONDE voltar.
 //
-// Regra de destino:
-//   1. a última tela INTERNA visitada nesta aba (pilha própria, guardada em
-//      sessionStorage — sobrevive a recarregamento e a links <a> comuns);
-//   2. sem origem válida (acesso direto pela URL, aba nova): o pai canônico
-//      da tela (ex.: Pesquisa de Preços → Catálogo e Pedidos);
-//   3. nunca sai do OrganizaPro: só aceita caminho interno ("/..."), de rota
-//      com shell; nunca usa history.back() nem document.referrer.
+// Regra:
+//   - cada tela interna aberta nesta aba entra numa pilha (sessionStorage —
+//     sobrevive a recarregamento e a links <a> comuns);
+//   - cada clique em "← Voltar" volta exatamente UM passo dessa sequência;
+//     voltar não empilha, então cliques seguidos percorrem o caminho de trás
+//     para frente, sem pular etapas;
+//   - sem histórico interno não há destino (nenhum destino fixo ou "pai");
+//   - nunca sai do OrganizaPro: só aceita caminho interno ("/...") de tela
+//     com shell; não depende do histórico do navegador.
 
 export const CHAVE_PILHA = "organizapro:voltar:pilha";
 export const CHAVE_ATUAL = "organizapro:voltar:atual";
 export const CHAVE_VOLTANDO = "organizapro:voltar:voltando";
-export const LIMITE_PILHA = 30;
-export const INICIO = "/dashboard";
-
-/** Telas onde "Voltar" não faz sentido: a Visão Geral é o ponto de partida. */
-export const SEM_VOLTAR: readonly string[] = [INICIO];
-
-/** Pai funcional de telas que nascem de outra (fallback sem origem registrada). */
-const PAI_CANONICO: { prefixo: string; pai: string }[] = [
-  { prefixo: "/pesquisa-precos", pai: "/pedidos" },
-  { prefixo: "/estoque", pai: "/pedidos" },
-  { prefixo: "/agenda-autonoma", pai: "/agendamentos" },
-  { prefixo: "/clientes/", pai: "/clientes" },
-  { prefixo: "/site/", pai: "/site" },
-];
+export const LIMITE_PILHA = 50;
 
 export function caminhoDe(rota: string): string {
   const i = rota.search(/[?#]/);
@@ -46,15 +35,6 @@ export function rotaInternaValida(rota: unknown, rotasShell: readonly string[]):
   return rotasShell.some(r => casaPrefixo(caminho, r));
 }
 
-export function mostrarVoltar(caminho: string): boolean {
-  return !SEM_VOLTAR.includes(caminho);
-}
-
-export function paiCanonico(caminho: string): string {
-  const achado = PAI_CANONICO.find(p => p.prefixo.endsWith("/") ? caminho.startsWith(p.prefixo) : casaPrefixo(caminho, p.prefixo));
-  return achado?.pai ?? INICIO;
-}
-
 /** Registra a tela anterior ao mudar de tela (não registra ao voltar pelo botão). */
 export function registrarVisita(pilha: string[], anterior: string | null, atual: string, rotasShell: readonly string[]): string[] {
   if (!anterior || !rotaInternaValida(anterior, rotasShell)) return pilha;
@@ -63,17 +43,17 @@ export function registrarVisita(pilha: string[], anterior: string | null, atual:
   return [...base, anterior].slice(-LIMITE_PILHA);
 }
 
-/** Para onde o botão leva agora, e como fica a pilha depois de voltar. */
-export function destinoVoltar(atual: string, pilha: string[], rotasShell: readonly string[]): { destino: string; pilha: string[]; origem: "historico" | "pai" } {
+/** Um passo para trás: a tela anterior e a pilha depois de voltar. Sem histórico → destino null. */
+export function destinoVoltar(atual: string, pilha: string[], rotasShell: readonly string[]): { destino: string | null; pilha: string[] } {
   const caminhoAtual = caminhoDe(atual);
   const resto = [...pilha];
   while (resto.length) {
     const candidato = resto.pop()!;
     if (rotaInternaValida(candidato, rotasShell) && caminhoDe(candidato) !== caminhoAtual) {
-      return { destino: candidato, pilha: resto, origem: "historico" };
+      return { destino: candidato, pilha: resto };
     }
   }
-  return { destino: paiCanonico(caminhoAtual), pilha: [], origem: "pai" };
+  return { destino: null, pilha: [] };
 }
 
 /** Nome da tela de destino (rótulo do menu), para o aria-label/título. */

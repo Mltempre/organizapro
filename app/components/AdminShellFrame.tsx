@@ -19,7 +19,7 @@ import { ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncEx
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import {
-  CHAVE_ATUAL, CHAVE_PILHA, CHAVE_VOLTANDO, caminhoDe, destinoVoltar, lerPilha, mostrarVoltar, nomeDaTela, registrarVisita,
+  CHAVE_ATUAL, CHAVE_PILHA, CHAVE_VOLTANDO, caminhoDe, destinoVoltar, lerPilha, nomeDaTela, registrarVisita,
 } from "../../lib/navegacao-voltar";
 import { AdminShellContext, type AdminShellHeader } from "./AdminShellContext";
 import NegocioNaoVinculado from "./NegocioNaoVinculado";
@@ -170,9 +170,9 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
   // ── "← Voltar" — padrão de navegação de todas as telas internas ────────
   // Um só ponto (esta chrome persistente). Registra a tela anterior a cada
   // troca de rota numa pilha da aba (sessionStorage; também sobrevive a
-  // recarregamento e a links <a> comuns). Destino: última tela interna
-  // visitada; sem origem (acesso direto), o pai canônico da tela. Nunca
-  // sai do OrganizaPro e nunca depende do histórico do navegador — regra em
+  // recarregamento e a links <a> comuns). Cada clique volta exatamente um
+  // passo; sem histórico interno o botão fica desativado. Nunca sai do
+  // OrganizaPro e nunca depende do histórico do navegador — regra em
   // lib/navegacao-voltar.ts.
   const pilhaVoltarBruta = useSyncExternalStore(assinarPilhaVoltar, lerPilhaVoltarBruta, () => "[]");
   const pilhaVoltar = useMemo(() => lerPilha(pilhaVoltarBruta, ROTAS_COM_SHELL), [pilhaVoltarBruta]);
@@ -180,7 +180,10 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
   const voltandoRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const atual = window.location.pathname + window.location.search;
+    // Tela atual pelo pathname do Next (confiável já no render); a query só
+    // entra quando a URL do navegador já corresponde a esta tela — logo após
+    // um redirecionamento (ex.: login → Visão Geral) a URL pode atrasar.
+    const atual = pathname + (window.location.pathname === pathname ? window.location.search : "");
     let anterior = anteriorRef.current;
     let voltando = voltandoRef.current;
     try {
@@ -199,9 +202,13 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const alvoVoltar = destinoVoltar(pathname, pilhaVoltar, ROTAS_COM_SHELL);
-  const nomeAlvoVoltar = nomeDaTela(alvoVoltar.destino, [...navGrupos.flatMap((g) => g.itens), ...navForaDoMenuPreVenda, { l: "Configurações", h: "/configuracoes" }]);
+  const nomeAlvoVoltar = alvoVoltar.destino
+    ? nomeDaTela(alvoVoltar.destino, [...navGrupos.flatMap((g) => g.itens), ...navForaDoMenuPreVenda, { l: "Configurações", h: "/configuracoes" }])
+    : null;
   const voltar = () => {
-    const { destino, pilha } = destinoVoltar(window.location.pathname + window.location.search, pilhaVoltar, ROTAS_COM_SHELL);
+    const atual = pathname + (window.location.pathname === pathname ? window.location.search : "");
+    const { destino, pilha } = destinoVoltar(atual, pilhaVoltar, ROTAS_COM_SHELL);
+    if (!destino) return; // sem histórico interno: não inventa destino
     voltandoRef.current = destino;
     try { sessionStorage.setItem(CHAVE_VOLTANDO, destino); } catch { /* idem */ }
     gravarPilhaVoltar(pilha);
@@ -269,6 +276,8 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
           }
           .ash-voltar:hover { background: rgba(212, 175, 55, 0.14); border-color: #d4af37; color: #f2d98a; }
           .ash-voltar:focus-visible { outline: 2px solid #d4af37; outline-offset: 2px; }
+          .ash-voltar[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+          .ash-voltar[aria-disabled="true"]:hover { background: rgba(20, 17, 8, 0.92); border-color: rgba(212, 175, 55, 0.5); color: #e3c05c; }
           .ash-header {
             padding: 20px 32px;
           }
@@ -509,24 +518,6 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
                 ☰
               </button>
 
-              {mostrarVoltar(pathname) && (
-                <a
-                  href={alvoVoltar.destino}
-                  className="ash-voltar"
-                  data-testid="voltar"
-                  aria-label={`Voltar para ${nomeAlvoVoltar ?? "a tela anterior"}`}
-                  title={`Voltar para ${nomeAlvoVoltar ?? "a tela anterior"}`}
-                  onClick={(e) => {
-                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // nova aba: segue o href
-                    e.preventDefault();
-                    voltar();
-                  }}
-                >
-                  <span aria-hidden="true">←</span>
-                  <span className="ash-voltar-texto">Voltar</span>
-                </a>
-              )}
-
               <div style={{ minWidth: 0 }}>
                 <h1 style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {header.title}
@@ -559,6 +550,27 @@ export default function AdminShellFrame({ children }: { children: ReactNode }) {
                 {header.actionLabel}
               </button>
             )}
+
+            {/* "← Voltar" — histórico interno da aba, um passo por clique;
+                canto direito do cabeçalho, em todas as telas internas. Sem
+                histórico, fica desativado (nenhum destino fixo). */}
+            <a
+              href={alvoVoltar.destino ?? undefined}
+              className="ash-voltar"
+              data-testid="voltar"
+              aria-disabled={alvoVoltar.destino ? undefined : true}
+              aria-label={alvoVoltar.destino ? `Voltar para ${nomeAlvoVoltar ?? "a tela anterior"}` : "Voltar (sem tela anterior nesta aba)"}
+              title={alvoVoltar.destino ? `Voltar para ${nomeAlvoVoltar ?? "a tela anterior"}` : "Sem tela anterior nesta aba"}
+              onClick={(e) => {
+                if (!alvoVoltar.destino) { e.preventDefault(); return; }
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // nova aba: segue o href
+                e.preventDefault();
+                voltar();
+              }}
+            >
+              <span aria-hidden="true">←</span>
+              <span className="ash-voltar-texto">Voltar</span>
+            </a>
           </header>
 
           {/* CONTENT — troca a cada navegação; a sidebar acima, não. */}
