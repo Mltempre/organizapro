@@ -217,10 +217,17 @@ test("Orçamentos usa o catálogo único e a MESMA API — sem cadastro paralelo
   assert.match(codigo, /fetch\('\/api\/orcamentos', \{\s*method: 'POST'/);
   assert.match(codigo, /procedimento: form\.procedimento\.trim\(\),\s*valor: valorNumerico,/);
   assert.doesNotMatch(codigo, /itens: form\.itens|servico_id/, "itens não viajam para a API de orçamentos");
-  assert.match(p, /data-testid="orcamento-itens-catalogo"/);
-  assert.match(p, />Itens do catálogo \(opcional\)</);
-  assert.match(p, /Combine produtos e mão de obra\./);
-  assert.match(p, /<a href="\/pedidos"[^>]*>Cadastrar em Catálogo e Pedidos<\/a>/);
+  // Seletor de itens: um componente só, compartilhado com "Gerar orçamento" (Oportunidades).
+  assert.match(codigo, /import ItensCatalogoOrcamento, \{[^}]*\} from '\.\.\/components\/ItensCatalogoOrcamento'/);
+  assert.match(p, /<ItensCatalogoOrcamento\s/);
+  const comp = ler("app/components/ItensCatalogoOrcamento.tsx");
+  assert.match(semComentarios(comp), /from '\.\.\/\.\.\/lib\/catalogo-comercial'/);
+  assert.match(comp, /comporOrcamentoDoCatalogo\(/);
+  assert.doesNotMatch(semComentarios(comp), /from\('|fetch\(/, "o seletor não lê nem escreve nada sozinho");
+  assert.match(comp, /data-testid="orcamento-itens-catalogo"/);
+  assert.match(comp, />Itens do catálogo \(opcional\)</);
+  assert.match(comp, /Combine produtos e mão de obra\./);
+  assert.match(comp, /<a href="\/pedidos"[^>]*>Cadastrar em Catálogo e Pedidos<\/a>/);
   assert.doesNotMatch(p, /Consultoria mensal|'Serviço é obrigatório\.'/);
   // Motor e rotas de orçamento intocados por esta frente.
   assert.doesNotMatch(ler("app/api/orcamentos/route.ts"), /catalogo|clinica_servicos/);

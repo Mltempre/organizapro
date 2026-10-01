@@ -23,7 +23,7 @@ import {
 // novo: é a mesma máquina de estados e os mesmos scores já usados pelo
 // Radar (lib/motor-tratamento.ts).
 
-type OrcamentoPicker = { id: string; paciente_nome: string; procedimento: string; valor: number };
+type OrcamentoPicker = { id: string; paciente_nome: string; telefone: string | null; procedimento: string; valor: number };
 type ClientePicker = { id: string; nome: string; telefone: string | null; whatsapp: string | null };
 
 type FormNovo = {
@@ -56,6 +56,20 @@ function formatarData(iso: string) {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
+// Tudo o que o orçamento aprovado já sabe vira o ponto de partida do
+// serviço contratado — o usuário revisa e confirma; nada é registrado sozinho.
+// Cliente cadastrado não entra: orçamento não guarda essa referência (só
+// nome/telefone como texto), e nome/telefone nunca decidem vínculo.
+function dadosDoOrcamento(o: OrcamentoPicker): Pick<FormNovo, 'orcamentoId' | 'paciente_nome' | 'telefone' | 'tipo_tratamento' | 'valor_estimado'> {
+  return {
+    orcamentoId: o.id,
+    paciente_nome: o.paciente_nome,
+    telefone: o.telefone ? normalizar(o.telefone) : '',
+    tipo_tratamento: o.procedimento,
+    valor_estimado: String(o.valor),
+  };
+}
+
 function hojeStr() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); }
 
 export default function TratamentosPage() {
@@ -74,6 +88,9 @@ export default function TratamentosPage() {
   const [form, setForm]               = useState<FormNovo>(formInicial);
   const [salvando, setSalvando]       = useState(false);
   const idempotencyKeyRef = React.useRef('');
+  // /tratamentos?orcamento=<id> — vindo de "Registrar serviço contratado" no
+  // orçamento aprovado. Lido uma vez; abre o formulário já preenchido.
+  const orcamentoDaUrlRef = React.useRef<string | null | undefined>(undefined);
 
   const [transicionando, setTransicionando] = useState<string | null>(null);
   const [modalInterromper, setModalInterromper] = useState<Tratamento | null>(null);
@@ -111,11 +128,28 @@ export default function TratamentosPage() {
         // silenciosamente "nenhum tratamento".
         if (tratRes.status !== 404) { console.error('Erro ao carregar tratamentos:', tratRes.status); setErro(MSG_ERRO_PADRAO); }
       }
+      const aprovados: OrcamentoPicker[] = [];
       if (orcRes.ok) {
         const json = await orcRes.json();
-        setOrcamentosAprovados(Array.isArray(json.orcamentos) ? json.orcamentos : []);
+        if (Array.isArray(json.orcamentos)) aprovados.push(...json.orcamentos);
       }
+      setOrcamentosAprovados(aprovados);
       setPacientes((pacRes.data || []) as ClientePicker[]);
+
+      if (orcamentoDaUrlRef.current === undefined) {
+        orcamentoDaUrlRef.current = new URLSearchParams(window.location.search).get('orcamento');
+      }
+      if (orcamentoDaUrlRef.current) {
+        const origem = aprovados.find(o => o.id === orcamentoDaUrlRef.current);
+        orcamentoDaUrlRef.current = null;
+        if (origem) {
+          setForm({ ...formInicial, ...dadosDoOrcamento(origem) });
+          idempotencyKeyRef.current = crypto.randomUUID();
+          setModalNovo(true);
+        } else {
+          setErro('Orçamento aprovado não encontrado. Selecione a origem no formulário.');
+        }
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') { router.push('/login'); return; }
       console.error(err);
@@ -140,12 +174,10 @@ export default function TratamentosPage() {
 
   function selecionarOrcamento(id: string) {
     const o = orcamentosAprovados.find(x => x.id === id);
-    setForm(prev => ({
-      ...prev, orcamentoId: id,
-      paciente_nome: o?.paciente_nome ?? prev.paciente_nome,
-      tipo_tratamento: o ? o.procedimento : prev.tipo_tratamento,
-      valor_estimado: o ? String(o.valor) : prev.valor_estimado,
-    }));
+    if (!o) { setForm(prev => ({ ...prev, orcamentoId: id })); return; }
+    const dados = dadosDoOrcamento(o);
+    // Telefone da origem só entra se existir — nunca apaga um já digitado.
+    setForm(prev => ({ ...prev, ...dados, telefone: dados.telefone || prev.telefone }));
   }
 
   async function salvar() {
@@ -384,8 +416,9 @@ export default function TratamentosPage() {
       )}
 
       {modalNovo && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }} onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}>
-          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3148' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16, overscrollBehavior: 'contain' }} onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}>
+          {/* Mesma contenção do "Novo orçamento": altura limitada à área visível e rolagem só dentro do modal. */}
+          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain', border: '1px solid #2d3148' }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Novo serviço contratado</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
@@ -394,6 +427,11 @@ export default function TratamentosPage() {
                   <option value="">— Serviço avulso (sem orçamento) —</option>
                   {orcamentosAprovados.map(o => <option key={o.id} value={o.id}>{o.paciente_nome} — {o.procedimento} ({formatarValor(o.valor)})</option>)}
                 </select>
+                {form.orcamentoId && tratamentos.some(t => t.orcamento_origem_id === form.orcamentoId) && (
+                  <p data-testid="orcamento-ja-registrado" style={{ fontSize: 12, color: '#fbbf24', margin: '6px 0 0' }}>
+                    Já existe um serviço contratado registrado a partir deste orçamento.
+                  </p>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente cadastrado (opcional)</label>

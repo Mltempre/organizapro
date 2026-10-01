@@ -8,6 +8,8 @@ import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import { OPORTUNIDADE_STATUS, ROTULO_STATUS_OPORTUNIDADE, oportunidadeElegivelParaOrcamento, type OportunidadeStatus } from '../../lib/oportunidades-demanda';
+import { itemVendavel } from '../../lib/catalogo-comercial';
+import ItensCatalogoOrcamento, { type ItemCatalogoOrcamento, type ItemEscolhidoOrcamento } from '../components/ItensCatalogoOrcamento';
 
 // ── Superfície operacional de Oportunidades (última milha: Oportunidade →
 // Orçamento) ─────────────────────────────────────────────────────────────
@@ -55,8 +57,8 @@ function formatarDataHora(iso: string) {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-type FormOrcamento = { paciente_nome: string; procedimento: string; valor: string; observacao: string };
-const formInicial: FormOrcamento = { paciente_nome: '', procedimento: '', valor: '', observacao: '' };
+type FormOrcamento = { paciente_nome: string; procedimento: string; valor: string; observacao: string; itens: ItemEscolhidoOrcamento[] };
+const formInicial: FormOrcamento = { paciente_nome: '', procedimento: '', valor: '', observacao: '', itens: [] };
 
 export default function OportunidadesPage() {
   const router = useRouter();
@@ -76,6 +78,11 @@ export default function OportunidadesPage() {
   const [form, setForm] = useState<FormOrcamento>(formInicial);
   const [salvando, setSalvando] = useState(false);
   const idempotencyKeyRef = React.useRef('');
+  // Catálogo do "Gerar orçamento": o MESMO seletor e a mesma leitura do
+  // "Novo orçamento" (/orcamentos). Carregado só quando o modal abre pela
+  // primeira vez — a lista de oportunidades não depende dele.
+  const [catalogo, setCatalogo] = useState<ItemCatalogoOrcamento[]>([]);
+  const catalogoCarregadoRef = React.useRef(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -152,10 +159,29 @@ export default function OportunidadesPage() {
     }
   }
 
+  async function carregarCatalogo() {
+    if (catalogoCarregadoRef.current) return;
+    catalogoCarregadoRef.current = true;
+    try {
+      const cuRes = await fetch('/api/minha-clinica', { headers: { Authorization: `Bearer ${accessToken}` } });
+      const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
+      if (!cid) { catalogoCarregadoRef.current = false; return; }
+      const catRes = await supabase.from('clinica_servicos').select('id, nome, preco_centavos, disponivel').eq('clinica_id', cid).order('ordem');
+      // Catálogo indisponível não bloqueia: o orçamento continua podendo ser
+      // descrito à mão, como sempre foi.
+      if (catRes.error) { catalogoCarregadoRef.current = false; return; }
+      setCatalogo(((catRes.data || []) as ItemCatalogoOrcamento[]).filter(itemVendavel));
+    } catch (e) {
+      console.error(e);
+      catalogoCarregadoRef.current = false;
+    }
+  }
+
   function abrirGerarOrcamento(op: Oportunidade) {
-    setForm({ paciente_nome: op.nome_informado || '', procedimento: '', valor: '', observacao: '' });
+    setForm({ paciente_nome: op.nome_informado || '', procedimento: '', valor: '', observacao: '', itens: [] });
     idempotencyKeyRef.current = crypto.randomUUID();
     setErro(''); setModalOrcamento(op);
+    carregarCatalogo();
   }
 
   async function salvarOrcamento() {
@@ -283,8 +309,9 @@ export default function OportunidadesPage() {
       )}
 
       {modalOrcamento && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }} onClick={e => { if (e.target === e.currentTarget) setModalOrcamento(null); }}>
-          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3148' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16, overscrollBehavior: 'contain' }} onClick={e => { if (e.target === e.currentTarget) setModalOrcamento(null); }}>
+          {/* Mesma contenção do "Novo orçamento": altura limitada à área visível e rolagem só dentro do modal. */}
+          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain', border: '1px solid #2d3148' }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 8, marginTop: 0 }}>Gerar orçamento</h2>
             <p style={{ fontSize: 12, color: '#64748b', marginBottom: 24 }}>A partir da oportunidade de {modalOrcamento.nome_informado || modalOrcamento.telefone}.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -292,6 +319,19 @@ export default function OportunidadesPage() {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</label>
                 <input value={form.paciente_nome} onChange={e => setForm(prev => ({ ...prev, paciente_nome: e.target.value }))} placeholder="Ex: Maria Silva" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
               </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Telefone</label>
+                {/* Já conhecido: vem da própria oportunidade e segue para o orçamento pela API. */}
+                <div data-testid="oportunidade-telefone" style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'rgba(15,17,23,0.5)', color: '#94a3b8', fontSize: 13 }}>
+                  {modalOrcamento.telefone} <span style={{ fontSize: 11, color: '#64748b' }}>· da oportunidade</span>
+                </div>
+              </div>
+              <ItensCatalogoOrcamento
+                catalogo={catalogo}
+                itens={form.itens}
+                onItens={(itens, composto) => setForm(prev => ({ ...prev, itens, ...composto }))}
+                onErro={setErro}
+              />
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Serviço</label>
                 <input value={form.procedimento} onChange={e => setForm(prev => ({ ...prev, procedimento: e.target.value }))} placeholder="Ex: Avaliação inicial" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />

@@ -23,7 +23,7 @@ import {
 // (calcularIndicadoresCobranca) — nunca uma segunda consulta, nunca um
 // número fabricado.
 
-type TratamentoPicker = { id: string; paciente_nome: string; tipo_tratamento: string; valor_estimado: number | null };
+type TratamentoPicker = { id: string; paciente_id: string | null; paciente_nome: string; paciente_telefone: string | null; tipo_tratamento: string; valor_estimado: number | null };
 type ClientePicker = { id: string; nome: string; telefone: string | null; whatsapp: string | null };
 
 type FormNovo = {
@@ -188,11 +188,18 @@ export default function CobrancasPage() {
     setForm(prev => ({ ...prev, pacienteId: id, paciente_nome: p?.nome ?? prev.paciente_nome, telefone: normalizar(p?.whatsapp || p?.telefone || '') }));
   }
 
+  // Tudo o que o serviço contratado já sabe vira o ponto de partida da
+  // cobrança (cliente cadastrado, nome, telefone, descrição, valor) — o
+  // usuário revisa e confirma; nada é registrado sozinho. Dado ausente na
+  // origem nunca apaga o que já foi digitado.
   function selecionarTratamento(id: string) {
     const t = tratamentos.find(x => x.id === id);
+    const clienteDaOrigem = t?.paciente_id && pacientes.some(p => p.id === t.paciente_id) ? t.paciente_id : null;
     setForm(prev => ({
       ...prev, tratamentoId: id,
+      pacienteId: clienteDaOrigem ?? prev.pacienteId,
       paciente_nome: t?.paciente_nome ?? prev.paciente_nome,
+      telefone: t?.paciente_telefone ? normalizar(t.paciente_telefone) : prev.telefone,
       descricao: t ? t.tipo_tratamento : prev.descricao,
       valor: t?.valor_estimado ? String(t.valor_estimado) : prev.valor,
     }));
@@ -211,8 +218,11 @@ export default function CobrancasPage() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({
         clinica_id: clinicaId,
+        paciente_id: form.pacienteId || undefined,
         paciente_nome: form.paciente_nome.trim(),
-        telefone: form.telefone ? normalizar(form.telefone) : undefined,
+        // Nome do campo que a API realmente lê (antes ia como "telefone" e
+        // era descartado — a cobrança nascia sem telefone).
+        paciente_telefone: form.telefone ? normalizar(form.telefone) : undefined,
         tratamento_origem_id: form.tratamentoId || undefined,
         descricao: form.descricao.trim(),
         valor: valorNumerico,
@@ -456,8 +466,9 @@ export default function CobrancasPage() {
       )}
 
       {modalNovo && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }} onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}>
-          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3148' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16, overscrollBehavior: 'contain' }} onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}>
+          {/* Mesma contenção do "Novo orçamento": altura limitada à área visível e rolagem só dentro do modal. */}
+          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain', border: '1px solid #2d3148' }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Nova cobrança</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>

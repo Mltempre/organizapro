@@ -11,7 +11,8 @@ import {
   estaParado, diasParado, calcularScoreOportunidade, MOTIVOS_DECISAO,
   type Orcamento, type StatusOrcamento, type MotivoDecisao,
 } from '../../lib/motor-orcamentos';
-import { itemVendavel, comporOrcamentoDoCatalogo, type ItemCatalogo } from '../../lib/catalogo-comercial';
+import { itemVendavel } from '../../lib/catalogo-comercial';
+import ItensCatalogoOrcamento, { type ItemCatalogoOrcamento, type ItemEscolhidoOrcamento } from '../components/ItensCatalogoOrcamento';
 
 // ── Superfície operacional de Orçamentos ─────────────────────────────────
 // Usa só as APIs já construídas e testadas (GET/POST /api/orcamentos,
@@ -36,12 +37,11 @@ type FormNovo = {
   procedimento: string;
   valor: string;
   observacao: string;
-  itens: { servicoId: string; quantidade: number }[];
+  itens: ItemEscolhidoOrcamento[];
 };
 
 const formInicial: FormNovo = { pacienteId: '', paciente_nome: '', telefone: '', procedimento: '', valor: '', observacao: '', itens: [] };
 
-type ItemCatalogoOrcamento = Pick<ItemCatalogo, 'id' | 'nome' | 'preco_centavos' | 'disponivel'>;
 
 const STATUS_CONFIG: Record<StatusOrcamento, { label: string; color: string; bg: string }> = {
   apresentado: { label: 'Aguardando decisão', color: '#38bdf8', bg: 'rgba(14,165,233,0.14)' },
@@ -87,8 +87,6 @@ export default function OrcamentosPage() {
   const [orcamentos, setOrcamentos]   = useState<Orcamento[]>([]);
   const [pacientes, setPacientes]     = useState<ClientePicker[]>([]);
   const [catalogo, setCatalogo]       = useState<ItemCatalogoOrcamento[]>([]);
-  const [itemEscolhido, setItemEscolhido] = useState('');
-  const [qtdEscolhida, setQtdEscolhida]   = useState('1');
   const [clinicaId, setClinicaId]     = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [carregando, setCarregando]   = useState(true);
@@ -165,7 +163,6 @@ export default function OrcamentosPage() {
 
   function abrirNovo() {
     setForm(formInicial);
-    setItemEscolhido(''); setQtdEscolhida('1');
     idempotencyKeyRef.current = crypto.randomUUID();
     setErro(''); setModalNovo(true);
   }
@@ -177,32 +174,6 @@ export default function OrcamentosPage() {
       paciente_nome: p?.nome ?? prev.paciente_nome,
       telefone: normalizar(p?.whatsapp || p?.telefone || ''),
     }));
-  }
-
-  // Itens do catálogo (ex.: peça + mão de obra): preenchem descrição e valor
-  // pela soma dos preços cadastrados. Os dois campos continuam editáveis.
-  function aplicarItens(itens: FormNovo['itens']) {
-    const { descricao, totalCentavos } = comporOrcamentoDoCatalogo(itens.flatMap(i => {
-      const c = catalogo.find(x => x.id === i.servicoId);
-      return c ? [{ nome: c.nome, preco_centavos: c.preco_centavos ?? 0, quantidade: i.quantidade }] : [];
-    }));
-    setForm(prev => ({
-      ...prev, itens,
-      procedimento: descricao,
-      valor: totalCentavos > 0 ? (totalCentavos / 100).toFixed(2) : '',
-    }));
-  }
-
-  function adicionarItem() {
-    const quantidade = Number(qtdEscolhida);
-    if (!itemEscolhido) return;
-    if (!Number.isInteger(quantidade) || quantidade <= 0) { setErro('Quantidade deve ser um número inteiro maior que zero.'); return; }
-    setErro('');
-    const existente = form.itens.find(i => i.servicoId === itemEscolhido);
-    aplicarItens(existente
-      ? form.itens.map(i => i.servicoId === itemEscolhido ? { ...i, quantidade: i.quantidade + quantidade } : i)
-      : [...form.itens, { servicoId: itemEscolhido, quantidade }]);
-    setItemEscolhido(''); setQtdEscolhida('1');
   }
 
   async function salvar() {
@@ -491,6 +462,20 @@ export default function OrcamentosPage() {
                         </button>
                       </div>
                     )}
+                    {o.status === 'aprovado' && (
+                      // Continua o fluxo no formulário EXISTENTE de Serviços
+                      // contratados, já com este orçamento selecionado — nada
+                      // é registrado sem o usuário revisar e confirmar lá.
+                      <button
+                        type="button"
+                        className="orc-btn-continuar"
+                        data-testid="orcamento-registrar-servico"
+                        onClick={() => router.push(`/tratamentos?orcamento=${encodeURIComponent(o.id)}`)}
+                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.1)', color: '#4ade80', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Registrar serviço contratado
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -542,70 +527,12 @@ export default function OrcamentosPage() {
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
-              <div data-testid="orcamento-itens-catalogo">
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Itens do catálogo (opcional)</label>
-                {catalogo.length === 0 ? (
-                  <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                    Nenhum item com preço no catálogo. <a href="/pedidos" style={{ color: '#38bdf8' }}>Cadastrar em Catálogo e Pedidos</a> ou descreva abaixo.
-                  </p>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <select
-                        value={itemEscolhido}
-                        onChange={e => setItemEscolhido(e.target.value)}
-                        aria-label="Item do catálogo"
-                        style={{ flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                      >
-                        <option value="">Produto ou serviço…</option>
-                        {catalogo.map(c => <option key={c.id} value={c.id}>{c.nome} — {formatarValor((c.preco_centavos ?? 0) / 100)}</option>)}
-                      </select>
-                      <input
-                        type="number" min="1" step="1"
-                        value={qtdEscolhida}
-                        onChange={e => setQtdEscolhida(e.target.value)}
-                        aria-label="Quantidade"
-                        style={{ width: 64, padding: '10px 8px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={adicionarItem}
-                        disabled={!itemEscolhido}
-                        style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#e2e8f0', fontSize: 13, cursor: itemEscolhido ? 'pointer' : 'not-allowed', opacity: itemEscolhido ? 1 : 0.5 }}
-                      >
-                        + Adicionar
-                      </button>
-                    </div>
-                    {form.itens.length > 0 && (
-                      <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {form.itens.map(i => {
-                          const c = catalogo.find(x => x.id === i.servicoId);
-                          if (!c) return null;
-                          return (
-                            <li key={i.servicoId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13, color: '#e2e8f0' }}>
-                              <span>{i.quantidade}× {c.nome}</span>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                {formatarValor(((c.preco_centavos ?? 0) * i.quantidade) / 100)}
-                                <button
-                                  type="button"
-                                  onClick={() => aplicarItens(form.itens.filter(x => x.servicoId !== i.servicoId))}
-                                  aria-label={`Remover ${c.nome}`}
-                                  style={{ border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 14 }}
-                                >
-                                  ✕
-                                </button>
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    <p style={{ fontSize: 12, color: '#64748b', margin: '8px 0 0' }}>
-                      Combine produtos e mão de obra. Descrição e valor são preenchidos pela soma dos preços do catálogo e podem ser ajustados.
-                    </p>
-                  </>
-                )}
-              </div>
+              <ItensCatalogoOrcamento
+                catalogo={catalogo}
+                itens={form.itens}
+                onItens={(itens, composto) => setForm(prev => ({ ...prev, itens, ...composto }))}
+                onErro={setErro}
+              />
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descrição</label>
                 <input
