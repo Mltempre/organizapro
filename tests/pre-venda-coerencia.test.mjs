@@ -71,16 +71,25 @@ test("Gerente Comercial em todo lugar visível (nada de 'Copiloto' como nome de 
   }
 });
 
-test("Visão Geral: cada atalho diz o nome da página de destino", () => {
+test("Visão Geral: centro limpo — só ações e acessos com valor executivo; atalhos puros ficam no menu (Limpeza GO 1)", () => {
   const casa = ler("app/components/CasaDashboard.tsx");
+  // Ficam: acesso ao Gerente Comercial (dono da lista completa de prioridades),
+  // ao Dinheiro, à Agenda e ao Fechamento Contábil (única porta dessa vertical).
   for (const [href, texto] of [
-    ["/copiloto", "Abrir Gerente Comercial →"], ["/financeiro", "Abrir Dinheiro →"], ["/receita-perdida", "Ver Receita Perdida →"],
-    ["/previsor-faturamento", "Ver Previsor de Faturamento →"], ["/agendamentos", "Abrir agenda →"], ["/orcamentos", "Orçamentos →"],
-    ["/oportunidades", "Oportunidades →"], ["/reputacao", "Ver Reputação →"], ["/google-presenca", "Ver Google Presença →"],
-    ["/fechamento-contabil", "Ver Fechamento Contábil →"],
-  ]) assert.ok(casa.includes(`href="${href}">${texto}</Link>`) || casa.includes(`href="${href}" aria-describedby="casa-ecommerce-descricao">${texto}</Link>`), `${href} → "${texto}"`);
-  assert.match(casa, /href="\/pedidos" aria-describedby="casa-ecommerce-descricao">Catálogo e Pedidos →<\/Link>/);
-  assert.match(casa, /sinal\.destinoAcao\.startsWith\("\/follow-up"\) \? "Abrir Follow-up Comercial"/);
+    ["/copiloto", "Abrir Gerente Comercial →"], ["/financeiro", "Abrir Dinheiro →"],
+    ["/agendamentos", "Abrir agenda →"], ["/fechamento-contabil", "Ver Fechamento Contábil →"],
+  ]) assert.ok(casa.includes(`href="${href}">${texto}</Link>`), `${href} → "${texto}"`);
+  // Saíram do centro da Casa (navegação pura, já no menu lateral) — as telas,
+  // rotas, APIs e motores continuam intactos.
+  for (const removido of ["Ver Receita Perdida →", "Ver Previsor de Faturamento →", ">Orçamentos →<",
+    "Catálogo e Pedidos →", ">Oportunidades →<", "Ver Reputação →", "Ver Google Presença →",
+    "Valores que merecem acompanhamento", "casa-ecommerce-descricao"]) {
+    assert.ok(!casa.includes(removido), `atalho/bloco removido ainda presente: ${removido}`);
+  }
+  // A lista extensa de prioridades virou resumo curto; a lista completa pertence ao Gerente Comercial.
+  assert.match(casa, /prioridade identificada|prioridades identificadas/);
+  assert.match(casa, /A lista completa está no Gerente Comercial\./);
+  assert.doesNotMatch(casa, /renderPrioridades|maisPrioridades/);
   assert.doesNotMatch(casa, /Acompanhar clientes|Abrir financeiro|Ver valores em risco|Ver previsão →|Ver avaliações|Presença no Google|Interesses recebidos|E-commerce IA/);
   assert.match(ler("app/components/FaixaExecutiva.tsx"), /label: "Prioridades comerciais", valor: oportunidades,\s+destino: "\/copiloto"/);
 });

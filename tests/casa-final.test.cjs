@@ -63,18 +63,26 @@ test('dinheiro em risco reutiliza predicado real sem virar receita recebida', as
   assert.equal(r.element.props.receitaPerdida.itens[0].valor,500);
   assert.match(r.html,/500,00/); assert.doesNotMatch(r.html,/Recebido no mês/);
 });
-test('prioridades não repetem sinais entre resumo e expansão; destino de ação prevalece', async () => {
+// Limpeza GO 1 (2026-10-01): a Casa mostra só o resumo curto das prioridades;
+// a lista completa (motivo, evidência, ação) pertence ao Gerente Comercial.
+test('prioridades: Casa mostra só resumo (total + 1ª) e aponta para o Gerente Comercial', async () => {
   const { element } = await carregar();
   const signals = Array.from({length:4},(_,i)=>({ id:`s${i}`,titulo:`Prioridade única ${i}`,prioridade:'alta',motivo:'Motivo registrado',evidencia:'Registro de teste',acaoSugerida:'Revisar',destino:'/orcamentos',destinoAcao:'/follow-up',contexto:{nome:'Cliente',telefone:'11999999999'} }));
   const html = render(React.createElement(Casa,{...element.props,temDados:true,missaoDoDia:signals.slice(0,3),outrasPrioridades:signals.slice(3)}));
-  for (let i=0;i<4;i++) assert.equal(html.split(`Prioridade única ${i}`).length-1,1);
-  assert.match(html,/<details/); assert.equal((html.match(/href="\/follow-up"/g)||[]).length,4);
+  assert.match(html,/4 prioridades identificadas/);
+  assert.match(html,/Prioridade única 0/);
+  for (let i=1;i<4;i++) assert.ok(!html.includes(`Prioridade única ${i}`), `prioridade ${i} não deveria renderizar na Casa`);
+  assert.doesNotMatch(html,/<details/);
+  assert.match(html,/href="\/copiloto"/);
   assert.doesNotMatch(html,/wa.me|Tempo estimado|Diretor Digital/);
 });
 test('links estáticos renderizados apontam para páginas existentes e ações novo=1 têm consumidores', async () => {
   const { html } = await carregar();
   const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map(m=>m[1]);
-  assert.ok(hrefs.length>=10);
+  // Limpeza GO 1: conta vazia renderiza 6 links (Novo cliente, Novo agendamento,
+  // Gerente Comercial, Dinheiro, Ver cobranças, Abrir agenda) — os atalhos
+  // puros saíram; cada link restante aponta para página existente.
+  assert.ok(hrefs.length>=6);
   for (const href of hrefs) assert.ok(fs.existsSync(path.join(root,'app',href.split('?')[0],'page.tsx')),href);
   for (const page of ['clientes','agendamentos']) assert.match(fs.readFileSync(path.join(root,'app',page,'page.tsx'),'utf8'),/get\('novo'\) === '1'\) abrirNovo\(\)/);
 });

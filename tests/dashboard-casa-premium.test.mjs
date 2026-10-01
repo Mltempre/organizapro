@@ -54,15 +54,17 @@ test("Casa apresenta valores com origem cobranças, sem contagem ambígua A rece
 
 // Revisão final da Casa (2026-09-29): "Em atraso" (valorEmAtraso) e
 // "Cobranças vencidas" (Receita Perdida) são o MESMO cálculo — cobranças
-// abertas com vencimento passado. O card Dinheiro mostra o valor uma vez só,
-// na lista de acompanhamento que leva à Receita Perdida.
-test("Casa · Dinheiro: cobrança vencida aparece uma vez só (sem 'Em atraso' duplicando 'Cobranças vencidas')", () => {
+// abertas com vencimento passado. O card Dinheiro mostra o valor uma vez só.
+// Limpeza GO 1 (2026-10-01): o detalhamento por categoria e os atalhos saíram
+// da Casa; ficam o "A receber" (que já inclui as vencidas) e o total em risco
+// em uma linha — detalhe na Receita Perdida e no Dinheiro (menu lateral).
+test("Casa · Dinheiro: cobrança vencida aparece uma vez só (sem 'Em atraso' duplicando o valor em risco)", () => {
   const casa = ler("app/components/CasaDashboard.tsx");
   const semComentarios = casa.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\/.*$/gm, "");
   assert.doesNotMatch(semComentarios, /<dt>Em atraso<\/dt>|valorEmAtraso/);
-  assert.match(casa, /cobranca_atrasada: "Cobranças vencidas"/);
-  assert.match(casa, /As cobranças vencidas aparecem abaixo e já estão incluídas no valor a receber\./);
-  assert.match(casa, /<Link href="\/receita-perdida">Ver Receita Perdida →<\/Link>/);
+  assert.match(casa, /Cobranças vencidas já estão incluídas no valor a receber\./);
+  assert.match(casa, /Em risco: \{moeda\(receitaPerdida\.totalConhecido\)\}/);
+  assert.doesNotMatch(casa, /Ver Receita Perdida →|Ver Previsor de Faturamento →|Valores que merecem acompanhamento/);
   assert.match(ler("app/components/CasaDashboard.module.css"), /\.numeros \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
 });
 test("zero fabricação: OrganizaProTrabalhandoCard nunca lista item com quantidade zero (delegado a calcularAtividadeRecente, que já filtra)", () => {
@@ -123,10 +125,15 @@ test("FaixaExecutiva: todos os destinos são rotas reais do produto", () => {
   }
 });
 
-test("Casa mantém acesso real a Orçamentos e Reputação", () => {
+// Limpeza GO 1 (2026-10-01): Orçamentos e Reputação deixaram de ser atalhos
+// no centro da Casa — são navegação pura, já no menu lateral. Na Casa ficam
+// as contagens (orçamentos aguardando resposta, avaliações solicitadas).
+test("Casa não repete atalhos do menu: Orçamentos e Reputação ficam no menu lateral; contagens permanecem", () => {
   const casa=ler("app/components/CasaDashboard.tsx");
-  assert.match(casa,/href="\/orcamentos"/);
-  assert.match(casa,/href="\/reputacao"/);
+  assert.doesNotMatch(casa,/href="\/orcamentos"/);
+  assert.doesNotMatch(casa,/href="\/reputacao"/);
+  assert.match(casa,/orçamento\(s\) apresentado\(s\) aguardando resposta/);
+  assert.match(casa,/Avaliações solicitadas/);
 });
 // ── 7. Orçamento apresentado/parado aparece corretamente quando aplicável ──
 
