@@ -51,13 +51,18 @@ const ORIGEM_LABELS: Record<OrigemReceitaPerdida, { label: string; icon: string 
   pedido_nao_concluido:   { label: 'Pedido não concluído',   icon: '🛒' },
 };
 
-const ACESSOS_RAPIDOS = [
-  { label: 'Cobranças',            href: '/cobrancas',            icon: '🧾' },
-  { label: 'Orçamentos',           href: '/orcamentos',           icon: '💰' },
-  { label: 'Pedidos',              href: '/pedidos',              icon: '🛒' },
-  { label: 'Previsor de Faturamento', href: '/previsor-faturamento', icon: '🔮' },
-  { label: 'Linha Econômica',      href: '/linha-economica',      icon: '📐' },
-  { label: 'Receita Perdida',      href: '/receita-perdida',      icon: '📉' },
+// Dinheiro é o dono da visão financeira. Os 3 detalhes continuam sendo
+// páginas próprias (rotas e motores intactos) e são abertos daqui.
+const DETALHES_DINHEIRO = [
+  { label: 'Receita Perdida',         href: '/receita-perdida',      icon: '📉', descricao: 'Detalhe do dinheiro em risco, item a item' },
+  { label: 'Previsor de Faturamento', href: '/previsor-faturamento', icon: '🔮', descricao: 'Detalhe do que deve entrar nos próximos 30 dias' },
+  { label: 'Linha Econômica',         href: '/linha-economica',      icon: '📐', descricao: 'Origem e prova da receita confirmada' },
+];
+// Onde o dinheiro é registrado (operação) — atalhos discretos.
+const ACESSOS_OPERACAO = [
+  { label: 'Cobranças',  href: '/cobrancas',  icon: '🧾' },
+  { label: 'Orçamentos', href: '/orcamentos', icon: '💰' },
+  { label: 'Pedidos',    href: '/pedidos',    icon: '🛒' },
 ];
 
 function formatarValor(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -192,10 +197,10 @@ export default function FinanceiroPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Próxima ação financeira — mesma ordenação real já usada em
+  // Maiores valores em risco — mesma ordenação real já usada em
   // app/receita-perdida/page.tsx (valor desc, nulos por último, depois dias
-  // em risco desc), nenhuma prioridade nova inventada. Top 5 só para não
-  // sobrecarregar a tela — o detalhe completo continua em /receita-perdida.
+  // em risco desc). Só um resumo (top 3): a lista de "o que fazer agora" é do
+  // Gerente Comercial e o detalhe completo continua em /receita-perdida.
   const proximasAcoes = resumo
     ? [...resumo.receitaPerdida.itens]
         .sort((a, b) => {
@@ -204,7 +209,7 @@ export default function FinanceiroPage() {
           if (b.valor !== null) return 1;
           return b.diasEmRisco - a.diasEmRisco;
         })
-        .slice(0, 5)
+        .slice(0, 3)
     : [];
 
   return (
@@ -227,12 +232,13 @@ export default function FinanceiroPage() {
         <>
           {/* 5 perguntas do empresário — cada card vem de um único motor real, nunca um número fabricado */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, marginBottom: 24 }}>
-            <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
+            <button type="button" onClick={() => router.push('/cobrancas')} aria-label="A receber — abrir Cobranças" style={{ textAlign: 'left', cursor: 'pointer', background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px', color: 'inherit', font: 'inherit' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>A receber</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#38bdf8' }}>{resumo.indicadores?.valorEmAberto !== null && resumo.indicadores?.valorEmAberto !== undefined ? formatarValor(resumo.indicadores.valorEmAberto) : '—'}</div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{resumo.indicadores ? `${resumo.indicadores.quantidadeEmCobranca} em cobrança ativa` : 'nenhuma cobrança registrada'}</div>
-            </div>
-            <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
+              <div style={{ fontSize: 11, color: '#4a9bb0', marginTop: 8 }}>Ver detalhe →</div>
+            </button>
+            <button type="button" onClick={() => router.push('/cobrancas')} aria-label="Atrasado — abrir Cobranças" style={{ textAlign: 'left', cursor: 'pointer', background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px', color: 'inherit', font: 'inherit' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Atrasado</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#f87171' }}>{resumo.indicadores?.valorEmAtraso !== null && resumo.indicadores?.valorEmAtraso !== undefined ? formatarValor(resumo.indicadores.valorEmAtraso) : '—'}</div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
@@ -240,37 +246,52 @@ export default function FinanceiroPage() {
                   ? `${formatarPercentual(resumo.indicadores.proporcaoValorAtrasado)} do que está em aberto`
                   : 'sem cobrança em aberto'}
               </div>
-            </div>
-            <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
+              <div style={{ fontSize: 11, color: '#4a9bb0', marginTop: 8 }}>Ver detalhe →</div>
+            </button>
+            <button type="button" onClick={() => router.push('/linha-economica')} aria-label="Total recebido — abrir Linha Econômica" style={{ textAlign: 'left', cursor: 'pointer', background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px', color: 'inherit', font: 'inherit' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Total recebido · todo o histórico</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#4ade80' }}>{formatarValor(resumo.linhaEconomica.totalComprovado)}</div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{resumo.linhaEconomica.quantidadeComprovada} pagamento{resumo.linhaEconomica.quantidadeComprovada !== 1 ? 's' : ''} comprovado{resumo.linhaEconomica.quantidadeComprovada !== 1 ? 's' : ''} (cobranças e pedidos pagos)</div>
-            </div>
-            <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
+              <div style={{ fontSize: 11, color: '#4a9bb0', marginTop: 8 }}>Ver detalhe →</div>
+            </button>
+            <button type="button" onClick={() => router.push('/previsor-faturamento')} aria-label="Previsto — abrir Previsor de Faturamento" style={{ textAlign: 'left', cursor: 'pointer', background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px', color: 'inherit', font: 'inherit' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Previsto até {formatarData(resumo.previsor.horizonteFim)}</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#4a9bb0' }}>{formatarValor(resumo.previsor.totalEsperado30Dias)}</div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{formatarValor(resumo.previsor.confirmadoProgramado.total)} confirmado</div>
-            </div>
-            <div style={{ background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px' }}>
+              <div style={{ fontSize: 11, color: '#4a9bb0', marginTop: 8 }}>Ver detalhe →</div>
+            </button>
+            <button type="button" onClick={() => router.push('/receita-perdida')} aria-label="Em risco — abrir Receita Perdida" style={{ textAlign: 'left', cursor: 'pointer', background: '#1e2130', border: '1px solid #2d3148', borderRadius: 14, padding: '18px 20px', color: 'inherit', font: 'inherit' }}>
               <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Em risco</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#fbbf24' }}>{formatarValor(resumo.receitaPerdida.totalConhecido)}</div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{resumo.receitaPerdida.totalItensComValor} {resumo.receitaPerdida.totalItensComValor === 1 ? 'item' : 'itens'} com valor registrado</div>
-            </div>
+              <div style={{ fontSize: 11, color: '#4a9bb0', marginTop: 8 }}>Ver detalhe →</div>
+            </button>
           </div>
 
-          {/* Acesso rápido — cobranças/orçamentos/pedidos e as 3 visões existentes continuam acessíveis, nenhuma foi removida */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8, marginBottom: 28 }}>
-            {ACESSOS_RAPIDOS.map((a) => (
-              <button key={a.href} onClick={() => router.push(a.href)} style={{ textAlign: 'left', cursor: 'pointer', background: '#1e2130', border: '1px solid #2d3148', borderRadius: 10, padding: '10px 14px', color: '#cbd5e1', font: 'inherit', fontSize: 12 }}>
-                <span style={{ marginRight: 6 }}>{a.icon}</span>{a.label}
+          {/* Detalhes do Dinheiro — as 3 visões continuam páginas próprias, abertas daqui */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Detalhes do dinheiro</div>
+          <div data-testid="dinheiro-detalhes" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8, marginBottom: 12 }}>
+            {DETALHES_DINHEIRO.map((d) => (
+              <button key={d.href} onClick={() => router.push(d.href)} style={{ textAlign: 'left', cursor: 'pointer', background: '#1e2130', border: '1px solid #2d3148', borderRadius: 10, padding: '12px 14px', color: '#cbd5e1', font: 'inherit', fontSize: 13 }}>
+                <div style={{ fontWeight: 700, color: '#f1f5f9' }}><span style={{ marginRight: 6 }}>{d.icon}</span>{d.label} →</div>
+                <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 4 }}>{d.descricao}</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: '#64748b', marginBottom: 28 }}>
+            <span>Registrar e acompanhar:</span>
+            {ACESSOS_OPERACAO.map((a) => (
+              <button key={a.href} onClick={() => router.push(a.href)} style={{ cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, color: '#4a9bb0', font: 'inherit', fontSize: 12 }}>
+                <span style={{ marginRight: 4 }}>{a.icon}</span>{a.label}
               </button>
             ))}
           </div>
 
-          {/* Próxima ação financeira — toda ação exibida tem motivo, evidência, valor (quando comprovável) e CTA real */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎯 Próxima ação financeira</div>
+          {/* Maiores valores em risco — resumo financeiro (top 3), com motivo, evidência, valor e CTA real.
+              A priorização de "o que fazer agora" é do Gerente Comercial; o detalhe completo, da Receita Perdida. */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>⚠ Maiores valores em risco</div>
           {proximasAcoes.length === 0 && (
-            <EmptyState compact icon="✅" title="Nenhuma ação financeira prioritária agora." description="Nenhum orçamento parado, cobrança atrasada, serviço sem retorno ou pedido não concluído identificado." />
+            <EmptyState compact icon="✅" title="Nenhum valor em risco agora." description="Nenhum orçamento parado, cobrança atrasada, serviço sem retorno ou pedido não concluído identificado." />
           )}
           {proximasAcoes.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -290,6 +311,17 @@ export default function FinanceiroPage() {
                 );
               })}
             </div>
+          )}
+          {resumo.receitaPerdida.itens.length > 0 && (
+            <p data-testid="dinheiro-risco-rodape" style={{ fontSize: 12, color: '#64748b', marginTop: 10 }}>
+              <button onClick={() => router.push('/receita-perdida')} style={{ cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, color: '#4a9bb0', font: 'inherit', fontSize: 12 }}>
+                Ver {resumo.receitaPerdida.itens.length === 1 ? 'o item' : `os ${resumo.receitaPerdida.itens.length} itens`} em Receita Perdida →
+              </button>
+              {' · '}Prioridades e próximos passos ficam no{' '}
+              <button onClick={() => router.push('/copiloto')} style={{ cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, color: '#4a9bb0', font: 'inherit', fontSize: 12 }}>
+                Gerente Comercial →
+              </button>
+            </p>
           )}
         </>
       )}

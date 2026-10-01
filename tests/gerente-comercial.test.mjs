@@ -150,9 +150,11 @@ test('Gerente: acompanhamento já priorizado não se repete; segundo caso do mes
 
 test('Núcleo econômico: valor em risco é "registrado" (inclui estimativa e proposta), nunca "comprovado"; plural "itens"', () => {
   const ler = p => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-  for (const f of ['app/copiloto/page.tsx', 'app/financeiro/page.tsx', 'app/receita-perdida/page.tsx']) {
+  for (const f of ['app/financeiro/page.tsx', 'app/receita-perdida/page.tsx']) {
     assert.doesNotMatch(ler(f), /com valor comprovado/, f);
     assert.match(ler(f), /'item' : 'itens'\} com valor registrado/, f);
   }
+  // Gerente: sem total financeiro repetido — só o impacto de cada prioridade.
+  assert.doesNotMatch(ler('app/copiloto/page.tsx'), /com valor comprovado|estado\.receitaPerdida/);
   assert.doesNotMatch(ler('app/copiloto/page.tsx'), /item\{[^}]*\? 's' : ''\}/, 'sem "items"');
 });

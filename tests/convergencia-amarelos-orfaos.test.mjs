@@ -44,23 +44,26 @@ test("Casa mantém todas as prioridades canônicas acessíveis e demo preserva a
 });
 // ── 2. Previsor de Faturamento 30 Dias — ganha consumidor cruzado real ───
 
-test("Copiloto importa e chama gerarPrevisorFaturamento (antes: zero consumidor fora da própria página)", () => {
-  const codigo = ler("app/copiloto/page.tsx");
+// Consolidação Gerente + Dinheiro: o consumidor cruzado do Previsor é o
+// Dinheiro (dono da visão financeira); o Gerente não repete o resumo.
+test("Previsor tem consumidor cruzado real no Dinheiro, que leva ao detalhe (o motor nunca fica órfão)", () => {
+  const codigo = ler("app/financeiro/page.tsx");
   assert.match(codigo, /import \{ gerarPrevisorFaturamento, type ResumoPrevisorFaturamento \} from '\.\.\/\.\.\/lib\/previsor-faturamento'/);
   assert.match(codigo, /const previsor = gerarPrevisorFaturamento\(/);
+  assert.match(codigo, /router\.push\('\/previsor-faturamento'\)/);
+  assert.doesNotMatch(ler("app/copiloto/page.tsx"), /gerarPrevisorFaturamento|estado\.previsor/, "Gerente não repete o previsor");
 });
 
-test("Copiloto usa filtros PRÓPRIOS do previsor para tratamentos/pedidos (retorno_agendado e aguardando_confirmacao_pagamento) — nunca reaproveita a lista já filtrada do Radar, que os exclui e subcontaria o total", () => {
-  const codigo = ler("app/copiloto/page.tsx");
-  assert.match(codigo, /tratamentosParaPrevisor[\s\S]{0,200}retorno_agendado/);
-  assert.match(codigo, /pedidosParaPrevisor[\s\S]{0,200}aguardando_confirmacao_pagamento/);
+test("Dinheiro usa filtros PRÓPRIOS do previsor (retorno_agendado e aguardando_confirmacao_pagamento) — nunca a lista já filtrada do risco, que subcontaria o total", () => {
+  const codigo = ler("app/financeiro/page.tsx");
+  assert.match(codigo, /tratamentosPrevisor[\s\S]{0,200}retorno_agendado/);
+  assert.match(codigo, /pedidosPrevisor[\s\S]{0,200}aguardando_confirmacao_pagamento/);
 });
 
-test("Copiloto distingue confirmado de perspectiva na UI (nunca só o total misturado) e nunca soma emRisco ao total exibido", () => {
-  const codigo = ler("app/copiloto/page.tsx");
-  assert.match(codigo, /Confirmado: \{formatarValor\(estado\.previsor\.confirmadoProgramado\.total\)\}/);
-  assert.match(codigo, /Em perspectiva: \{formatarValor\(estado\.previsor\.emPerspectiva\.totalComData \+ estado\.previsor\.emPerspectiva\.totalSemData\)\}/);
-  assert.doesNotMatch(codigo, /estado\.previsor\.emRisco[^)]*\+/, "nunca soma emRisco a outro total");
+test("Dinheiro mostra o confirmado separado do total previsto e nunca soma emRisco ao previsto", () => {
+  const codigo = ler("app/financeiro/page.tsx");
+  assert.match(codigo, /\{formatarValor\(resumo\.previsor\.confirmadoProgramado\.total\)\} confirmado/);
+  assert.doesNotMatch(codigo, /previsor\.emRisco[^)]*\+/, "nunca soma emRisco a outro total");
 });
 
 // ── 3. Orçamento que Fecha — calcularScoreOportunidade deixa de ser órfão ─

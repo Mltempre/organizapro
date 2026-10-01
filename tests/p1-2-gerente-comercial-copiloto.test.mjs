@@ -65,12 +65,14 @@ test("Copiloto: cobre os 4 estados exigidos (loading/error/empty/success) — nu
   assert.match(codigo, /Nada pedindo atenção agora/);
 });
 
-test("Copiloto: cada item das seções reais tem CTA para a superfície operacional correta (/agendamentos, /follow-up, /receita-perdida, ou o destino real do sinal)", () => {
+test("Copiloto: cada item das seções reais tem CTA para a superfície operacional correta (/agendamentos, /follow-up ou o destino real do sinal); valores financeiros ficam em Dinheiro", () => {
   const codigo = ler("app/copiloto/page.tsx");
   assert.match(codigo, /router\.push\('\/agendamentos'\)/);
   assert.match(codigo, /router\.push\('\/follow-up'\)/);
-  assert.match(codigo, /router\.push\('\/receita-perdida'\)/);
   assert.match(codigo, /router\.push\(sinal\.destino!\)/);
+  // Resumos financeiros saíram do Gerente (dono: Dinheiro); fica só um acesso.
+  assert.doesNotMatch(codigo, /router\.push\('\/receita-perdida'\)|router\.push\('\/previsor-faturamento'\)/);
+  assert.match(codigo, /href="\/financeiro"/);
 });
 
 test("Copiloto: só conta follow-ups cujo dono do fluxo é o próprio follow-up — nunca duplica ação já gerenciada pelo Cobrador Digital/Agenda Autônoma", () => {
