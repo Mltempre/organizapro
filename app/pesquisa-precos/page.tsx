@@ -108,6 +108,7 @@ export default function PesquisaPrecosPage() {
   const [resultado, setResultado] = useState<ResultadoBusca | null>(null);
   const [erroBusca, setErroBusca] = useState("");
   const [registradas, setRegistradas] = useState<Set<string>>(new Set());
+  const [imagensFalhas, setImagensFalhas] = useState<Set<string>>(new Set());
   const buscandoRef = useRef(false);
 
   // Vindo do Catálogo ("Pesquisar preço"): consulta já preparada com o item.
@@ -367,7 +368,21 @@ export default function PesquisaPrecosPage() {
                 const foraDaConta = r.comparabilidade === "baixa" || (resultado.consulta.tipo === "servico" && r.mesmaLocalidade !== true);
                 const chave = r.url + r.precoCentavos;
                 return <tr key={chave} style={{ opacity: foraDaConta ? 0.6 : 1 }}>
-                  <td style={{ maxWidth: 320 }}>{r.titulo}{r.localidade && <><br /><span style={{ color: "#64748b" }}>📍 {r.localidade}</span></>}{r.diferenca && <><br /><span style={{ color: "#fbbf24" }}>Diferença: {r.diferenca}</span></>}</td>
+                  <td style={{ maxWidth: 380 }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      {/* Produto: imagem declarada pela página da loja (sem busca extra). Sem imagem,
+                          ou se a loja bloquear/expirar o arquivo, fica o placeholder — nunca outra imagem. */}
+                      {resultado.consulta.tipo === "produto" && (r.imagemUrl && !imagensFalhas.has(r.imagemUrl)
+                        // eslint-disable-next-line @next/next/no-img-element -- imagem externa da loja; next/image exigiria liberar cada domínio de loja
+                        ? <img src={r.imagemUrl} alt={`Imagem do produto em ${r.fonte}`} title={`Imagem publicada por ${r.fonte}`} data-testid="imagem-referencia"
+                            loading="lazy" decoding="async" referrerPolicy="no-referrer" width={56} height={56}
+                            onError={() => setImagensFalhas(s => new Set(s).add(r.imagemUrl!))}
+                            style={{ width: 56, height: 56, objectFit: "contain", borderRadius: 8, background: "#fff", flexShrink: 0 }} />
+                        : <div aria-hidden="true" data-testid="sem-imagem-referencia" title="Sem imagem confiável desta fonte"
+                            style={{ width: 56, height: 56, borderRadius: 8, border: "1px dashed #2d3148", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, opacity: 0.45, flexShrink: 0 }}>📦</div>)}
+                      <div style={{ minWidth: 0 }}>{r.titulo}{r.localidade && <><br /><span style={{ color: "#64748b" }}>📍 {r.localidade}</span></>}{r.diferenca && <><br /><span style={{ color: "#fbbf24" }}>Diferença: {r.diferenca}</span></>}</div>
+                    </div>
+                  </td>
                   <td style={{ fontWeight: 700, color: "#f1f5f9" }}>{R(r.precoCentavos)}</td>
                   <td><a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: "#4a9bb0" }}>{r.fonte}</a><br /><span style={{ color: "#64748b" }}>{r.confirmacao === "pagina_consultada" ? "página consultada" : "site consultado — confira a página"}</span></td>
                   <td>{r.comparabilidade === "alta" ? "Alta" : r.comparabilidade === "media" ? "Média" : "Baixa"}{foraDaConta && <><br /><span style={{ color: "#fbbf24" }}>{r.comparabilidade === "baixa" ? "Fora da conta" : "Outra região — fora da conta"}</span></>}</td>

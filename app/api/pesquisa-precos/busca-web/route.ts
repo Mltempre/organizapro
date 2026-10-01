@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminPesquisaPrecos, resolverTenantPesquisaPrecos } from "../../../../lib/pesquisa-precos-servidor";
 import { consumirCotaIa } from "../../../../lib/seguranca-operacoes";
 import { executarBuscaWeb, resumirReferencias, type TipoConsultaPreco } from "../../../../lib/pesquisa-precos-web";
+import { imagensDasReferencias } from "../../../../lib/pesquisa-precos-imagem";
 
 const COTA_USUARIO_HORA = 10;
 const COTA_NEGOCIO_HORA = 40;
@@ -51,11 +52,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: `${busca.erro} Você ainda pode registrar preços manualmente.` }, { status: busca.status });
   }
   const resumo = resumirReferencias(busca.extracao.referencias, { tipo, localidade: localidade || null, seuPrecoCentavos });
+  // Produto: imagem declarada pela própria página da loja de cada referência
+  // (sem busca extra nem custo de API). Falha/ausência → sem imagem.
+  const imagens = tipo === "produto" ? await imagensDasReferencias(busca.extracao.referencias) : new Map<string, string>();
   return NextResponse.json({
     sucesso: true,
     consulta: { termo, tipo, localidade: localidade || null, pesquisadoEm },
     itemCatalogo,
-    referencias: busca.extracao.referencias,
+    referencias: busca.extracao.referencias.map(r => ({ ...r, imagemUrl: imagens.get(r.url) ?? null })),
     descartadas: busca.extracao.descartadas,
     fontesConsultadas: busca.extracao.fontesConsultadas,
     respostaInterpretavel: busca.extracao.respostaInterpretavel,

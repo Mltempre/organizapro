@@ -32,6 +32,7 @@ export type ReferenciaPreco = {
   diferenca: string | null;
   confirmacao: Confirmacao;
   mesmaLocalidade: boolean | null; // só para serviço com cidade informada
+  imagemUrl?: string | null; // produto: imagem declarada pela página da loja (lib/pesquisa-precos-imagem.ts)
 };
 
 export type MotivoDescarte = "url_invalida" | "site_nao_consultado" | "preco_invalido" | "titulo_ausente" | "duplicada";
