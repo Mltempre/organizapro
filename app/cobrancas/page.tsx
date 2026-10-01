@@ -11,6 +11,7 @@ import {
   estaAtrasada, diasAtraso, calcularScoreCobranca, calcularIndicadoresCobranca,
   MOTIVOS_CANCELAMENTO, type Cobranca, type StatusCobranca, type MotivoCancelamento,
 } from '../../lib/motor-cobranca';
+import { descricaoDaVenda, type PedidoVenda } from '../../lib/venda-execucao';
 
 // ── Superfície operacional de Cobranças (Financeiro/Cobrador AI V1) ──────
 // Usa só as APIs já construídas e testadas (GET/POST /api/cobrancas,
@@ -23,12 +24,13 @@ import {
 // (calcularIndicadoresCobranca) — nunca uma segunda consulta, nunca um
 // número fabricado.
 
-type TratamentoPicker = { id: string; paciente_id: string | null; paciente_nome: string; paciente_telefone: string | null; tipo_tratamento: string; valor_estimado: number | null };
+// Venda de origem (Pedidos = Venda/Execução única): a cobrança nasce da venda.
+type VendaPicker = PedidoVenda;
 type ClientePicker = { id: string; nome: string; telefone: string | null; whatsapp: string | null };
 
 type FormNovo = {
   pacienteId: string;
-  tratamentoId: string;
+  pedidoId: string;
   paciente_nome: string;
   telefone: string;
   descricao: string;
@@ -36,7 +38,7 @@ type FormNovo = {
   vencimento: string;
   observacao: string;
 };
-const formInicial: FormNovo = { pacienteId: '', tratamentoId: '', paciente_nome: '', telefone: '', descricao: '', valor: '', vencimento: '', observacao: '' };
+const formInicial: FormNovo = { pacienteId: '', pedidoId: '', paciente_nome: '', telefone: '', descricao: '', valor: '', vencimento: '', observacao: '' };
 
 const STATUS_CONFIG: Record<StatusCobranca, { label: string; color: string; bg: string }> = {
   pendente:     { label: 'Pendente',    color: '#38bdf8', bg: 'rgba(14,165,233,0.14)' },
@@ -48,6 +50,18 @@ const MOTIVO_LABELS: Record<MotivoCancelamento, string> = {
   negociado: 'Negociado', erro_lancamento: 'Erro de lançamento',
   paciente_nao_localizado: 'Cliente não localizado', inadimplencia_assumida: 'Inadimplência assumida', outro: 'Outro motivo',
 };
+
+// Dados que a venda já conhece, prontos para revisão na cobrança.
+function dadosDaVenda(v: VendaPicker, pacientes: ClientePicker[]): Pick<FormNovo, 'pedidoId' | 'pacienteId' | 'paciente_nome' | 'telefone' | 'descricao' | 'valor'> {
+  return {
+    pedidoId: v.id,
+    pacienteId: v.paciente_id && pacientes.some(p => p.id === v.paciente_id) ? v.paciente_id : '',
+    paciente_nome: v.nome_cliente,
+    telefone: v.telefone ? normalizar(v.telefone) : '',
+    descricao: descricaoDaVenda(v),
+    valor: (v.valor_centavos / 100).toFixed(2),
+  };
+}
 
 function normalizar(tel: string) { return tel.replace(/\D/g, ''); }
 function formatarValor(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -61,7 +75,9 @@ export default function CobrancasPage() {
   const router = useRouter();
   const [cobrancas, setCobrancas]     = useState<Cobranca[]>([]);
   const [pacientes, setPacientes]     = useState<ClientePicker[]>([]);
-  const [tratamentos, setTratamentos] = useState<TratamentoPicker[]>([]);
+  const [vendas, setVendas] = useState<VendaPicker[]>([]);
+  // /cobrancas?pedido=<id> — vindo de "Gerar cobrança" na venda. Lido uma vez.
+  const pedidoDaUrlRef = React.useRef<string | null | undefined>(undefined);
   const [clinicaId, setClinicaId]     = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [carregando, setCarregando]   = useState(true);
@@ -146,9 +162,9 @@ export default function CobrancasPage() {
       setClinicaId(cid || '');
       if (!cid) { setCobrancas([]); setCarregando(false); return; }
 
-      const [cobRes, tratRes, pacRes] = await Promise.all([
+      const [cobRes, vendaRes, pacRes] = await Promise.all([
         fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
-        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
+        fetch(`/api/pedidos?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
         supabase.from('pacientes').select('id, nome, telefone, whatsapp').eq('clinica_id', cid).order('nome'),
       ]);
 
@@ -161,11 +177,31 @@ export default function CobrancasPage() {
         // silenciosamente "nenhuma cobrança".
         if (cobRes.status !== 404) { console.error('Erro ao carregar cobranças:', cobRes.status); setErro(MSG_ERRO_PADRAO); }
       }
-      if (tratRes.ok) {
-        const json = await tratRes.json();
-        setTratamentos(Array.isArray(json.tratamentos) ? json.tratamentos : []);
+      // Vendas que podem originar cobrança: não canceladas e ainda não pagas
+      // pelo fluxo próprio do pedido (venda paga já é receita).
+      const vendasLidas: VendaPicker[] = [];
+      if (vendaRes.ok) {
+        const json = await vendaRes.json();
+        if (Array.isArray(json.pedidos)) vendasLidas.push(...(json.pedidos as VendaPicker[]).filter(v => v.status !== 'cancelado' && v.status !== 'pago'));
       }
-      setPacientes((pacRes.data || []) as ClientePicker[]);
+      setVendas(vendasLidas);
+      const pacientesLidos = (pacRes.data || []) as ClientePicker[];
+      setPacientes(pacientesLidos);
+
+      if (pedidoDaUrlRef.current === undefined) {
+        pedidoDaUrlRef.current = new URLSearchParams(window.location.search).get('pedido');
+      }
+      if (pedidoDaUrlRef.current) {
+        const origem = vendasLidas.find(v => v.id === pedidoDaUrlRef.current);
+        pedidoDaUrlRef.current = null;
+        if (origem) {
+          setForm({ ...formInicial, ...dadosDaVenda(origem, pacientesLidos) });
+          idempotencyKeyRef.current = crypto.randomUUID();
+          setModalNovo(true);
+        } else {
+          setErro('Venda não encontrada ou já paga/cancelada. Selecione a origem no formulário.');
+        }
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') { router.push('/login'); return; }
       console.error(err);
@@ -188,21 +224,15 @@ export default function CobrancasPage() {
     setForm(prev => ({ ...prev, pacienteId: id, paciente_nome: p?.nome ?? prev.paciente_nome, telefone: normalizar(p?.whatsapp || p?.telefone || '') }));
   }
 
-  // Tudo o que o serviço contratado já sabe vira o ponto de partida da
-  // cobrança (cliente cadastrado, nome, telefone, descrição, valor) — o
+  // Tudo o que a venda já sabe vira o ponto de partida da cobrança (cliente
+  // cadastrado, nome, telefone, descrição, valor, venda de origem) — o
   // usuário revisa e confirma; nada é registrado sozinho. Dado ausente na
   // origem nunca apaga o que já foi digitado.
-  function selecionarTratamento(id: string) {
-    const t = tratamentos.find(x => x.id === id);
-    const clienteDaOrigem = t?.paciente_id && pacientes.some(p => p.id === t.paciente_id) ? t.paciente_id : null;
-    setForm(prev => ({
-      ...prev, tratamentoId: id,
-      pacienteId: clienteDaOrigem ?? prev.pacienteId,
-      paciente_nome: t?.paciente_nome ?? prev.paciente_nome,
-      telefone: t?.paciente_telefone ? normalizar(t.paciente_telefone) : prev.telefone,
-      descricao: t ? t.tipo_tratamento : prev.descricao,
-      valor: t?.valor_estimado ? String(t.valor_estimado) : prev.valor,
-    }));
+  function selecionarVenda(id: string) {
+    const v = vendas.find(x => x.id === id);
+    if (!v) { setForm(prev => ({ ...prev, pedidoId: id })); return; }
+    const dados = dadosDaVenda(v, pacientes);
+    setForm(prev => ({ ...prev, ...dados, pacienteId: dados.pacienteId || prev.pacienteId, telefone: dados.telefone || prev.telefone }));
   }
 
   async function salvar() {
@@ -223,7 +253,7 @@ export default function CobrancasPage() {
         // Nome do campo que a API realmente lê (antes ia como "telefone" e
         // era descartado — a cobrança nascia sem telefone).
         paciente_telefone: form.telefone ? normalizar(form.telefone) : undefined,
-        tratamento_origem_id: form.tratamentoId || undefined,
+        pedido_origem_id: form.pedidoId || undefined,
         descricao: form.descricao.trim(),
         valor: valorNumerico,
         vencimento: form.vencimento,
@@ -472,10 +502,10 @@ export default function CobrancasPage() {
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Nova cobrança</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Serviço contratado de origem (opcional)</label>
-                <select value={form.tratamentoId} onChange={e => selecionarTratamento(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Venda de origem (opcional)</label>
+                <select value={form.pedidoId} onChange={e => selecionarVenda(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }}>
                   <option value="">— Cobrança avulsa —</option>
-                  {tratamentos.map(t => <option key={t.id} value={t.id}>{t.paciente_nome} — {t.tipo_tratamento}{t.valor_estimado ? ` (${formatarValor(t.valor_estimado)})` : ''}</option>)}
+                  {vendas.map(v => <option key={v.id} value={v.id}>{v.nome_cliente} — {descricaoDaVenda(v)} ({formatarValor(v.valor_centavos / 100)})</option>)}
                 </select>
               </div>
               <div>

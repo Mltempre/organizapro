@@ -23,7 +23,7 @@ const titulosDaRota = h => {
 test("menu: ordem e rótulos finais da demonstração", () => {
   assert.deepEqual(menu.map(x => x.l), [
     "Visão Geral", "Oportunidades", "Dinheiro",
-    "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Estoque", "Pesquisa de Preços", "Serviços contratados", "Receita Perdida",
+    "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Estoque", "Pesquisa de Preços", "Receita Perdida",
     "Agenda", "Agenda Autônoma", "Chatbot IA", "WhatsApp",
     "Google Presença", "Reputação", "Meu Site", "Conteúdo IA",
     "Gerente Comercial", "Métricas", "Raio-X da Empresa", "Previsor de Faturamento", "Linha Econômica", "Ads e Atribuição",
@@ -98,7 +98,8 @@ test("Serviços contratados: nomenclatura universal na apresentação; rota, API
   for (const f of ["app/follow-up/page.tsx", "app/financeiro/page.tsx", "app/receita-perdida/page.tsx", "app/previsor-faturamento/page.tsx", "app/copiloto/page.tsx", "app/clientes/[id]/page.tsx", "app/components/CasaDashboard.tsx"]) {
     assert.doesNotMatch(ler(f), /'Tratamento (sem|com) retorno'|"Tratamentos sem retorno|🩺/, f);
   }
-  assert.match(ler("lib/nucleo-inteligente.ts"), /destinoLabel: "Ver serviço contratado"/);
+  // Execução de venda: o sinal leva à venda em Pedidos.
+  assert.match(ler("lib/nucleo-inteligente.ts"), /tratamento_sem_retorno: \{ evidencia: "na venda real em execução", destino: "\/pedidos", destinoLabel: "Ver venda" \}/);
   assert.match(ler("lib/follow-up-comercial.ts"), /`Serviço \$\{t\.tipoTratamento\} interrompido há/);
 });
 

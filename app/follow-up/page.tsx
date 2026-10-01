@@ -11,11 +11,12 @@ import { fetchJsonSeguro } from '../../lib/fetch-seguro';
 import { gerarFollowUpsComerciais, type CasoFollowUp, type TipoFollowUpProprio } from '../../lib/follow-up-comercial';
 import { agregarClientesElegiveisRecompra } from '../../lib/motor-pedidos';
 import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
+import { particionarVendas, type PedidoVenda } from '../../lib/venda-execucao';
 
 // ── Follow-up Comercial Inteligente V1 · visão executiva ────────────────
 // Nenhuma consulta nova, nenhum motor novo: reaproveita as mesmas APIs
 // já usadas por app/receita-perdida/page.tsx e app/previsor-
-// faturamento/page.tsx (/api/orcamentos, /api/tratamentos, /api/pedidos)
+// faturamento/page.tsx (/api/orcamentos, /api/pedidos — venda e execução)
 // e delega toda a classificação a lib/follow-up-comercial.ts. Cobrança
 // atrasada e os sinais de Agenda Autônoma aparecem aqui só como
 // referência (donoDoFluxo) — a ação real continua em /cobrancas e
@@ -23,9 +24,8 @@ import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
 
 type OportunidadeRow = { id: string; telefone: string; nome_informado: string | null; status: string; orcamento_vinculado_id: string | null; ultima_interacao_em: string };
 type OrcamentoRow = { id: string; paciente_nome: string; telefone: string | null; procedimento: string; valor: number; status: string; apresentado_em: string };
-type TratamentoRow = { id: string; paciente_nome: string; paciente_telefone: string | null; tipo_tratamento: string; status: string; proxima_data_prevista: string | null; updated_at: string; interrompido_em: string | null };
-type PedidoRow = { id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string; paciente_id: string | null; pedido_itens?: { descricao: string }[] };
-type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: string | null; descricao: string; valor: number; vencimento: string; status: string };
+type PedidoRow = PedidoVenda;
+type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: string | null; descricao: string; valor: number; vencimento: string; status: string; pedido_origem_id?: string | null };
 
 const TIPO_LABELS: Record<string, { label: string; icon: string }> = {
   oportunidade_parada: { label: 'Oportunidade parada', icon: '📡' },
@@ -83,27 +83,31 @@ export default function FollowUpPage() {
       setClinicaId(cid || '');
       if (!cid) { setCasos([]); setCarregando(false); return; }
 
-      const [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR] = await Promise.all([
+      const [oportunidadesR, orcamentosR, pedidosR, cobrancasR] = await Promise.all([
         fetchJsonSeguro<{ data: OportunidadeRow[] }>('/api/oportunidades', { headers: auth }, { data: [] }),
         fetchJsonSeguro<{ orcamentos: OrcamentoRow[] }>(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }, { orcamentos: [] }),
-        fetchJsonSeguro<{ tratamentos: TratamentoRow[] }>(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }, { tratamentos: [] }),
         fetchJsonSeguro<{ pedidos: PedidoRow[] }>(`/api/pedidos?clinica_id=${cid}`, { headers: auth }, { pedidos: [] }),
         fetchJsonSeguro<{ cobrancas: CobrancaRow[] }>(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }, { cobrancas: [] }),
       ]);
-      const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, tratamentosRes = tratamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
-      setFalhaParcial([oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR].some(r => r.falhou));
+      const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
+      setFalhaParcial([oportunidadesR, orcamentosR, pedidosR, cobrancasR].some(r => r.falhou));
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
-      const tratamentos: TratamentoRow[] = (tratamentosRes.tratamentos ?? []).filter((t: TratamentoRow) => t.status === 'em_andamento' || t.status === 'interrompido');
       const todosPedidos: PedidoRow[] = pedidosRes.pedidos ?? [];
-      const pedidosNaoConcluidos = todosPedidos.filter(p => p.status === 'criado' || p.status === 'confirmado');
-      const cobrancas: CobrancaRow[] = (cobrancasRes.cobrancas ?? []).filter((c: CobrancaRow) => c.status === 'pendente' || c.status === 'em_cobranca');
+      const todasCobrancas: CobrancaRow[] = cobrancasRes.cobrancas ?? [];
+      // Venda/Execução (lib/venda-execucao.ts): "sem retorno" vem da execução
+      // da venda (paga ou não — é relacionamento); "pedido não concluído" só
+      // para venda em aberto sem cobrança vinculada e sem execução ativa.
+      const vendas = particionarVendas(todosPedidos, todasCobrancas);
+      const tratamentos = vendas.acompanhamentos.filter((t) => t.status === 'em_andamento' || t.status === 'interrompido');
+      const pedidosNaoConcluidos = vendas.pedidosAReceber.filter(p => p.status === 'criado' || p.status === 'confirmado');
+      const cobrancas = todasCobrancas.filter((c) => c.status === 'pendente' || c.status === 'em_cobranca');
 
       // Recompra possível — mesma agregação real já usada em app/dashboard/page.tsx
       // (agregarClientesElegiveisRecompra), reaproveitada aqui sem nova consulta.
       const recomprasPossiveis = agregarClientesElegiveisRecompra(
-        todosPedidos.map(p => ({ pacienteId: p.paciente_id, telefone: p.telefone, nomeCliente: p.nome_cliente, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado', criadoEm: p.criado_em, pagamentoConfirmadoEm: null }))
+        todosPedidos.map(p => ({ pacienteId: p.paciente_id, telefone: p.telefone, nomeCliente: p.nome_cliente, status: p.status, criadoEm: p.criado_em, pagamentoConfirmadoEm: null }))
       );
 
       const hoje = hojeStr();

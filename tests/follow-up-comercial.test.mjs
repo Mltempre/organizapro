@@ -290,7 +290,9 @@ test("follow-up: tela busca só pelas APIs canônicas já existentes (todas esco
   assert.match(pagina, /import \{ fetchJsonSeguro \} from '\.\.\/\.\.\/lib\/fetch-seguro'/);
   assert.match(pagina, /fetchJsonSeguro<\{ data: OportunidadeRow\[\] \}>\('\/api\/oportunidades'/);
   assert.match(pagina, /\/api\/orcamentos\?clinica_id=\$\{cid\}/);
-  assert.match(pagina, /\/api\/tratamentos\?clinica_id=\$\{cid\}/);
+  // Pedidos = Venda/Execução única: execução de venda vem de /api/pedidos; /api/tratamentos não é mais fonte.
+  assert.doesNotMatch(pagina, /\/api\/tratamentos/);
+  assert.match(pagina, /particionarVendas\(todosPedidos, todasCobrancas\)/);
   assert.match(pagina, /\/api\/pedidos\?clinica_id=\$\{cid\}/);
   assert.match(pagina, /\/api\/cobrancas\?clinica_id=\$\{cid\}/);
   assert.doesNotMatch(pagina, /supabase\.from\("orcamentos"\)/);

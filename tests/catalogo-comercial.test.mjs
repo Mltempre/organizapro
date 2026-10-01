@@ -152,7 +152,9 @@ test("Catálogo e Pedidos: administra o catálogo aqui (novo/editar/imagem/preç
   assert.match(p, /\{vendavel && \(\s*<button[^>]*onClick=\{\(\) => abrirNovo\(c\.id\)\}/, "Adicionar ao pedido só para item vendável");
   assert.match(p, /data-testid="fluxo-pedido"/);
   for (const etapa of ["'Catálogo'", "'Montar pedido'", "'Total'", "'Registrar'", "'Acompanhar status'"]) assert.ok(p.includes(etapa), etapa);
-  assert.match(p, /Pedidos registrados aqui alimentam os sinais de pedido parado e de recompra no Gerente Comercial, no Follow-up Comercial e na Receita Perdida\./);
+  // Pedidos = Venda/Execução única: o texto explica que a venda (produto, serviço ou orçamento aprovado) alimenta os sinais.
+  assert.match(p, /Pedidos são as vendas do negócio — de produto, de serviço ou vindas de um orçamento aprovado\./);
+  assert.match(p, /alimentam os sinais de pedido parado, serviço sem retorno e recompra no Gerente Comercial, no Follow-up Comercial e na Receita Perdida\./);
   assert.doesNotMatch(semComentarios(p), /catálogo[^.]*\bIA\b|gerad[oa] por IA|operad[oa] por IA/i, "não atribui o catálogo a IA");
 });
 

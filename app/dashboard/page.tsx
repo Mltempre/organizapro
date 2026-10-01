@@ -8,13 +8,11 @@ import { gerarOportunidadesClientes, type OportunidadeCliente } from "../../lib/
 import type { Orcamento } from "../../lib/motor-orcamentos";
 import type { Tratamento } from "../../lib/motor-tratamento";
 import { calcularIndicadoresCobranca, type Cobranca, type IndicadoresCobranca } from "../../lib/motor-cobranca";
-import { agregarClientesElegiveisRecompra, type PedidoStatus } from "../../lib/motor-pedidos";
+import { agregarClientesElegiveisRecompra } from "../../lib/motor-pedidos";
+import { particionarVendas, type PedidoVenda } from "../../lib/venda-execucao";
 
-type PedidoRow = {
-  id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string;
-  paciente_id?: string | null; pagamento_confirmado_em?: string | null;
-  pedido_itens?: { descricao: string }[];
-};
+// Pedidos = Venda/Execução única: a execução da venda substitui Serviços contratados.
+type PedidoRow = PedidoVenda;
 import {
   adaptarOportunidadesClientes,
   adaptarRecomendacoes,
@@ -70,7 +68,8 @@ type DashData = {
   orcamentosParadosRows: Orcamento[];
   pedidosNaoConcluidosRows: PedidoRow[];
   todosPedidosRows: PedidoRow[];
-  tratamentosAtivosRows: Tratamento[];
+  tratamentosAtivosRows: Tratamento[];     // execução de venda ativa — sinais de relacionamento (Radar)
+  tratamentosAReceberRows: Tratamento[];   // mesma execução, só o que ainda é dinheiro a receber (Receita Perdida)
   cobrancasAbertasRows: Cobranca[];
   todasCobrancasRows: Cobranca[];
   oportunidadesDemandaRows: OportunidadeDemandaSinal[];
@@ -94,6 +93,7 @@ export default function Dashboard() {
     pedidosNaoConcluidosRows: [],
     todosPedidosRows: [],
     tratamentosAtivosRows: [],
+    tratamentosAReceberRows: [],
     cobrancasAbertasRows: [],
     todasCobrancasRows: [],
     oportunidadesDemandaRows: [],
@@ -179,23 +179,6 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
         .then(async (r) => (r.ok ? ((await r.json()).pedidos as PedidoRow[]) ?? null : null))
-        .catch(() => null);
-
-      // Smart Commerce Canônico — mesmo raciocínio: public.tratamentos e
-      // public.cobrancas só são acessíveis via service role, leitura via
-      // /api/tratamentos e /api/cobrancas. Sem filtro de status na URL
-      // (mesmo padrão de pedidos) — o filtro real acontece aqui e dentro
-      // do próprio Radar (estaAtrasada/precisaRetorno). Falha nunca
-      // fabrica tratamento/cobrança: impede apresentar um resumo falso.
-      const tratamentosAtivosPromise = fetch(`/api/tratamentos?clinica_id=${cid}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-        .then(async (r) => {
-          if (!r.ok) return null;
-          const todos = (await r.json()).tratamentos as Tratamento[];
-          if (!Array.isArray(todos)) return null;
-          return todos.filter((t) => t.status === "em_andamento" || t.status === "interrompido");
-        })
         .catch(() => null);
 
       // Dinheiro (Bloco F) precisa de TODAS as cobranças (inclusive pagas/
@@ -294,14 +277,20 @@ export default function Dashboard() {
       const orcamentosParadosRows = await orcamentosParadosPromise;
       const todosPedidosRows = await todosPedidosPromise;
 
-      const tratamentosAtivosRows = await tratamentosAtivosPromise;
       const todasCobrancasRows = await todasCobrancasPromise;
 
       const oportunidadesDemandaRows = await oportunidadesDemandaPromise;
-      if (!Array.isArray(orcamentosParadosRows) || !Array.isArray(todosPedidosRows) || !Array.isArray(tratamentosAtivosRows) || !Array.isArray(todasCobrancasRows) || !Array.isArray(oportunidadesDemandaRows)) {
+      if (!Array.isArray(orcamentosParadosRows) || !Array.isArray(todosPedidosRows) || !Array.isArray(todasCobrancasRows) || !Array.isArray(oportunidadesDemandaRows)) {
         throw new Error("Os dados comerciais estão indisponíveis. Tente novamente para consultar valores e prioridades.");
       }
-      const pedidosNaoConcluidosRows = todosPedidosRows.filter((p) => p.status === "criado" || p.status === "confirmado");
+      // Venda/Execução (lib/venda-execucao.ts): cada venda entra uma única vez
+      // no dinheiro; "sem retorno" vem da execução da venda; venda com
+      // cobrança vinculada é contada pela cobrança.
+      const vendas = particionarVendas(todosPedidosRows, todasCobrancasRows);
+      const execucaoEmRisco = (t: Tratamento) => t.status === "em_andamento" || t.status === "interrompido";
+      const tratamentosAtivosRows = vendas.acompanhamentos.filter(execucaoEmRisco);
+      const tratamentosAReceberRows = vendas.acompanhamentosAReceber.filter(execucaoEmRisco);
+      const pedidosNaoConcluidosRows = vendas.pedidosAReceber.filter((p) => p.status === "criado" || p.status === "confirmado");
       const cobrancasAbertasRows = todasCobrancasRows.filter((c) => c.status === "pendente" || c.status === "em_cobranca");
 
       // Agenda Autônoma de Receita · um cancelamento só é oportunidade se o
@@ -364,6 +353,7 @@ export default function Dashboard() {
         pedidosNaoConcluidosRows,
         todosPedidosRows,
         tratamentosAtivosRows,
+        tratamentosAReceberRows,
         cobrancasAbertasRows,
         todasCobrancasRows,
         oportunidadesDemandaRows,
@@ -462,13 +452,12 @@ export default function Dashboard() {
           pacienteId:            p.paciente_id ?? null,
           telefone:              p.telefone,
           nomeCliente:           p.nome_cliente,
-          status:                p.status as PedidoStatus,
+          status:                p.status,
           criadoEm:              p.criado_em,
           pagamentoConfirmadoEm: p.pagamento_confirmado_em ?? null,
         }))),
-        // Smart Commerce Canônico — Convergência de Tratamentos/Cobranças:
-        // dados já buscados acima via /api/tratamentos e /api/cobrancas
-        // (service role, escopado por clinica_id).
+        // Execução de venda (Pedidos = Venda/Execução) e cobranças — dados
+        // já buscados acima via /api/pedidos e /api/cobrancas.
         tratamentosSemRetorno: dash.tratamentosAtivosRows.map(t => ({
           id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone,
           tipoTratamento: t.tipo_tratamento, status: t.status,
@@ -494,7 +483,7 @@ export default function Dashboard() {
         hoje: hojeStr, agora: agoraIso,
         orcamentosParados: dash.orcamentosParadosRows.map((o) => ({ id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento, valor: o.valor, apresentadoEm: o.apresentado_em })),
         cobrancasAtrasadas: dash.cobrancasAbertasRows.map((c) => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca', tratamentoOrigemId: c.tratamento_origem_id })),
-        tratamentosSemRetorno: dash.tratamentosAtivosRows.map((t) => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status, proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em, valorEstimado: t.valor_estimado })),
+        tratamentosSemRetorno: dash.tratamentosAReceberRows.map((t) => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status, proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em, valorEstimado: t.valor_estimado })),
         pedidosNaoConcluidos: dash.pedidosNaoConcluidosRows.map((p) => ({ id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone, descricao: 'pedido', valor: p.valor_centavos / 100, criadoEm: p.criado_em })),
         oportunidadesAbertas: [], // Sem valor financeiro; permanecem na lista canônica de prioridades.
       });

@@ -77,11 +77,13 @@ test("todas as ~27 páginas que dependem de /api/minha-clinica ficam sob ROTAS_C
       return "/" + rel.replace(/\[.*?\]/g, "x").split("/")[0]; // rota-base (primeiro segmento real)
     });
   const unicos = [...new Set(paginasComMinhaClinica)];
+  // Rotas fora de navGrupos (rodapé, demonstração, histórico fora do menu
+  // como /tratamentos) entram por literal no próprio array ROTAS_COM_SHELL.
+  const blocoRotas = adminShellFrame.slice(adminShellFrame.indexOf("export const ROTAS_COM_SHELL"), adminShellFrame.indexOf("];", adminShellFrame.indexOf("export const ROTAS_COM_SHELL")));
   for (const rota of unicos) {
-    // /configuracoes entra em ROTAS_COM_SHELL fora de navGrupos (item de
-    // rodapé, não de menu) — mesmo padrão de sempre, checado à parte.
-    const padrao = rota === "/configuracoes" ? /"\/configuracoes"/ : new RegExp(`h: "${rota.replace("/", "\\/")}"`);
-    assert.match(adminShellFrame, padrao, `${rota} deveria estar sob ROTAS_COM_SHELL (coberta pelo gate)`);
+    const noMenu = new RegExp(`h: "${rota.replace("/", "\\/")}"`).test(adminShellFrame);
+    const literal = blocoRotas.includes(`"${rota}"`);
+    assert.ok(noMenu || literal, `${rota} deveria estar sob ROTAS_COM_SHELL (coberta pelo gate)`);
   }
 });
 

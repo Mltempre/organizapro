@@ -51,14 +51,13 @@
 // nunca é somado em dois estágios, porque só o estágio terminal soma.
 //
 // ── Três categorias, nunca confundidas ───────────────────────────────────
-// A) COMPROVADO: toda cobrança 'pago' + todo pedido 'pago' (evidência de
-//    pagamento real, com ou sem origem rastreável).
-// B) ATRIBUÍVEL (subconjunto de A): só cobranças 'pago' cuja cadeia
-//    oportunidade->orçamento->tratamento->cobrança é 100% rastreável
-//    pelos vínculos reais acima. Pedidos NUNCA são atribuíveis nesta V1
-//    — não existe hoje nenhum vínculo técnico real entre pedido e
-//    oportunidade/origem (pedidos são domínio irmão independente, por
-//    desenho — ver lib/motor-pedidos.ts). Documentado, não contornado.
+// A) COMPROVADO: toda cobrança 'pago' + todo pedido 'pago' SEM cobrança
+//    vinculada (venda com cobrança conta só pela cobrança — nunca duas
+//    receitas para a mesma venda; lib/venda-execucao.ts).
+// B) ATRIBUÍVEL (subconjunto de A): cobranças/pedidos 'pago' cuja cadeia
+//    oportunidade->orçamento->venda(pedido)->cobrança é 100% rastreável
+//    pelos vínculos reais (pedidos.orcamento_origem_id,
+//    cobrancas.pedido_origem_id; tratamento_origem_id só no legado).
 // C) NÃO ATRIBUÍVEL = COMPROVADO − ATRIBUÍVEL (nunca uma fonte de dado
 //    separada — é sempre o resto do mesmo total real).
 // Nenhuma correlação vira causalidade: uma cadeia completa prova só que
@@ -97,7 +96,8 @@ export type TratamentoParaLinhaEconomica = {
 export type CobrancaParaLinhaEconomica = {
   id: string;
   pacienteNome: string;
-  tratamentoOrigemId: string | null;
+  tratamentoOrigemId: string | null; // vínculo legado (Serviços contratados)
+  pedidoOrigemId?: string | null; // venda de origem — com ele, a receita da venda conta SÓ pela cobrança
   status: StatusCobranca;
   valor: number;
   valorPago: number | null;
@@ -112,6 +112,7 @@ export type PedidoParaLinhaEconomica = {
   status: "criado" | "confirmado" | "aguardando_confirmacao_pagamento" | "pago" | "cancelado";
   valor: number; // já em reais (valor_centavos / 100), resolvido por quem chama
   pagamentoConfirmadoEm: string | null; // timestamptz ISO
+  orcamentoOrigemId?: string | null; // venda nascida de orçamento aprovado — torna a cadeia rastreável
 };
 
 export type EntradaLinhaEconomica = {
@@ -175,6 +176,12 @@ function diasEntre(de: string, ate: string): number {
 export function gerarLinhaEconomica(input: EntradaLinhaEconomica): ResumoLinhaEconomica {
   const orcamentosPorId = new Map(input.orcamentos.map((o) => [o.id, o]));
   const tratamentosPorId = new Map(input.tratamentos.map((t) => [t.id, t]));
+  const pedidosPorId = new Map(input.pedidos.map((p) => [p.id, p]));
+  // Venda com cobrança vinculada (não cancelada): a receita é a da cobrança,
+  // nunca a do pedido também — mesma regra de lib/venda-execucao.ts.
+  const pedidosComCobranca = new Set(
+    input.cobrancas.filter((c) => c.status !== "cancelada").map((c) => c.pedidoOrigemId).filter((id): id is string => !!id)
+  );
   const oportunidadePorOrcamentoId = new Map(
     input.oportunidades.filter((op) => op.orcamentoVinculadoId).map((op) => [op.orcamentoVinculadoId as string, op])
   );
@@ -187,8 +194,11 @@ export function gerarLinhaEconomica(input: EntradaLinhaEconomica): ResumoLinhaEc
   for (const c of input.cobrancas) {
     if (c.status !== "pago" || c.valorPago === null || !c.pagoEm) continue;
 
-    const tratamento = c.tratamentoOrigemId ? tratamentosPorId.get(c.tratamentoOrigemId) : undefined;
-    const orcamento = tratamento?.orcamentoOrigemId ? orcamentosPorId.get(tratamento.orcamentoOrigemId) : undefined;
+    // Cadeia pela venda (Pedidos = Venda/Execução); vínculo legado com serviço só quando não há venda.
+    const venda = c.pedidoOrigemId ? pedidosPorId.get(c.pedidoOrigemId) : undefined;
+    const tratamento = !venda && c.tratamentoOrigemId ? tratamentosPorId.get(c.tratamentoOrigemId) : undefined;
+    const orcamentoOrigemId = venda ? venda.orcamentoOrigemId : tratamento?.orcamentoOrigemId;
+    const orcamento = orcamentoOrigemId ? orcamentosPorId.get(orcamentoOrigemId) : undefined;
     const oportunidade = orcamento ? oportunidadePorOrcamentoId.get(orcamento.id) : undefined;
     const recuperada = foiRecuperada({ status: c.status, vencimento: c.vencimento, pago_em: c.pagoEm, em_cobranca_em: c.emCobrancaEm });
 
@@ -198,6 +208,7 @@ export function gerarLinhaEconomica(input: EntradaLinhaEconomica): ResumoLinhaEc
       etapa: "orcamento", id: orcamento.id,
       diasAteDecisao: orcamento.decididoEm ? diasEntre(orcamento.apresentadoEm, orcamento.decididoEm) : null,
     });
+    if (venda) trilha.push({ etapa: "pedido", id: venda.id });
     if (tratamento) trilha.push({ etapa: "tratamento", id: tratamento.id });
     trilha.push({ etapa: "cobranca", id: c.id, recuperada });
 
@@ -214,20 +225,30 @@ export function gerarLinhaEconomica(input: EntradaLinhaEconomica): ResumoLinhaEc
     });
   }
 
-  // ── Pedidos pagos: comprovado sempre; NUNCA atribuível nesta V1 — sem
-  // vínculo técnico real entre pedido e oportunidade/origem hoje.
+  // ── Pedidos pagos sem cobrança vinculada: comprovado; atribuível quando
+  // a venda nasceu de um orçamento ligado a uma oportunidade (vínculo real).
   for (const p of input.pedidos) {
     if (p.status !== "pago" || !p.pagamentoConfirmadoEm) continue;
+    if (pedidosComCobranca.has(p.id)) continue; // a cobrança já conta esta venda
+    const orcamento = p.orcamentoOrigemId ? orcamentosPorId.get(p.orcamentoOrigemId) : undefined;
+    const oportunidade = orcamento ? oportunidadePorOrcamentoId.get(orcamento.id) : undefined;
+    const trilha: EtapaTrilha[] = [];
+    if (oportunidade) trilha.push({ etapa: "oportunidade", id: oportunidade.id, canal: oportunidade.canal });
+    if (orcamento) trilha.push({
+      etapa: "orcamento", id: orcamento.id,
+      diasAteDecisao: orcamento.decididoEm ? diasEntre(orcamento.apresentadoEm, orcamento.decididoEm) : null,
+    });
+    trilha.push({ etapa: "pedido", id: p.id });
     itens.push({
       origem: "pedido",
       id: p.id,
       pacienteNome: p.pacienteNome,
       valor: p.valor,
-      atribuivel: false,
-      canalOrigem: null,
-      oportunidadeId: null,
+      atribuivel: !!oportunidade,
+      canalOrigem: oportunidade?.canal ?? null,
+      oportunidadeId: oportunidade?.id ?? null,
       recuperada: false,
-      trilha: [{ etapa: "pedido", id: p.id }],
+      trilha,
     });
   }
 

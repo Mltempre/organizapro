@@ -11,13 +11,12 @@ import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import { gerarLinhaEconomica, type ResumoLinhaEconomica, type CanalOportunidade } from '../../lib/linha-economica';
 import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
 import type { StatusOrcamento } from '../../lib/motor-orcamentos';
-import type { StatusTratamento } from '../../lib/motor-tratamento';
 import type { StatusCobranca } from '../../lib/motor-cobranca';
 
 // ── Linha Econômica / Prova de Resultado V1 · visão executiva ───────────
 // Nenhuma consulta nova, nenhum motor novo: busca exatamente os mesmos
 // dados já servidos por /api/oportunidades, /api/orcamentos,
-// /api/tratamentos, /api/cobrancas e /api/pedidos (mesmo padrão já usado
+// /api/cobrancas e /api/pedidos (cadeia oportunidade → orçamento → venda → cobrança) (mesmo padrão já usado
 // em app/receita-perdida/page.tsx e app/previsor-faturamento/page.tsx) e
 // delega toda a classificação a lib/linha-economica.ts. Esta tela só
 // renderiza — nenhum número é calculado aqui, nenhuma causalidade é
@@ -25,12 +24,11 @@ import type { StatusCobranca } from '../../lib/motor-cobranca';
 
 type OportunidadeRow = { id: string; canal: CanalOportunidade; status: OportunidadeStatus; orcamento_vinculado_id: string | null };
 type OrcamentoRow = { id: string; status: string; valor: number; apresentado_em: string; decidido_em: string | null };
-type TratamentoRow = { id: string; orcamento_origem_id: string | null; status: string };
 type CobrancaRow = {
-  id: string; paciente_nome: string; tratamento_origem_id: string | null; status: string;
+  id: string; paciente_nome: string; tratamento_origem_id: string | null; pedido_origem_id?: string | null; status: string;
   valor: number; valor_pago: number | null; vencimento: string; pago_em: string | null; em_cobranca_em: string | null;
 };
-type PedidoRow = { id: string; nome_cliente: string; status: string; valor_centavos: number; pagamento_confirmado_em: string | null };
+type PedidoRow = { id: string; nome_cliente: string; status: string; valor_centavos: number; pagamento_confirmado_em: string | null; orcamento_origem_id?: string | null };
 
 const CANAL_LABELS: Record<CanalOportunidade, { label: string; icon: string }> = {
   whatsapp: { label: 'WhatsApp', icon: '💬' },
@@ -64,29 +62,28 @@ export default function LinhaEconomicaPage() {
       // Mesmo padrão de fetch já usado em app/receita-perdida/page.tsx —
       // falha em qualquer domínio nunca fabrica dado, só resulta em lista
       // vazia (nunca derruba o resto da tela).
-      const [oportunidadesRes, orcamentosRes, tratamentosRes, cobrancasRes, pedidosRes] = await Promise.all([
+      const [oportunidadesRes, orcamentosRes, cobrancasRes, pedidosRes] = await Promise.all([
         fetch('/api/oportunidades', { headers: auth }).then(r => lerRespostaFinanceira(r, 'data')),
         fetch(`/api/orcamentos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'orcamentos')),
-        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'tratamentos')),
         fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'cobrancas')),
         fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'pedidos')),
       ]);
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
-      const tratamentos: TratamentoRow[] = tratamentosRes.tratamentos ?? [];
       const cobrancas: CobrancaRow[] = cobrancasRes.cobrancas ?? [];
       const pedidos: PedidoRow[] = pedidosRes.pedidos ?? [];
 
       const r = gerarLinhaEconomica({
         oportunidades: oportunidades.map(op => ({ id: op.id, canal: op.canal, status: op.status, orcamentoVinculadoId: op.orcamento_vinculado_id })),
         orcamentos: orcamentos.map(o => ({ id: o.id, status: o.status as StatusOrcamento, valor: o.valor, apresentadoEm: o.apresentado_em, decididoEm: o.decidido_em })),
-        tratamentos: tratamentos.map(t => ({ id: t.id, orcamentoOrigemId: t.orcamento_origem_id, status: t.status as StatusTratamento })),
+        // Cadeia pela venda: cobrança -> pedido -> orçamento (serviços legados já migrados para pedidos).
+        tratamentos: [],
         cobrancas: cobrancas.map(c => ({
-          id: c.id, pacienteNome: c.paciente_nome, tratamentoOrigemId: c.tratamento_origem_id, status: c.status as StatusCobranca,
+          id: c.id, pacienteNome: c.paciente_nome, tratamentoOrigemId: c.tratamento_origem_id, pedidoOrigemId: c.pedido_origem_id ?? null, status: c.status as StatusCobranca,
           valor: c.valor, valorPago: c.valor_pago, vencimento: c.vencimento, pagoEm: c.pago_em, emCobrancaEm: c.em_cobranca_em,
         })),
-        pedidos: pedidos.map(p => ({ id: p.id, pacienteNome: p.nome_cliente, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado', valor: p.valor_centavos / 100, pagamentoConfirmadoEm: p.pagamento_confirmado_em })),
+        pedidos: pedidos.map(p => ({ id: p.id, pacienteNome: p.nome_cliente, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado', valor: p.valor_centavos / 100, pagamentoConfirmadoEm: p.pagamento_confirmado_em, orcamentoOrigemId: p.orcamento_origem_id ?? null })),
       });
 
       setResumo(r);

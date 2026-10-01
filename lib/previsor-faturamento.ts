@@ -150,7 +150,7 @@ export type ResumoPrevisorFaturamento = {
 const DESTINOS: Record<OrigemPrevisor, string> = {
   cobranca_a_vencer: "/cobrancas",
   orcamento_apresentado: "/orcamentos",
-  tratamento_agendado: "/tratamentos",
+  tratamento_agendado: "/pedidos", // execução de venda (Pedidos = Venda/Execução)
   pedido_em_andamento: "/pedidos",
 };
 

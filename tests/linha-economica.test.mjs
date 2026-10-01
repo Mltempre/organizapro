@@ -230,7 +230,9 @@ const pagina = fs.readFileSync(new URL("../app/linha-economica/page.tsx", import
 test("linha-economica: busca só pelas APIs canônicas já existentes (todas escopadas por clinica_id), nenhuma query direta a supabase.from em tabela de negócio", () => {
   assert.match(pagina, /fetch\('\/api\/oportunidades'/);
   assert.match(pagina, /\/api\/orcamentos\?clinica_id=\$\{cid\}/);
-  assert.match(pagina, /\/api\/tratamentos\?clinica_id=\$\{cid\}/);
+  // Pedidos = Venda/Execução única: execução de venda vem de /api/pedidos; /api/tratamentos não é mais fonte.
+  assert.doesNotMatch(pagina, /\/api\/tratamentos/);
+  assert.match(pagina, /pedidoOrigemId: c\.pedido_origem_id \?\? null/);
   assert.match(pagina, /\/api\/cobrancas\?clinica_id=\$\{cid\}/);
   assert.match(pagina, /\/api\/pedidos\?clinica_id=\$\{cid\}/);
   assert.doesNotMatch(pagina, /supabase\.from\("orcamentos"\)/);
@@ -250,6 +252,6 @@ test("linha-economica: cid vem sempre de /api/minha-clinica (derivado do token),
   assert.ok(idxCid > -1);
   const trecho = pagina.slice(Math.max(0, idxCid - 200), idxCid + 50);
   assert.match(trecho, /\/api\/minha-clinica/);
-  // As 4 chamadas escopadas usam a MESMA variável cid derivada acima — nunca um clinica_id vindo de outro lugar
-  assert.equal((pagina.match(/clinica_id=\$\{cid\}/g) || []).length, 4);
+  // As 3 chamadas escopadas usam a MESMA variável cid derivada acima — nunca um clinica_id vindo de outro lugar
+  assert.equal((pagina.match(/clinica_id=\$\{cid\}/g) || []).length, 3);
 });

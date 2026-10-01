@@ -66,8 +66,9 @@ export type AgendamentoDoCliente = { id: string; telefone: string | null; data: 
 export type OportunidadeDoCliente = { id: string; telefone: string; canal: "whatsapp" | "manual" | "site"; status: OportunidadeStatus; criadoEm: string; ultimaInteracaoEm: string };
 export type OrcamentoDoCliente = { id: string; telefone: string | null; procedimento: string; valor: number; status: StatusOrcamento; apresentadoEm: string; decididoEm: string | null };
 export type TratamentoDoCliente = { id: string; pacienteId: string | null; telefone: string | null; tipoTratamento: string; status: StatusTratamento; valorEstimado: number | null; proximaDataPrevista: string | null; iniciadoEm: string; concluidoEm: string | null };
-export type CobrancaDoCliente = { id: string; pacienteId: string | null; telefone: string | null; descricao: string; valor: number; valorPago: number | null; vencimento: string; status: StatusCobranca; pagoEm: string | null; emCobrancaEm: string | null };
-export type PedidoDoCliente = { id: string; pacienteId: string | null; telefone: string | null; descricao: string; valor: number; status: "criado" | "confirmado" | "aguardando_confirmacao_pagamento" | "pago" | "cancelado"; criadoEm: string; pagamentoConfirmadoEm: string | null };
+export type CobrancaDoCliente = { id: string; pacienteId: string | null; telefone: string | null; descricao: string; valor: number; valorPago: number | null; vencimento: string; status: StatusCobranca; pagoEm: string | null; emCobrancaEm: string | null; pedidoOrigemId?: string | null };
+// Venda (Pedidos = Venda/Execução): execução opcional — concluída aparece na timeline.
+export type PedidoDoCliente = { id: string; pacienteId: string | null; telefone: string | null; descricao: string; valor: number; status: "criado" | "confirmado" | "aguardando_confirmacao_pagamento" | "pago" | "cancelado"; criadoEm: string; pagamentoConfirmadoEm: string | null; execucaoConcluidaEm?: string | null };
 export type AvaliacaoDoCliente = { id: string; telefone: string | null; enviadoEm: string | null; respondeu: boolean; clicadoEm: string | null };
 
 export type EntradaCliente360 = {
@@ -170,6 +171,7 @@ export function gerarCliente360(input: EntradaCliente360): ResumoCliente360 {
     timeline.push({ tipo: "orcamento", data: o.apresentadoEm, descricao: `Orçamento apresentado: ${o.procedimento}`, valor: o.valor, destino: "/orcamentos" });
     if (o.decididoEm) timeline.push({ tipo: "orcamento", data: o.decididoEm, descricao: `Orçamento ${o.status}: ${o.procedimento}`, valor: o.valor, destino: "/orcamentos" });
   }
+  // Serviços contratados LEGADOS (antes da convergência) — histórico, nunca apagado.
   for (const t of tratamentos) {
     timeline.push({ tipo: "tratamento", data: t.iniciadoEm, descricao: `Serviço iniciado: ${t.tipoTratamento}`, valor: t.valorEstimado, destino: "/tratamentos" });
     if (t.concluidoEm) timeline.push({ tipo: "tratamento", data: t.concluidoEm, descricao: `Serviço concluído: ${t.tipoTratamento}`, valor: t.valorEstimado, destino: "/tratamentos" });
@@ -180,6 +182,7 @@ export function gerarCliente360(input: EntradaCliente360): ResumoCliente360 {
   }
   for (const p of pedidos) {
     timeline.push({ tipo: "pedido", data: p.criadoEm, descricao: `Pedido: ${p.descricao}`, valor: p.valor, destino: "/pedidos" });
+    if (p.execucaoConcluidaEm) timeline.push({ tipo: "pedido", data: p.execucaoConcluidaEm, descricao: `Serviço concluído: ${p.descricao}`, valor: p.valor, destino: "/pedidos" });
     if (p.status === "pago" && p.pagamentoConfirmadoEm) timeline.push({ tipo: "pagamento_pedido", data: p.pagamentoConfirmadoEm, descricao: `Pagamento de pedido confirmado`, valor: p.valor, destino: "/pedidos" });
   }
   for (const av of avaliacoes) {
@@ -194,8 +197,13 @@ export function gerarCliente360(input: EntradaCliente360): ResumoCliente360 {
   // vezes ao atravessar orçamento -> tratamento -> cobrança.
   const cobrancasPagas = cobrancas.filter((c) => c.status === "pago" && c.valorPago !== null);
   const pedidosPagos = pedidos.filter((p) => p.status === "pago");
+  // Venda com cobrança vinculada: o dinheiro é o da cobrança — o pedido pago
+  // não soma de novo (nunca duas receitas para a mesma venda).
+  const vendasComCobranca = new Set(
+    cobrancas.filter((c) => c.status !== "cancelada").map((c) => c.pedidoOrigemId).filter((id): id is string => !!id)
+  );
   const totalPagoCobrancas = cobrancasPagas.reduce((s, c) => s + (c.valorPago as number), 0);
-  const totalPagoPedidos = pedidosPagos.reduce((s, p) => s + p.valor, 0);
+  const totalPagoPedidos = pedidosPagos.filter((p) => !vendasComCobranca.has(p.id)).reduce((s, p) => s + p.valor, 0);
   const totalPago = totalPagoCobrancas + totalPagoPedidos;
 
   const totalEmAberto = cobrancas

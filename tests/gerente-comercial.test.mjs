@@ -55,9 +55,10 @@ test('valor ausente, inválido e zero são tratados sem estimativa inventada', (
   assert.equal(coordenarGerenteComercial(sinais, null)[0].impacto.valor, null);
 });
 
-test('valor do tratamento continua explicitamente estimado', () => {
+test('valor da venda em execução nunca é apresentado como receita confirmada', () => {
   const [r] = coordenarGerenteComercial([{ ...sinais[0], tipo: 'tratamento_sem_retorno' }], { ...receita, itens: [{ ...receita.itens[0], origem: 'tratamento_sem_retorno' }] });
-  assert.match(r.impacto.descricao, /estimado/);
+  assert.match(r.impacto.descricao, /venda em execução/);
+  assert.match(r.impacto.descricao, /não é receita confirmada/);
 });
 
 test('Agenda Autônoma fornece destino operacional do cliente sem compromisso', () => {

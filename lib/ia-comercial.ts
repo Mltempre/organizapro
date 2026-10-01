@@ -184,8 +184,8 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         destinoLabel: "Ver cobrança",
       });
     } else if (sinal.tipo === "tratamento_sem_retorno") {
-      // Etapa "venda" da cadeia — /tratamentos já existe (última milha
-      // operacional, Tratamentos V1), destino real.
+      // Etapa "venda" da cadeia — execução da venda em /pedidos (Pedidos =
+      // Venda/Execução única; Serviços contratados saiu do fluxo ativo).
       lista.push({
         id: `consultivo-tratamento-${op.chave}`,
         categoria: "tratamento_sem_retorno",
@@ -193,11 +193,11 @@ export function gerarRecomendacoesConsultivas(input: EntradaConsultor): Recomend
         motivo: "Continuidade interrompida sem um próximo passo definido é um risco real de abandono — e de receita futura que não vai se realizar.",
         acao: op.acaoSugerida,
         evidencia: op.tempoDecorrido
-          ? `Serviço contratado registrado no sistema, ${op.tempoDecorrido}.`
-          : "Serviço contratado registrado no sistema.",
+          ? `Venda em execução registrada no sistema, ${op.tempoDecorrido}.`
+          : "Venda em execução registrada no sistema.",
         prioridade: op.prioridade,
-        destino: "/tratamentos",
-        destinoLabel: "Ver serviço contratado",
+        destino: "/pedidos",
+        destinoLabel: "Ver venda",
       });
     } else if (sinal.tipo === "pedido_nao_concluido") {
       // E-commerce IA V1 — mesma disciplina: reformula o sinal real do

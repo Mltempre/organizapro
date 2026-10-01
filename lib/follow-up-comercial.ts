@@ -176,13 +176,13 @@ export function gerarFollowUpsComerciais(input: EntradaFollowUp): CasoFollowUp[]
     if (!emAndamentoSemRetorno && !interrompido) continue;
     const dias = emAndamentoSemRetorno ? diasSemAtividade(t.updatedAt, input.agora) : diasInterrompido(t.interrompidoEm as string, input.agora);
     casos.push({
-      tipo: "tratamento_sem_retorno", entidadeTipo: "tratamento", entidadeId: t.id,
+      tipo: "tratamento_sem_retorno", entidadeTipo: "pedido", entidadeId: t.id,
       pacienteNome: t.pacienteNome, telefone: t.telefone ?? null,
       motivo: interrompido
         ? `Serviço ${t.tipoTratamento} interrompido há ${dias} dia${dias === 1 ? "" : "s"}.`
         : `Serviço ${t.tipoTratamento} sem retorno definido, ${dias} dia${dias === 1 ? "" : "s"} sem atualização.`,
       proximaAcao: "Entrar em contato para agendar o retorno",
-      destino: "/tratamentos",
+      destino: "/pedidos",
       donoDoFluxo: "follow-up",
       status: input.entidadesComTentativaHoje.has(t.id) ? "aguardando_retorno" : "elegivel",
     });

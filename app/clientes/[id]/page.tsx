@@ -33,8 +33,8 @@ type AvaliacaoRow = { id: string; telefone: string | null; enviado_em: string | 
 type OportunidadeRow = { id: string; telefone: string; canal: 'whatsapp' | 'manual' | 'site'; status: OportunidadeStatus; criado_em: string; ultima_interacao_em: string };
 type OrcamentoRow = { id: string; telefone: string | null; procedimento: string; valor: number; status: string; apresentado_em: string; decidido_em: string | null };
 type TratamentoRow = { id: string; paciente_id: string | null; paciente_telefone: string | null; tipo_tratamento: string; status: string; valor_estimado: number | null; proxima_data_prevista: string | null; iniciado_em: string; concluido_em: string | null };
-type CobrancaRow = { id: string; paciente_id: string | null; paciente_telefone: string | null; descricao: string; valor: number; valor_pago: number | null; vencimento: string; status: string; pago_em: string | null; em_cobranca_em: string | null };
-type PedidoRow = { id: string; paciente_id: string | null; telefone: string | null; valor_centavos: number; status: string; criado_em: string; pagamento_confirmado_em: string | null; pedido_itens?: { descricao: string }[] };
+type CobrancaRow = { id: string; paciente_id: string | null; paciente_telefone: string | null; descricao: string; valor: number; valor_pago: number | null; vencimento: string; status: string; pago_em: string | null; em_cobranca_em: string | null; pedido_origem_id?: string | null };
+type PedidoRow = { id: string; paciente_id: string | null; telefone: string | null; valor_centavos: number; status: string; criado_em: string; pagamento_confirmado_em: string | null; pedido_itens?: { descricao: string }[]; tratamento_legado_id?: string | null; execucao_concluida_em?: string | null };
 
 // Memória com Proveniência + Auditoria das Decisões (P1: Reintegração da
 // Inteligência) — vem de GET /api/memoria, que já lê eventos_dominio
@@ -113,9 +113,13 @@ export default function Cliente360Page() {
       const avaliacoes: AvaliacaoRow[] = (avaliacoesRes.data ?? []) as AvaliacaoRow[];
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
-      const tratamentos: TratamentoRow[] = tratamentosRes.tratamentos ?? [];
       const cobrancas: CobrancaRow[] = cobrancasRes.cobrancas ?? [];
       const pedidos: PedidoRow[] = pedidosRes.pedidos ?? [];
+      // Serviços contratados LEGADOS: o histórico continua visível, mas o que
+      // já virou venda (pedidos.tratamento_legado_id) aparece só como venda —
+      // nunca a mesma venda duas vezes na linha do tempo.
+      const migrados = new Set(pedidos.map(p => p.tratamento_legado_id).filter((id): id is string => !!id));
+      const tratamentos: TratamentoRow[] = (tratamentosRes.tratamentos ?? []).filter(t => !migrados.has(t.id));
       setFatos((memoriaRes.fatos ?? []) as FatoRow[]);
       setDecisoes((memoriaRes.decisoes ?? []) as DecisaoRow[]);
 
@@ -129,8 +133,8 @@ export default function Cliente360Page() {
         oportunidades: oportunidades.map(o => ({ id: o.id, telefone: o.telefone, canal: o.canal, status: o.status, criadoEm: o.criado_em, ultimaInteracaoEm: o.ultima_interacao_em })),
         orcamentos: orcamentos.map(o => ({ id: o.id, telefone: o.telefone, procedimento: o.procedimento, valor: o.valor, status: o.status as StatusOrcamento, apresentadoEm: o.apresentado_em, decididoEm: o.decidido_em })),
         tratamentos: tratamentos.map(t => ({ id: t.id, pacienteId: t.paciente_id, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status as StatusTratamento, valorEstimado: t.valor_estimado, proximaDataPrevista: t.proxima_data_prevista, iniciadoEm: t.iniciado_em, concluidoEm: t.concluido_em })),
-        cobrancas: cobrancas.map(c => ({ id: c.id, pacienteId: c.paciente_id, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, valorPago: c.valor_pago, vencimento: c.vencimento, status: c.status as StatusCobranca, pagoEm: c.pago_em, emCobrancaEm: c.em_cobranca_em })),
-        pedidos: pedidos.map(p => ({ id: p.id, pacienteId: p.paciente_id, telefone: p.telefone, descricao: p.pedido_itens?.length ? `${p.pedido_itens.length} ${p.pedido_itens.length === 1 ? 'item' : 'itens'}` : 'pedido', valor: p.valor_centavos / 100, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado', criadoEm: p.criado_em, pagamentoConfirmadoEm: p.pagamento_confirmado_em })),
+        cobrancas: cobrancas.map(c => ({ id: c.id, pacienteId: c.paciente_id, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, valorPago: c.valor_pago, vencimento: c.vencimento, status: c.status as StatusCobranca, pagoEm: c.pago_em, emCobrancaEm: c.em_cobranca_em, pedidoOrigemId: c.pedido_origem_id ?? null })),
+        pedidos: pedidos.map(p => ({ id: p.id, pacienteId: p.paciente_id, telefone: p.telefone, descricao: p.pedido_itens?.length ? `${p.pedido_itens.length} ${p.pedido_itens.length === 1 ? 'item' : 'itens'}` : 'pedido', valor: p.valor_centavos / 100, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado', criadoEm: p.criado_em, pagamentoConfirmadoEm: p.pagamento_confirmado_em, execucaoConcluidaEm: p.execucao_concluida_em ?? null })),
         avaliacoes: avaliacoes.map(av => ({ id: av.id, telefone: av.telefone, enviadoEm: av.enviado_em, respondeu: av.respondeu, clicadoEm: av.clicado_em })),
       });
 

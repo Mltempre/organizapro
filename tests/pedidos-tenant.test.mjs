@@ -91,7 +91,9 @@ test("dashboard: recompra_possivel é agregada a partir da MESMA lista de /api/p
   // Uma única fetch tenant-escopada alimenta os dois recortes.
   assert.match(dashboard, /todosPedidosPromise = fetch\(`\/api\/pedidos\?clinica_id=\$\{cid\}`/);
   assert.match(dashboard, /const todosPedidosRows = await todosPedidosPromise;/);
-  assert.match(dashboard, /const pedidosNaoConcluidosRows = todosPedidosRows\.filter/);
+  // Recorte da MESMA lista, passando pela regra única da venda (lib/venda-execucao.ts).
+  assert.match(dashboard, /const vendas = particionarVendas\(todosPedidosRows, todasCobrancasRows\)/);
+  assert.match(dashboard, /const pedidosNaoConcluidosRows = vendas\.pedidosAReceber\.filter/);
   // agregarClientesElegiveisRecompra só é chamada com dados de dash.todosPedidosRows
   // (o mesmo estado tenant-escopado), nunca com uma fonte paralela.
   const idxChamada = dashboard.indexOf("agregarClientesElegiveisRecompra(");

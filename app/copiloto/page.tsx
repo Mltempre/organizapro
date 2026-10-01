@@ -12,6 +12,7 @@ import { stTom, stTierOportunidade } from '../components/estilos-prioridade';
 import { fetchJsonSeguro } from '../../lib/fetch-seguro';
 import { gerarOportunidadesClientes, type OportunidadeCliente } from '../../lib/oportunidades-clientes';
 import { agregarClientesElegiveisRecompra } from '../../lib/motor-pedidos';
+import { particionarVendas, type PedidoVenda } from '../../lib/venda-execucao';
 import { gerarFollowUpsComerciais, type CasoFollowUp } from '../../lib/follow-up-comercial';
 import { agregarReceitaPerdida, type ResumoReceitaPerdida } from '../../lib/receita-perdida';
 import { gerarPrevisorFaturamento, type ResumoPrevisorFaturamento } from '../../lib/previsor-faturamento';
@@ -36,9 +37,9 @@ type CanceladoRow = { id: string; paciente_nome: string; telefone: string | null
 type AgItem = { id: string; hora: string; paciente_nome: string; telefone?: string; status: string; data: string };
 type OportunidadeRow = { id: string; telefone: string; nome_informado: string | null; status: OportunidadeStatus; orcamento_vinculado_id: string | null; ultima_interacao_em: string; canal: 'whatsapp' | 'manual' | 'site'; confianca_classificacao: 'alta' | 'media' | 'baixa' };
 type OrcamentoRow = { id: string; paciente_nome: string; telefone: string | null; procedimento: string; valor: number; status: string; apresentado_em: string };
-type TratamentoRow = { id: string; paciente_nome: string; paciente_telefone: string | null; tipo_tratamento: string; status: string; proxima_data_prevista: string | null; updated_at: string; interrompido_em: string | null; valor_estimado: number | null };
-type PedidoRow = { id: string; nome_cliente: string; telefone: string | null; valor_centavos: number; status: string; criado_em: string; paciente_id: string | null; pagamento_confirmado_em: string | null; pedido_itens?: { descricao: string }[] };
-type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: string | null; descricao: string; valor: number; vencimento: string; status: string; tratamento_origem_id: string | null };
+// Pedidos = Venda/Execução única: a execução da venda substitui Serviços contratados.
+type PedidoRow = PedidoVenda;
+type CobrancaRow = { id: string; paciente_nome: string; paciente_telefone: string | null; descricao: string; valor: number; vencimento: string; status: string; tratamento_origem_id: string | null; pedido_origem_id?: string | null };
 
 const TIPO_FOLLOWUP_LABELS: Record<string, string> = {
   oportunidade_parada: 'Oportunidade parada', orcamento_parado: 'Orçamento parado',
@@ -93,10 +94,9 @@ export default function CopilotoPage() {
       // app/dashboard/page.tsx. fetchJsonSeguro distingue falha real de
       // vazio real — uma API fora do ar nunca deve virar silenciosamente
       // "nada pendente" (achado sistêmico da auditoria de última milha).
-      const [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR, agHojeRes, semProximoRes, canceladosRes, atrasadosRes] = await Promise.all([
+      const [oportunidadesR, orcamentosR, pedidosR, cobrancasR, agHojeRes, semProximoRes, canceladosRes, atrasadosRes] = await Promise.all([
         fetchJsonSeguro<{ data: OportunidadeRow[] }>('/api/oportunidades', { headers: auth }, { data: [] }),
         fetchJsonSeguro<{ orcamentos: OrcamentoRow[] }>(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }, { orcamentos: [] }),
-        fetchJsonSeguro<{ tratamentos: TratamentoRow[] }>(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }, { tratamentos: [] }),
         fetchJsonSeguro<{ pedidos: PedidoRow[] }>(`/api/pedidos?clinica_id=${cid}`, { headers: auth }, { pedidos: [] }),
         fetchJsonSeguro<{ cobrancas: CobrancaRow[] }>(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }, { cobrancas: [] }),
         supabase.from('agendamentos').select('id, hora, paciente_nome, telefone, status, data').eq('clinica_id', cid).eq('data', hoje).order('hora'),
@@ -106,16 +106,21 @@ export default function CopilotoPage() {
         // anteriores ainda "agendado". A consulta de hoje acima nunca os contém.
         supabase.from('agendamentos').select('id, hora, paciente_nome, telefone, status, data').eq('clinica_id', cid).lt('data', hoje).eq('status', 'agendado').order('data', { ascending: false }).order('hora').limit(20),
       ]);
-      const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, tratamentosRes = tratamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
-      const falhaParcial = [oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR].some(r => r.falhou)
+      const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
+      const falhaParcial = [oportunidadesR, orcamentosR, pedidosR, cobrancasR].some(r => r.falhou)
         || !!agHojeRes.error || !!semProximoRes.error || !!canceladosRes.error || !!atrasadosRes.error;
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
-      const tratamentos: TratamentoRow[] = (tratamentosRes.tratamentos ?? []).filter((t: TratamentoRow) => t.status === 'em_andamento' || t.status === 'interrompido');
       const todosPedidos: PedidoRow[] = pedidosRes.pedidos ?? [];
-      const pedidosNaoConcluidos = todosPedidos.filter(p => p.status === 'criado' || p.status === 'confirmado');
-      const cobrancas: CobrancaRow[] = (cobrancasRes.cobrancas ?? []).filter((c: CobrancaRow) => c.status === 'pendente' || c.status === 'em_cobranca');
+      const todasCobrancas: CobrancaRow[] = cobrancasRes.cobrancas ?? [];
+      const cobrancas = todasCobrancas.filter((c) => c.status === 'pendente' || c.status === 'em_cobranca');
+      // Venda/Execução (lib/venda-execucao.ts): sinais de "sem retorno" vêm da
+      // execução da venda; no dinheiro cada venda entra uma única vez.
+      const vendas = particionarVendas(todosPedidos, todasCobrancas);
+      const tratamentos = vendas.acompanhamentos.filter((t) => t.status === 'em_andamento' || t.status === 'interrompido');
+      const tratamentosAReceber = vendas.acompanhamentosAReceber.filter((t) => t.status === 'em_andamento' || t.status === 'interrompido');
+      const pedidosNaoConcluidos = vendas.pedidosAReceber.filter(p => p.status === 'criado' || p.status === 'confirmado');
       const agendaHoje: AgItem[] = (agHojeRes.data ?? []) as AgItem[];
       const semProximoData: ClienteSemProximoRow[] = (semProximoRes.data ?? []) as ClienteSemProximoRow[];
 
@@ -139,7 +144,7 @@ export default function CopilotoPage() {
       });
 
       const recomprasPossiveis = agregarClientesElegiveisRecompra(
-        todosPedidos.map(p => ({ pacienteId: p.paciente_id, telefone: p.telefone, nomeCliente: p.nome_cliente, status: p.status as 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado', criadoEm: p.criado_em, pagamentoConfirmadoEm: p.pagamento_confirmado_em }))
+        todosPedidos.map(p => ({ pacienteId: p.paciente_id, telefone: p.telefone, nomeCliente: p.nome_cliente, status: p.status, criadoEm: p.criado_em, pagamentoConfirmadoEm: p.pagamento_confirmado_em ?? null }))
       );
 
       // ── Radar (Smart Commerce: orçamento/tratamento/pedido/recompra/
@@ -189,7 +194,7 @@ export default function CopilotoPage() {
         hoje, agora,
         orcamentosParados: orcamentos.map(o => ({ id: o.id, pacienteNome: o.paciente_nome, telefone: o.telefone, procedimento: o.procedimento, valor: o.valor, apresentadoEm: o.apresentado_em })),
         cobrancasAtrasadas: cobrancas.map(c => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca', tratamentoOrigemId: c.tratamento_origem_id })),
-        tratamentosSemRetorno: tratamentos.map(t => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status as 'em_andamento' | 'interrompido', proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em, valorEstimado: t.valor_estimado })),
+        tratamentosSemRetorno: tratamentosAReceber.map(t => ({ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status as 'em_andamento' | 'interrompido', proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em, valorEstimado: t.valor_estimado })),
         pedidosNaoConcluidos: pedidosNaoConcluidos.map(p => ({ id: p.id, pacienteNome: p.nome_cliente, telefone: p.telefone, descricao: 'pedido', valor: p.valor_centavos / 100, criadoEm: p.criado_em })),
         oportunidadesAbertas: oportunidades.map(op => ({ id: op.id, pacienteNome: op.nome_informado || op.telefone, status: op.status, orcamentoVinculadoId: op.orcamento_vinculado_id })),
       });
@@ -201,9 +206,9 @@ export default function CopilotoPage() {
       // 'aguardando_confirmacao_pagamento', que os filtros de Radar/
       // Follow-up acima não incluem) — nunca reaproveitar a lista já
       // filtrada para outro propósito, para nunca sub-contar o total.
-      const tratamentosParaPrevisor = ((tratamentosRes.tratamentos ?? []) as TratamentoRow[])
+      const tratamentosParaPrevisor = vendas.acompanhamentosAReceber
         .filter(t => t.status === 'em_andamento' || t.status === 'retorno_agendado' || t.status === 'interrompido');
-      const pedidosParaPrevisor = todosPedidos.filter(p => p.status === 'criado' || p.status === 'confirmado' || p.status === 'aguardando_confirmacao_pagamento');
+      const pedidosParaPrevisor = vendas.pedidosAReceber.filter(p => p.status === 'criado' || p.status === 'confirmado' || p.status === 'aguardando_confirmacao_pagamento');
       const previsor = gerarPrevisorFaturamento({
         hoje, agora,
         cobrancasAbertas: cobrancas.map(c => ({ id: c.id, pacienteNome: c.paciente_nome, telefone: c.paciente_telefone, descricao: c.descricao, valor: c.valor, vencimento: c.vencimento, status: c.status as 'pendente' | 'em_cobranca', tratamentoOrigemId: c.tratamento_origem_id })),

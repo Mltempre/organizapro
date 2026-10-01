@@ -83,7 +83,9 @@ test("Convergência: todos os 5 chegam à Missão do Dia com tipo e evidência c
   const porTipo = Object.fromEntries(missaoDoDia.map(s => [s.tipo, s]));
   assert.match(porTipo.orcamento_parado.evidencia, /orçamento real/i);
   assert.match(porTipo.cobranca_atrasada.evidencia, /cobrança real/i);
-  assert.match(porTipo.tratamento_sem_retorno.evidencia, /serviço contratado real/i);
+  // Execução de venda (Pedidos = Venda/Execução única).
+  assert.match(porTipo.tratamento_sem_retorno.evidencia, /venda real em execução/i);
+  assert.equal(porTipo.tratamento_sem_retorno.destino, "/pedidos");
   assert.match(porTipo.pedido_nao_concluido.evidencia, /pedido real/i);
   assert.match(porTipo.recompra_possivel.evidencia, /histórico real de pedidos/i);
 });

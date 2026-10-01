@@ -12,7 +12,8 @@ test('conta vazia: mensagem honesta, sem receita, sucesso fictício ou caixas de
   assert.doesNotMatch(html, /R\$|operando normalmente|Consultoria do Dia|Diretor Digital|SinalCanonico|100%|Recursos Incluídos/);
 });
 
-for (const api of ['/api/configuracoes','/api/orcamentos','/api/pedidos','/api/tratamentos','/api/cobrancas','/api/oportunidades']) {
+// Execução de venda vem de /api/pedidos (Pedidos = Venda/Execução única); /api/tratamentos não é mais fonte da Visão Geral.
+for (const api of ['/api/configuracoes','/api/orcamentos','/api/pedidos','/api/cobrancas','/api/oportunidades']) {
   test(`HTTP indisponível ${api} não vira zero nem lista vazia`, async () => {
     const { html } = await carregar({ apiError: api });
     assert.match(html, /role="alert"/); assert.match(html, /Tentar novamente/);
@@ -20,6 +21,11 @@ for (const api of ['/api/configuracoes','/api/orcamentos','/api/pedidos','/api/t
   });
   test(`contrato inválido ${api} não vira vazio`, async () => assert.match((await carregar({ invalidBody: api })).html, /role="alert"/));
 }
+test('Visão Geral não depende mais de /api/tratamentos (venda e execução vêm de /api/pedidos)', async () => {
+  const r = await carregar();
+  assert.ok(!r.calls.some(c => String(c.url).includes('/api/tratamentos')), 'não chama /api/tratamentos');
+  assert.ok(r.calls.some(c => String(c.url).includes('/api/pedidos')), 'lê /api/pedidos');
+});
 test('falha de rede não vira ausência de oportunidades', async () => assert.match((await carregar({ networkError: '/api/oportunidades' })).html, /role="alert"/));
 for (let i=0; i<10; i++) test(`erro da consulta ${i} impede resumo enganoso`, async () => assert.match((await carregar({ queryError: i })).html, /role="alert"/));
 

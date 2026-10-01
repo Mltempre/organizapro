@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '../..');
 // (exceto site_publico_por_slug_v2) responde "função inexistente" — o
 // estado do banco ANTES de uma migration pendente.
 function fixture(options = {}) {
-  const tables = { pedidos: [], pedido_itens: [], eventos_dominio: [], pacientes: [{ id: 'client-a', clinica_id: 'a' }],
+  const tables = { pedidos: [], pedido_itens: [], eventos_dominio: [], orcamentos: [], cobrancas: [], tratamentos: [], pacientes: [{ id: 'client-a', clinica_id: 'a' }],
     clinica_servicos: [{ id: 'service-a', clinica_id: 'a', nome: 'Serviço local A', preco_centavos: 1500, disponivel: true },
       { id: 'service-b', clinica_id: 'b', nome: 'Serviço local B', preco_centavos: 700, disponivel: true }] };
   const calls = [], faults = [], cache = new Map(); let serial = 0;
@@ -20,6 +20,9 @@ function fixture(options = {}) {
       select() { return chain; }, order() { return chain; }, limit() { return chain; },
       eq(k, v) { q.filters.push([k, v]); return chain; },
       in(k, vs) { q.filters.push([k, vs]); return chain; },
+      // Venda/Execução: IS NULL e diferente-de (mesma semântica do PostgREST).
+      is(k, v) { q.filters.push([k, v, 'is']); return chain; },
+      neq(k, v) { q.filters.push([k, v, 'neq']); return chain; },
       insert(v) { q.action = 'insert'; q.value = v; return chain; },
       update(v) { q.action = 'update'; q.value = v; return chain; },
       upsert(v, opts) { q.action = 'upsert'; q.value = v; q.onConflict = opts?.onConflict; return chain; },
@@ -27,7 +30,7 @@ function fixture(options = {}) {
       single() { single = true; return run(); }, maybeSingle() { single = true; return run(); },
       then(ok, fail) { return run().then(ok, fail); },
     };
-    const matches = r => q.filters.every(([k, v]) => Array.isArray(v) ? v.includes(r[k]) : r[k] === v);
+    const matches = r => q.filters.every(([k, v, op]) => op === 'is' ? (r[k] ?? null) === v : op === 'neq' ? r[k] !== v : Array.isArray(v) ? v.includes(r[k]) : r[k] === v);
     async function run() {
       const fault = faults.findIndex(f => f.table === table && f.action === q.action);
       if (fault >= 0) { faults.splice(fault, 1); return { data: null, error: { message: 'local failure' } }; }

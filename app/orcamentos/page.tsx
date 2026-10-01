@@ -87,6 +87,8 @@ export default function OrcamentosPage() {
   const [orcamentos, setOrcamentos]   = useState<Orcamento[]>([]);
   const [pacientes, setPacientes]     = useState<ClientePicker[]>([]);
   const [catalogo, setCatalogo]       = useState<ItemCatalogoOrcamento[]>([]);
+  // Orçamento aprovado que já virou venda (pedidos.orcamento_origem_id): uma venda por orçamento.
+  const [orcamentosComVenda, setOrcamentosComVenda] = useState<Set<string>>(new Set());
   const [clinicaId, setClinicaId]     = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [carregando, setCarregando]   = useState(true);
@@ -127,11 +129,17 @@ export default function OrcamentosPage() {
       setClinicaId(cid || '');
       if (!cid) { setOrcamentos([]); setCarregando(false); return; }
 
-      const [orcRes, pacRes, catRes] = await Promise.all([
+      const [orcRes, pacRes, catRes, pedRes] = await Promise.all([
         fetch(`/api/orcamentos?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
         supabase.from('pacientes').select('id, nome, telefone, whatsapp').eq('clinica_id', cid).order('nome'),
         supabase.from('clinica_servicos').select('id, nome, preco_centavos, disponivel').eq('clinica_id', cid).order('ordem'),
+        fetch(`/api/pedidos?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }).catch(() => null),
       ]);
+      // Vendas já registradas a partir de orçamento. Falha aqui não bloqueia:
+      // a API de pedidos recusa uma segunda venda do mesmo orçamento.
+      const pedJson = pedRes && pedRes.ok ? await pedRes.json().catch(() => null) : null;
+      const pedidosLidos: { orcamento_origem_id?: string | null }[] = Array.isArray(pedJson?.pedidos) ? pedJson.pedidos : [];
+      setOrcamentosComVenda(new Set(pedidosLidos.map(p => p.orcamento_origem_id).filter((id): id is string => !!id)));
       // Catálogo indisponível não bloqueia: o orçamento continua podendo ser
       // descrito à mão, como sempre foi.
       setCatalogo(((catRes.data || []) as ItemCatalogoOrcamento[]).filter(itemVendavel));
@@ -462,20 +470,29 @@ export default function OrcamentosPage() {
                         </button>
                       </div>
                     )}
-                    {o.status === 'aprovado' && (
-                      // Continua o fluxo no formulário EXISTENTE de Serviços
-                      // contratados, já com este orçamento selecionado — nada
-                      // é registrado sem o usuário revisar e confirmar lá.
+                    {o.status === 'aprovado' && (orcamentosComVenda.has(o.id) ? (
+                      <button
+                        type="button"
+                        data-testid="orcamento-venda-registrada"
+                        onClick={() => router.push('/pedidos')}
+                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 11, cursor: 'pointer' }}
+                      >
+                        ✓ Venda registrada →
+                      </button>
+                    ) : (
+                      // Continua o fluxo no formulário EXISTENTE de Pedidos
+                      // (Venda/Execução), já com este orçamento — nada é
+                      // registrado sem o usuário revisar e confirmar lá.
                       <button
                         type="button"
                         className="orc-btn-continuar"
-                        data-testid="orcamento-registrar-servico"
-                        onClick={() => router.push(`/tratamentos?orcamento=${encodeURIComponent(o.id)}`)}
+                        data-testid="orcamento-registrar-venda"
+                        onClick={() => router.push(`/pedidos?orcamento=${encodeURIComponent(o.id)}`)}
                         style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.1)', color: '#4ade80', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                       >
-                        Registrar serviço contratado
+                        Registrar venda
                       </button>
-                    )}
+                    ))}
                   </div>
                 </div>
               </div>

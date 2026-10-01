@@ -12,6 +12,7 @@ import {
 } from "./follow-up-comercial";
 import { agregarClientesElegiveisRecompra } from "./motor-pedidos";
 import { statusEfetivoOportunidade } from "./oportunidades-demanda";
+import { acompanhamentoDaVenda, particionarVendas, type PedidoVenda } from "./venda-execucao";
 
 /**
  * Relê a entidade real do banco (nunca confia no que o client mandou) e
@@ -56,19 +57,29 @@ export async function reavaliarCasoFollowUp(
   }
 
   if (tipo === "tratamento_sem_retorno") {
-    const { data } = await admin.from("tratamentos")
-      .select("id, paciente_nome, paciente_telefone, tipo_tratamento, status, proxima_data_prevista, updated_at, interrompido_em")
-      .eq("id", entidadeId).eq("clinica_id", clinica_id).in("status", ["em_andamento", "interrompido"]).maybeSingle();
-    if (!data) return null;
-    const resultado = gerarFollowUpsComerciais({ ...entradaBase, tratamentosSemRetorno: [{ id: data.id, pacienteNome: data.paciente_nome, telefone: data.paciente_telefone, tipoTratamento: data.tipo_tratamento, status: data.status, proximaDataPrevista: data.proxima_data_prevista, updatedAt: data.updated_at, interrompidoEm: data.interrompido_em }] });
+    // Execução de VENDA (Pedidos = Venda/Execução única): entidadeId é o id
+    // do pedido. "tratamento_sem_retorno" segue como chave estável do tipo.
+    const { data } = await admin.from("pedidos")
+      .select("*, pedido_itens(descricao, quantidade)")
+      .eq("id", entidadeId).eq("clinica_id", clinica_id).neq("status", "cancelado")
+      .in("execucao_status", ["em_andamento", "interrompido"]).maybeSingle();
+    const t = data ? acompanhamentoDaVenda(data as PedidoVenda) : null;
+    if (!t) return null;
+    const resultado = gerarFollowUpsComerciais({ ...entradaBase, tratamentosSemRetorno: [{ id: t.id, pacienteNome: t.paciente_nome, telefone: t.paciente_telefone, tipoTratamento: t.tipo_tratamento, status: t.status, proximaDataPrevista: t.proxima_data_prevista, updatedAt: t.updated_at, interrompidoEm: t.interrompido_em }] });
     return resultado[0] ?? null;
   }
 
   if (tipo === "pedido_nao_concluido") {
     const { data } = await admin.from("pedidos")
-      .select("id, nome_cliente, telefone, valor_centavos, criado_em, pedido_itens(descricao)")
+      .select("*, pedido_itens(descricao)")
       .eq("id", entidadeId).eq("clinica_id", clinica_id).in("status", ["criado", "confirmado"]).maybeSingle();
     if (!data) return null;
+    // Mesma partição das telas: venda com cobrança vinculada (a cobrança
+    // assume o caso) ou com execução ativa (o caso é "sem retorno") não é
+    // "pedido não concluído".
+    const { data: cobrancasDaVenda } = await admin.from("cobrancas")
+      .select("pedido_origem_id, status").eq("clinica_id", clinica_id).eq("pedido_origem_id", entidadeId);
+    if (particionarVendas([data as PedidoVenda], cobrancasDaVenda ?? []).pedidosAReceber.length === 0) return null;
     const itens = data.pedido_itens as { descricao: string }[] | null;
     const descricao = itens?.length ? `${itens.length} ${itens.length === 1 ? "item" : "itens"}` : "pedido";
     const resultado = gerarFollowUpsComerciais({ ...entradaBase, pedidosNaoConcluidos: [{ id: data.id, pacienteNome: data.nome_cliente, telefone: data.telefone, descricao, valor: data.valor_centavos / 100, criadoEm: data.criado_em }] });

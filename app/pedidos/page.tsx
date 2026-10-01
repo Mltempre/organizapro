@@ -9,6 +9,10 @@ import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import { ehEstadoTerminal, type PedidoStatus } from '../../lib/motor-pedidos';
 import {
+  ROTULO_EXECUCAO, MOTIVOS_INTERRUPCAO, proximosStatusExecucao,
+  type ExecucaoStatus, type MotivoInterrupcao,
+} from '../../lib/venda-execucao';
+import {
   FORM_ITEM_VAZIO, formularioDoItem, itemVendavel, salvarItemCatalogo, enviarImagemItem,
   type ItemCatalogo, type FormItemCatalogo,
 } from '../../lib/catalogo-comercial';
@@ -36,7 +40,25 @@ type Pedido = {
   status: PedidoStatus; origem: string; observacao: string | null;
   pagamento_informado_em: string | null; pagamento_confirmado_em: string | null;
   criado_em: string; pedido_itens: PedidoItem[];
+  // Venda/Execução (opcionais: antes da migration as colunas não existem).
+  orcamento_origem_id?: string | null; tratamento_legado_id?: string | null;
+  execucao_status?: ExecucaoStatus | null; proxima_data_prevista?: string | null;
+  motivo_interrupcao?: MotivoInterrupcao | null;
 };
+type OrcamentoAprovado = { id: string; paciente_nome: string; telefone: string | null; procedimento: string; valor: number };
+
+const EXECUCAO_COR: Record<ExecucaoStatus, string> = {
+  em_andamento: '#4a9bb0', retorno_agendado: '#fbbf24', concluido: '#16a34a', interrompido: '#f87171', abandonado: '#94a3b8',
+};
+const ACAO_EXECUCAO: Record<ExecucaoStatus, string> = {
+  em_andamento: 'Acompanhar execução', retorno_agendado: 'Agendar retorno', concluido: 'Concluir serviço',
+  interrompido: 'Interromper', abandonado: 'Marcar abandonado',
+};
+const MOTIVO_LABELS: Record<MotivoInterrupcao, string> = {
+  desistiu: 'Cliente desistiu', aguardando_decisao: 'Aguardando decisão do cliente',
+  financeiro: 'Motivo financeiro', saude: 'Motivo de saúde', outro: 'Outro motivo',
+};
+function formatarDia(dia: string) { const [y, m, d] = dia.split('-'); return `${d}/${m}/${y}`; }
 
 type LinhaForm = { servicoId: string; descricaoManual: string; valorManualReais: string; quantidade: string };
 // servicoId: '' = ainda sem escolha; id do catálogo; ou AVULSO (fora do catálogo).
@@ -88,6 +110,15 @@ export default function PedidosPage() {
 
   const [transicionando, setTransicionando] = useState<string | null>(null);
 
+  // Venda a partir de orçamento aprovado (/pedidos?orcamento=<id>) e execução.
+  const [orcamentoOrigem, setOrcamentoOrigem] = useState<OrcamentoAprovado | null>(null);
+  const [acompanharExecucao, setAcompanharExecucao] = useState(false);
+  const orcamentoDaUrlRef = React.useRef<string | null | undefined>(undefined);
+  const [vendasComCobranca, setVendasComCobranca] = useState<Set<string>>(new Set());
+  const [modalExecucao, setModalExecucao] = useState<{ pedido: Pedido; alvo: 'retorno_agendado' | 'interrompido' } | null>(null);
+  const [dataRetorno, setDataRetorno] = useState('');
+  const [motivoInterrupcao, setMotivoInterrupcao] = useState<MotivoInterrupcao | ''>('');
+
   // Cadastro de item do catálogo (Novo item / Editar item)
   const [modalItem, setModalItem]       = useState<{ item: ItemCatalogo | null } | null>(null);
   const [formItem, setFormItem]         = useState<FormItemCatalogo>({ ...FORM_ITEM_VAZIO });
@@ -113,10 +144,18 @@ export default function PedidosPage() {
       setClinicaId(cid || '');
       if (!cid) throw new Error('Negócio não vinculado ao usuário.');
 
-      const [pedRes, pacRes, catRes] = await Promise.all([
+      if (orcamentoDaUrlRef.current === undefined) {
+        orcamentoDaUrlRef.current = new URLSearchParams(window.location.search).get('orcamento');
+      }
+      const [pedRes, pacRes, catRes, cobRes, orcRes] = await Promise.all([
         fetch(`/api/pedidos?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
         supabase.from('pacientes').select('id, nome, telefone, whatsapp').eq('clinica_id', cid).order('nome'),
         supabase.from('clinica_servicos').select('id, nome, descricao, imagem_url, icone, ordem, preco_centavos, disponivel').eq('clinica_id', cid).order('ordem'),
+        // Cobranças: só para saber qual venda já tem cobrança vinculada (não bloqueia a tela).
+        fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: { Authorization: `Bearer ${session.access_token}` } }).catch(() => null),
+        orcamentoDaUrlRef.current
+          ? fetch(`/api/orcamentos?clinica_id=${cid}&status=aprovado`, { headers: { Authorization: `Bearer ${session.access_token}` } }).catch(() => null)
+          : Promise.resolve(null),
       ]);
 
       if (!pedRes.ok || pacRes.error || catRes.error) throw new Error(MSG_ERRO_PADRAO);
@@ -126,6 +165,31 @@ export default function PedidosPage() {
       setPacientes(pacRes.data as ClientePicker[]);
       setCatalogo(catRes.data as CatalogoPicker[]);
       setCargaValida(true);
+      const cobJson = cobRes && cobRes.ok ? await cobRes.json().catch(() => null) : null;
+      const cobrancasLidas: { pedido_origem_id?: string | null; status: string }[] = Array.isArray(cobJson?.cobrancas) ? cobJson.cobrancas : [];
+      setVendasComCobranca(new Set(cobrancasLidas.filter(c => c.status !== 'cancelada').map(c => c.pedido_origem_id).filter((id): id is string => !!id)));
+
+      // Orçamento aprovado → Venda: abre o formulário EXISTENTE já preenchido
+      // (cliente, telefone, descrição, valor, origem). Nada é registrado sem
+      // o usuário revisar e confirmar. Uma venda por orçamento.
+      const idOrcamento = orcamentoDaUrlRef.current;
+      if (idOrcamento) {
+        orcamentoDaUrlRef.current = null;
+        const pedidosLidos = json.pedidos as Pedido[];
+        const orcJson = orcRes && orcRes.ok ? await orcRes.json().catch(() => null) : null;
+        const origem = (Array.isArray(orcJson?.orcamentos) ? orcJson.orcamentos as OrcamentoAprovado[] : []).find(o => o.id === idOrcamento);
+        if (pedidosLidos.some(p => p.orcamento_origem_id === idOrcamento)) {
+          setErro('Já existe uma venda registrada a partir deste orçamento.');
+        } else if (!origem) {
+          setErro('Orçamento aprovado não encontrado.');
+        } else {
+          setPacienteId(''); setNomeCliente(origem.paciente_nome); setTelefone(origem.telefone ? normalizar(origem.telefone) : '');
+          setLinhas([{ servicoId: AVULSO, descricaoManual: origem.procedimento, valorManualReais: Number(origem.valor).toFixed(2), quantidade: '1' }]);
+          setOrcamentoOrigem(origem); setAcompanharExecucao(true);
+          idempotencyKeyRef.current = crypto.randomUUID();
+          setModalNovo(true);
+        }
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AuthSessionMissingError') { router.push('/login'); return; }
       console.error(err);
@@ -175,6 +239,7 @@ export default function PedidosPage() {
     if (!cargaValida) { setErro('Carregue os pedidos, clientes e catálogo antes de registrar um pedido.'); return; }
     setPacienteId(''); setNomeCliente(''); setTelefone('');
     setLinhas([servicoId ? { ...linhaVazia, servicoId } : novaLinha()]);
+    setOrcamentoOrigem(null); setAcompanharExecucao(false);
     idempotencyKeyRef.current = crypto.randomUUID();
     setErro(''); setModalNovo(true);
   }
@@ -222,13 +287,15 @@ export default function PedidosPage() {
         clinica_id: clinicaId, paciente_id: pacienteId || undefined,
         nome_cliente: nomeCliente.trim(), telefone: telefone ? normalizar(telefone) : undefined,
         itens, idempotency_key: idempotencyKeyRef.current,
+        orcamento_origem_id: orcamentoOrigem?.id || undefined,
+        acompanhar_execucao: acompanharExecucao || undefined,
       }),
     });
     const json = await res.json();
     if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
     setModalNovo(false);
     carregar();
-    setSucesso('Pedido registrado.');
+    setSucesso(orcamentoOrigem ? 'Venda registrada a partir do orçamento.' : 'Pedido registrado.');
     setTimeout(() => setSucesso(''), 3500);
     } catch {
       setErro('Não foi possível confirmar o registro. Tente novamente sem fechar o formulário.');
@@ -254,6 +321,37 @@ export default function PedidosPage() {
     } finally {
       setTransicionando(null);
     }
+  }
+
+  async function mudarExecucao(pedido: Pedido, novo: ExecucaoStatus, extras?: { proxima_data_prevista?: string; motivo_interrupcao?: MotivoInterrupcao }) {
+    setTransicionando(pedido.id);
+    try {
+      const res = await fetch(`/api/pedidos/${pedido.id}/execucao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ clinica_id: clinicaId, novo_status: novo, ...extras }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.sucesso) { setErro(json.error || MSG_ERRO_PADRAO); return; }
+      setModalExecucao(null);
+      carregar();
+      setSucesso('Execução atualizada.');
+      setTimeout(() => setSucesso(''), 3500);
+    } catch (e) {
+      console.error(e);
+      setErro(MSG_ERRO_PADRAO);
+    } finally {
+      setTransicionando(null);
+    }
+  }
+
+  function acaoExecucao(pedido: Pedido, alvo: ExecucaoStatus) {
+    if (alvo === 'retorno_agendado' || alvo === 'interrompido') {
+      setDataRetorno(''); setMotivoInterrupcao(''); setErro('');
+      setModalExecucao({ pedido, alvo });
+      return;
+    }
+    mudarExecucao(pedido, alvo);
   }
 
   const filtrados = pedidos.filter(p => filtro === 'todos' || p.status === filtro);
@@ -291,7 +389,7 @@ export default function PedidosPage() {
             ))}
           </div>
           <p style={{ fontSize: 11, color: '#64748b', margin: '8px 0 0' }}>
-            Pedidos registrados aqui alimentam os sinais de pedido parado e de recompra no Gerente Comercial, no Follow-up Comercial e na Receita Perdida.
+            Pedidos são as vendas do negócio — de produto, de serviço ou vindas de um orçamento aprovado. Com a execução acompanhada (em andamento, retorno, conclusão), alimentam os sinais de pedido parado, serviço sem retorno e recompra no Gerente Comercial, no Follow-up Comercial e na Receita Perdida.
           </p>
         </div>
       )}
@@ -395,7 +493,34 @@ export default function PedidosPage() {
                     <div style={{ fontSize: 12, marginTop: 6, color: '#94a3b8' }}>
                       {p.pedido_itens.map(it => `${it.quantidade}× ${it.descricao} (${formatarValor(it.valor_unitario_centavos)})`).join(' · ')}
                     </div>
-                    <div style={{ fontSize: 12, marginTop: 5, color: '#475569' }}>Criado em {formatarData(p.criado_em)}</div>
+                    <div style={{ fontSize: 12, marginTop: 5, color: '#475569' }}>
+                      Criado em {formatarData(p.criado_em)}
+                      {p.orcamento_origem_id && <span data-testid="venda-origem-orcamento"> · a partir de orçamento aprovado</span>}
+                      {p.tratamento_legado_id && <span> · migrado de serviço contratado</span>}
+                    </div>
+                    {p.status !== 'cancelado' && (
+                      <div data-testid="venda-execucao" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                        {p.execucao_status && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: EXECUCAO_COR[p.execucao_status], border: `1px solid ${EXECUCAO_COR[p.execucao_status]}55`, padding: '2px 8px', borderRadius: 20 }}>
+                            Execução: {ROTULO_EXECUCAO[p.execucao_status]}
+                            {p.execucao_status === 'retorno_agendado' && p.proxima_data_prevista ? ` · ${formatarDia(p.proxima_data_prevista)}` : ''}
+                            {p.execucao_status === 'interrompido' && p.motivo_interrupcao ? ` · ${MOTIVO_LABELS[p.motivo_interrupcao]}` : ''}
+                          </span>
+                        )}
+                        {proximosStatusExecucao(p.execucao_status ?? null).map(alvo => (
+                          <button key={alvo} className="ped-btn" disabled={transicionando === p.id} onClick={() => acaoExecucao(p, alvo)} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: alvo === 'interrompido' || alvo === 'abandonado' ? '#f87171' : '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>
+                            {ACAO_EXECUCAO[alvo]}
+                          </button>
+                        ))}
+                        {vendasComCobranca.has(p.id) ? (
+                          <span data-testid="venda-cobranca-vinculada" style={{ fontSize: 11, color: '#94a3b8' }}>· Cobrança vinculada</span>
+                        ) : p.status !== 'pago' && (
+                          <button data-testid="venda-gerar-cobranca" className="ped-btn" onClick={() => router.push(`/cobrancas?pedido=${encodeURIComponent(p.id)}`)} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(251,191,36,0.4)', background: 'transparent', color: '#fbbf24', fontSize: 11, cursor: 'pointer' }}>
+                            Gerar cobrança
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
                     <div style={{ fontSize: 17, fontWeight: 700, color: '#f1f5f9' }}>{formatarValor(p.valor_centavos)}</div>
@@ -429,9 +554,15 @@ export default function PedidosPage() {
       )}
 
       {modalNovo && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }} onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}>
-          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3148' }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Novo pedido</h2>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16, overscrollBehavior: 'contain' }} onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}>
+          {/* Mesma contenção do "Novo orçamento": altura limitada à área visível e rolagem só dentro do modal. */}
+          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 560, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain', border: '1px solid #2d3148' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: orcamentoOrigem ? 8 : 24, marginTop: 0 }}>{orcamentoOrigem ? 'Registrar venda' : 'Novo pedido'}</h2>
+            {orcamentoOrigem && (
+              <p data-testid="venda-orcamento-origem" style={{ fontSize: 12, color: '#64748b', margin: '0 0 20px' }}>
+                A partir do orçamento aprovado de {orcamentoOrigem.paciente_nome} — revise e confirme.
+              </p>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
               <div>
@@ -487,11 +618,51 @@ export default function PedidosPage() {
 
             <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', marginBottom: 16, textAlign: 'right' }}>Total: {formatarValor(totalEstimado)}</div>
 
+            <label data-testid="venda-acompanhar-execucao" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#cbd5e1', marginBottom: 18, cursor: 'pointer' }}>
+              <input type="checkbox" checked={acompanharExecucao} onChange={e => setAcompanharExecucao(e.target.checked)} style={{ width: 16, height: 16 }} />
+              Acompanhar execução do serviço (em andamento, retorno, conclusão)
+            </label>
+
             {erro && <div style={{ marginBottom: 16 }}><Feedback type="erro" message={erro} onClose={() => setErro('')} /></div>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="ped-btn-cancelar" onClick={() => setModalNovo(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
               <button className="ped-btn-salvar" onClick={salvar} disabled={salvando} style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>
-                {salvando ? 'Salvando...' : 'Registrar pedido'}
+                {salvando ? 'Salvando...' : orcamentoOrigem ? 'Registrar venda' : 'Registrar pedido'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {modalExecucao && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1020, padding: 16, overscrollBehavior: 'contain' }} onClick={e => { if (e.target === e.currentTarget) setModalExecucao(null); }}>
+          <div style={{ background: '#1e2130', borderRadius: 16, padding: 28, width: '100%', maxWidth: 400, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', border: '1px solid #2d3148' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', margin: '0 0 16px' }}>
+              {modalExecucao.alvo === 'retorno_agendado' ? 'Agendar retorno' : 'Interromper execução'} — {modalExecucao.pedido.nome_cliente}
+            </h2>
+            {modalExecucao.alvo === 'retorno_agendado' ? (
+              <>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data do retorno</label>
+                <input type="date" value={dataRetorno} onChange={e => setDataRetorno(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }} />
+              </>
+            ) : (
+              <>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Motivo (opcional)</label>
+                <select value={motivoInterrupcao} onChange={e => setMotivoInterrupcao(e.target.value as MotivoInterrupcao | '')} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #2d3148', background: '#0f1117', color: '#e2e8f0', fontSize: 13, boxSizing: 'border-box' }}>
+                  <option value="">— Não informar —</option>
+                  {MOTIVOS_INTERRUPCAO.map(m => <option key={m} value={m}>{MOTIVO_LABELS[m]}</option>)}
+                </select>
+              </>
+            )}
+            {erro && <div style={{ marginTop: 14 }}><Feedback type="erro" message={erro} onClose={() => setErro('')} /></div>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+              <button className="ped-btn-cancelar" onClick={() => setModalExecucao(null)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#94a3b8', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+              <button
+                className="ped-btn-salvar"
+                disabled={transicionando === modalExecucao.pedido.id || (modalExecucao.alvo === 'retorno_agendado' && !dataRetorno)}
+                onClick={() => mudarExecucao(modalExecucao.pedido, modalExecucao.alvo, modalExecucao.alvo === 'retorno_agendado' ? { proxima_data_prevista: dataRetorno } : (motivoInterrupcao ? { motivo_interrupcao: motivoInterrupcao } : undefined))}
+                style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1F4E5F,#0d3547)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Confirmar
               </button>
             </div>
           </div>

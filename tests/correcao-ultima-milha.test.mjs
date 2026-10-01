@@ -111,18 +111,21 @@ test("Cobranças: a key de CRIAR cobrança (idempotencyKeyRef, fluxo diferente) 
 // 7 superfícies identificadas na auditoria: Copiloto, Follow-up,
 // Orçamentos, Oportunidades, Cobranças, Pedidos, Tratamentos.
 
-test("Copiloto: usa fetchJsonSeguro nas 5 APIs e expõe falhaParcial (nunca finge 'nada pendente' quando uma fonte falhou de verdade)", () => {
+test("Copiloto: usa fetchJsonSeguro nas 4 APIs e expõe falhaParcial (nunca finge 'nada pendente' quando uma fonte falhou de verdade)", () => {
   const codigo = ler("app/copiloto/page.tsx");
   assert.match(codigo, /import \{ fetchJsonSeguro \} from '\.\.\/\.\.\/lib\/fetch-seguro'/);
   assert.match(codigo, /falhaParcial: boolean/);
-  assert.match(codigo, /const falhaParcial = \[oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR\]\.some\(r => r\.falhou\)/);
+  // Execução de venda vem de /api/pedidos (Pedidos = Venda/Execução única) — sem /api/tratamentos.
+  assert.match(codigo, /const falhaParcial = \[oportunidadesR, orcamentosR, pedidosR, cobrancasR\]\.some\(r => r\.falhou\)/);
+  assert.doesNotMatch(codigo, /\/api\/tratamentos/);
   assert.match(codigo, /estado\.falhaParcial && \(/);
 });
 
-test("Follow-up: usa fetchJsonSeguro nas 5 APIs e mostra aviso quando falhaParcial", () => {
+test("Follow-up: usa fetchJsonSeguro nas 4 APIs e mostra aviso quando falhaParcial", () => {
   const codigo = ler("app/follow-up/page.tsx");
   assert.match(codigo, /import \{ fetchJsonSeguro \} from '\.\.\/\.\.\/lib\/fetch-seguro'/);
-  assert.match(codigo, /setFalhaParcial\(\[oportunidadesR, orcamentosR, tratamentosR, pedidosR, cobrancasR\]\.some\(r => r\.falhou\)\)/);
+  assert.match(codigo, /setFalhaParcial\(\[oportunidadesR, orcamentosR, pedidosR, cobrancasR\]\.some\(r => r\.falhou\)\)/);
+  assert.doesNotMatch(codigo, /\/api\/tratamentos/);
   assert.match(codigo, /falhaParcial && \(/);
 });
 

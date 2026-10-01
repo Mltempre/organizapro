@@ -23,7 +23,7 @@ const rotulosRisco = {
   // apresentados fica em "Comercial e presença".
   orcamento_parado: `Orçamentos parados (sem resposta há ${DIAS_PARA_CONSIDERAR_PARADO}+ dias)`,
   cobranca_atrasada: "Cobranças vencidas",
-  tratamento_sem_retorno: "Serviços sem retorno (valor estimado)",
+  tratamento_sem_retorno: "Serviços sem retorno (valor da venda)",
   pedido_nao_concluido: "Pedidos não concluídos",
 };
 

@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     paciente_nome?: string;
     paciente_telefone?: string;
     tratamento_origem_id?: string;
+    pedido_origem_id?: string; // venda (pedido) de origem — receita da venda passa a contar só aqui
     descricao?: string;
     valor?: number;
     vencimento?: string;
@@ -40,8 +41,11 @@ export async function POST(req: NextRequest) {
 
   const {
     clinica_id, paciente_id, paciente_nome, paciente_telefone,
-    tratamento_origem_id, descricao, valor, vencimento, observacao, idempotency_key,
+    tratamento_origem_id, pedido_origem_id, descricao, valor, vencimento, observacao, idempotency_key,
   } = body;
+  if (pedido_origem_id != null && (typeof pedido_origem_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pedido_origem_id))) {
+    return NextResponse.json({ sucesso: false, error: "pedido_origem_id inválido" }, { status: 400 });
+  }
 
   if (!clinica_id || !paciente_nome?.trim() || !descricao?.trim() || !vencimento || !idempotency_key) {
     return NextResponse.json(
@@ -88,6 +92,23 @@ export async function POST(req: NextRequest) {
     }
     if (valor === undefined) valorFinal = tratamento.valor_estimado;
   }
+  // Venda de origem: mesma regra — snapshot do valor da venda só na criação.
+  if (pedido_origem_id) {
+    const { data: venda, error: erroVenda } = await admin
+      .from("pedidos")
+      .select("id, valor_centavos, status")
+      .eq("id", pedido_origem_id)
+      .eq("clinica_id", clinica_id)
+      .maybeSingle();
+    if (erroVenda || !venda) {
+      logOperacao({ operacao: "cobranca.criar", clinica_id, resultado: "rejeitado", motivo: "pedido_origem_id não encontrado nesta clínica" });
+      return NextResponse.json({ sucesso: false, error: "Venda de origem não encontrada nesta empresa" }, { status: 400 });
+    }
+    if (venda.status === "cancelado") {
+      return NextResponse.json({ sucesso: false, error: "Venda cancelada não pode originar cobrança" }, { status: 409 });
+    }
+    if (valor === undefined) valorFinal = venda.valor_centavos / 100;
+  }
   if (valorFinal === null || valorFinal <= 0) {
     return NextResponse.json(
       { sucesso: false, error: "valor deve ser um número positivo — informe explicitamente ou vincule a um tratamento com valor_estimado definido" },
@@ -124,6 +145,8 @@ export async function POST(req: NextRequest) {
       paciente_nome: paciente_nome.trim(),
       paciente_telefone: paciente_telefone?.trim() || null,
       tratamento_origem_id: tratamento_origem_id || null,
+      // Só quando há venda de origem: cobrança avulsa continua idêntica.
+      ...(pedido_origem_id ? { pedido_origem_id } : {}),
       descricao: descricao.trim(),
       valor: valorFinal,
       vencimento,

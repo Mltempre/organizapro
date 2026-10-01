@@ -39,6 +39,10 @@ export async function POST(req: NextRequest) {
     origem?: "manual" | "site_publico";
     itens?: ItemEntrada[];
     idempotency_key?: string;
+    // Venda/Execução: orçamento aprovado de origem (no máximo uma venda por
+    // orçamento) e se a venda terá acompanhamento de execução.
+    orcamento_origem_id?: string;
+    acompanhar_execucao?: boolean;
   } = {};
 
   try {
@@ -56,6 +60,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sucesso: false, error: "Dados do pedido inválidos" }, { status: 400 });
   }
   const origem = body.origem === "site_publico" ? "site_publico" : "manual";
+  const { orcamento_origem_id, acompanhar_execucao } = body;
+  if ((orcamento_origem_id != null && (typeof orcamento_origem_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orcamento_origem_id)))
+    || (acompanhar_execucao != null && typeof acompanhar_execucao !== "boolean")) {
+    return NextResponse.json({ sucesso: false, error: "Dados do pedido inválidos" }, { status: 400 });
+  }
+  if (origem === "site_publico" && (orcamento_origem_id || acompanhar_execucao)) {
+    return NextResponse.json({ sucesso: false, error: "pedido do site não tem orçamento de origem nem acompanhamento de execução" }, { status: 400 });
+  }
 
   if (!clinica_id || !nome_cliente?.trim() || !idempotency_key) {
     return NextResponse.json(
@@ -120,6 +132,23 @@ export async function POST(req: NextRequest) {
   }
 
   if (eventoExistente) return NextResponse.json({ sucesso: false, error: "Registro anterior indisponível; não foi criado outro pedido" }, { status: 409 });
+
+  // Orçamento → Venda: só orçamento APROVADO do mesmo negócio, e uma venda
+  // por orçamento (o índice único do banco garante também sob concorrência).
+  if (orcamento_origem_id) {
+    const { data: orcamento, error: erroOrcamento } = await admin.from("orcamentos").select("id, status")
+      .eq("id", orcamento_origem_id).eq("clinica_id", clinica_id).maybeSingle();
+    if (erroOrcamento) return NextResponse.json({ sucesso: false, error: "Não foi possível validar o orçamento de origem" }, { status: 503 });
+    if (!orcamento) return NextResponse.json({ sucesso: false, error: "Orçamento de origem não encontrado nesta empresa" }, { status: 400 });
+    if (orcamento.status !== "aprovado") return NextResponse.json({ sucesso: false, error: "Só um orçamento aprovado pode virar venda" }, { status: 409 });
+    const { data: vendaExistente, error: erroVenda } = await admin.from("pedidos").select("id")
+      .eq("clinica_id", clinica_id).eq("orcamento_origem_id", orcamento_origem_id).limit(1).maybeSingle();
+    if (erroVenda) return NextResponse.json({ sucesso: false, error: "Não foi possível verificar vendas deste orçamento" }, { status: 503 });
+    if (vendaExistente) {
+      logOperacao({ operacao: "pedido.criar", clinica_id, resultado: "rejeitado", motivo: "orcamento ja possui venda" });
+      return NextResponse.json({ sucesso: false, error: "Já existe uma venda registrada a partir deste orçamento.", pedido_id: vendaExistente.id }, { status: 409 });
+    }
+  }
 
   // Resolve o preço real de cada item que referencia o catálogo — NUNCA
   // aceita valor do cliente para item com servico_id. Busca todos de uma
@@ -198,10 +227,18 @@ export async function POST(req: NextRequest) {
       observacao: observacao?.trim() || null,
       criado_por: autorizacao.userId,
       criado_em: agora,
+      // Colunas da Venda/Execução só quando usadas: pedido comum continua idêntico.
+      ...(orcamento_origem_id ? { orcamento_origem_id } : {}),
+      ...(acompanhar_execucao ? { execucao_status: "em_andamento" } : {}),
     })
     .select()
     .single();
 
+  if (erroInsertPedido && orcamento_origem_id && (erroInsertPedido as { code?: string }).code === "23505") {
+    // Corrida: outra requisição registrou a venda deste orçamento primeiro.
+    logOperacao({ operacao: "pedido.criar", clinica_id, resultado: "rejeitado", motivo: "orcamento ja possui venda (indice unico)" });
+    return NextResponse.json({ sucesso: false, error: "Já existe uma venda registrada a partir deste orçamento." }, { status: 409 });
+  }
   if (erroInsertPedido) {
     logOperacao({ operacao: "pedido.criar", clinica_id, resultado: "erro", motivo: erroInsertPedido.message });
     return NextResponse.json({ sucesso: false, error: "Não foi possível criar o pedido" }, { status: 500 });

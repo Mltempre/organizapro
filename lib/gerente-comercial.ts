@@ -27,7 +27,7 @@ export function coordenarGerenteComercial(
         descricao: valor === null
           ? (sinal.apresentacao?.impacto || sinal.acaoSugerida)
           : item?.origem === 'tratamento_sem_retorno'
-            ? 'Valor estimado registrado no serviço contratado em risco; não é receita confirmada.'
+            ? 'Valor da venda em execução em risco; não é receita confirmada.'
             : 'Valor registrado em risco; não é receita confirmada.',
       },
       destinoAcao: sinal.destinoAcao || casoAgenda?.destino || sinal.destino || null,

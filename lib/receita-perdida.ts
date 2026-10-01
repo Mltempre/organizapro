@@ -97,7 +97,7 @@ export type ResumoReceitaPerdida = {
 const DESTINOS: Record<OrigemReceitaPerdida, string> = {
   orcamento_parado: "/orcamentos",
   cobranca_atrasada: "/cobrancas",
-  tratamento_sem_retorno: "/tratamentos",
+  tratamento_sem_retorno: "/pedidos", // execução de venda (Pedidos = Venda/Execução)
   pedido_nao_concluido: "/pedidos",
 };
 

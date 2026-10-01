@@ -19,8 +19,8 @@ export async function lerFonteAtribuicao<T>(admin: SupabaseClient, clinicaId: st
 type Op = { id: string; canal: EntradaLinhaEconomica['oportunidades'][number]['canal']; status: EntradaLinhaEconomica['oportunidades'][number]['status']; orcamento_vinculado_id: string | null; paciente_vinculado_id: string | null; agendamento_vinculado_id: string | null; nome_informado: string | null };
 type Orc = { id: string; status: EntradaLinhaEconomica['orcamentos'][number]['status']; valor: number; apresentado_em: string; decidido_em: string | null; paciente_nome: string };
 type Trat = { id: string; status: EntradaLinhaEconomica['tratamentos'][number]['status']; orcamento_origem_id: string | null };
-type Cob = { id: string; status: EntradaLinhaEconomica['cobrancas'][number]['status']; paciente_nome: string; tratamento_origem_id: string | null; valor: number; valor_pago: number | null; vencimento: string; pago_em: string | null; em_cobranca_em: string | null };
-type Ped = { id: string; status: EntradaLinhaEconomica['pedidos'][number]['status']; nome_cliente: string; valor_centavos: number; pagamento_confirmado_em: string | null };
+type Cob = { id: string; status: EntradaLinhaEconomica['cobrancas'][number]['status']; paciente_nome: string; tratamento_origem_id: string | null; pedido_origem_id: string | null; valor: number; valor_pago: number | null; vencimento: string; pago_em: string | null; em_cobranca_em: string | null };
+type Ped = { id: string; status: EntradaLinhaEconomica['pedidos'][number]['status']; nome_cliente: string; valor_centavos: number; pagamento_confirmado_em: string | null; orcamento_origem_id: string | null };
 type Origem = { id: string; paciente_id: string | null; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; utm_content: string | null; gclid: string | null; fbclid: string | null; referrer_host: string | null; capturado_em: string; identificadores_ads: CaptacaoAtribuicao['identificadores'] };
 
 export async function carregarRelatorioAtribuicao(admin: SupabaseClient, clinicaId: string) {
@@ -30,8 +30,8 @@ export async function carregarRelatorioAtribuicao(admin: SupabaseClient, clinica
     lerFonteAtribuicao<Op>(admin, clinicaId, 'oportunidades_demanda', 'id,canal,status,orcamento_vinculado_id,paciente_vinculado_id,agendamento_vinculado_id,nome_informado'),
     lerFonteAtribuicao<Orc>(admin, clinicaId, 'orcamentos', 'id,status,valor,apresentado_em,decidido_em,paciente_nome'),
     lerFonteAtribuicao<Trat>(admin, clinicaId, 'tratamentos', 'id,status,orcamento_origem_id'),
-    lerFonteAtribuicao<Cob>(admin, clinicaId, 'cobrancas', 'id,status,paciente_nome,tratamento_origem_id,valor,valor_pago,vencimento,pago_em,em_cobranca_em'),
-    lerFonteAtribuicao<Ped>(admin, clinicaId, 'pedidos', 'id,status,nome_cliente,valor_centavos,pagamento_confirmado_em'),
+    lerFonteAtribuicao<Cob>(admin, clinicaId, 'cobrancas', 'id,status,paciente_nome,tratamento_origem_id,pedido_origem_id,valor,valor_pago,vencimento,pago_em,em_cobranca_em'),
+    lerFonteAtribuicao<Ped>(admin, clinicaId, 'pedidos', 'id,status,nome_cliente,valor_centavos,pagamento_confirmado_em,orcamento_origem_id'),
     lerFonteAtribuicao<{ id: string; nome: string }>(admin, clinicaId, 'pacientes', 'id,nome'),
     lerFonteAtribuicao<{ id: string; paciente_nome: string }>(admin, clinicaId, 'agendamentos', 'id,paciente_nome'),
   ]);
@@ -40,8 +40,8 @@ export async function carregarRelatorioAtribuicao(admin: SupabaseClient, clinica
     oportunidades: ops.map(o => ({ id: o.id, canal: o.canal, status: o.status, orcamentoVinculadoId: o.orcamento_vinculado_id })),
     orcamentos: orcs.map(o => ({ id: o.id, status: o.status, valor: o.valor, apresentadoEm: o.apresentado_em, decididoEm: o.decidido_em })),
     tratamentos: trats.map(t => ({ id: t.id, status: t.status, orcamentoOrigemId: t.orcamento_origem_id })),
-    cobrancas: cobs.map(c => ({ id: c.id, status: c.status, pacienteNome: c.paciente_nome, tratamentoOrigemId: c.tratamento_origem_id, valor: c.valor, valorPago: c.valor_pago, vencimento: c.vencimento, pagoEm: c.pago_em, emCobrancaEm: c.em_cobranca_em })),
-    pedidos: peds.map(p => ({ id: p.id, status: p.status, pacienteNome: p.nome_cliente, valor: p.valor_centavos / 100, pagamentoConfirmadoEm: p.pagamento_confirmado_em })),
+    cobrancas: cobs.map(c => ({ id: c.id, status: c.status, pacienteNome: c.paciente_nome, tratamentoOrigemId: c.tratamento_origem_id, pedidoOrigemId: c.pedido_origem_id, valor: c.valor, valorPago: c.valor_pago, vencimento: c.vencimento, pagoEm: c.pago_em, emCobrancaEm: c.em_cobranca_em })),
+    pedidos: peds.map(p => ({ id: p.id, status: p.status, pacienteNome: p.nome_cliente, valor: p.valor_centavos / 100, pagamentoConfirmadoEm: p.pagamento_confirmado_em, orcamentoOrigemId: p.orcamento_origem_id })),
   };
   const entidades: EntidadeAtribuicao[] = [
     ...clientes.map(c => ({ tipo: 'cliente' as const, id: c.id, nome: c.nome })),

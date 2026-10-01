@@ -166,7 +166,8 @@ test("cada item aparece exatamente uma vez, com origem e destino corretos (nunca
   const porOrigem = Object.fromEntries(r.itens.map(i => [i.origem, i]));
   assert.equal(porOrigem.orcamento_parado.destino, "/orcamentos");
   assert.equal(porOrigem.cobranca_atrasada.destino, "/cobrancas");
-  assert.equal(porOrigem.tratamento_sem_retorno.destino, "/tratamentos");
+  // Execução da venda (Pedidos = Venda/Execução única).
+  assert.equal(porOrigem.tratamento_sem_retorno.destino, "/pedidos");
   assert.equal(porOrigem.pedido_nao_concluido.destino, "/pedidos");
 });
 
@@ -203,7 +204,9 @@ const pagina = fs.readFileSync(new URL("../app/receita-perdida/page.tsx", import
 test("receita-perdida: busca só pelas APIs canônicas já existentes, nenhuma query direta a supabase.from em tabela de negócio", () => {
   assert.match(pagina, /\/api\/orcamentos\?clinica_id=\$\{cid\}&status=apresentado/);
   assert.match(pagina, /\/api\/cobrancas\?clinica_id=\$\{cid\}/);
-  assert.match(pagina, /\/api\/tratamentos\?clinica_id=\$\{cid\}/);
+  // Pedidos = Venda/Execução única: execução de venda vem de /api/pedidos.
+  assert.doesNotMatch(pagina, /\/api\/tratamentos/);
+  assert.match(pagina, /particionarVendas\(/);
   assert.match(pagina, /\/api\/pedidos\?clinica_id=\$\{cid\}/);
   assert.match(pagina, /fetch\('\/api\/oportunidades'/);
   assert.doesNotMatch(pagina, /supabase\.from\("orcamentos"\)/);

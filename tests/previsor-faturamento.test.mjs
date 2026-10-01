@@ -266,7 +266,9 @@ const pagina = fs.readFileSync(new URL("../app/previsor-faturamento/page.tsx", i
 test("previsor-faturamento: busca só pelas APIs canônicas já existentes (todas escopadas por clinica_id), nenhuma query direta a supabase.from em tabela de negócio", () => {
   assert.match(pagina, /\/api\/orcamentos\?clinica_id=\$\{cid\}&status=apresentado/);
   assert.match(pagina, /\/api\/cobrancas\?clinica_id=\$\{cid\}/);
-  assert.match(pagina, /\/api\/tratamentos\?clinica_id=\$\{cid\}/);
+  // Pedidos = Venda/Execução única: execução de venda vem de /api/pedidos.
+  assert.doesNotMatch(pagina, /\/api\/tratamentos/);
+  assert.match(pagina, /particionarVendas\(/);
   assert.match(pagina, /\/api\/pedidos\?clinica_id=\$\{cid\}/);
   assert.match(pagina, /fetch\('\/api\/oportunidades'/);
   assert.doesNotMatch(pagina, /supabase\.from\("orcamentos"\)/);

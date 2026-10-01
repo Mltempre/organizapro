@@ -9,18 +9,18 @@ import PageLoader from '../components/PageLoader';
 import EmptyState from '../components/EmptyState';
 import Feedback, { MSG_ERRO_PADRAO } from '../components/Feedback';
 import type { Orcamento, StatusOrcamento } from '../../lib/motor-orcamentos';
-import type { Tratamento, StatusTratamento } from '../../lib/motor-tratamento';
 import type { Cobranca, StatusCobranca } from '../../lib/motor-cobranca';
 import { calcularIndicadoresCobranca, type IndicadoresCobranca } from '../../lib/motor-cobranca';
 import { gerarPrevisorFaturamento, type ResumoPrevisorFaturamento } from '../../lib/previsor-faturamento';
 import { gerarLinhaEconomica, type ResumoLinhaEconomica, type CanalOportunidade } from '../../lib/linha-economica';
 import { agregarReceitaPerdida, type ResumoReceitaPerdida, type OrigemReceitaPerdida } from '../../lib/receita-perdida';
 import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
+import { particionarVendas, type PedidoVenda } from '../../lib/venda-execucao';
 
 // ── Hub Dinheiro / Financeiro Inteligente ────────────────────────────────
 // Composição pura: nenhum motor novo, nenhuma query nova. Busca exatamente
 // os mesmos dados já servidos por /api/orcamentos, /api/cobrancas,
-// /api/tratamentos, /api/pedidos e /api/oportunidades (mesmo padrão de
+// /api/pedidos (venda + execução) e /api/oportunidades (mesmo padrão de
 // app/cobrancas, app/previsor-faturamento, app/linha-economica e
 // app/receita-perdida) e delega toda a decisão aos 4 motores reais já
 // homologados: calcularIndicadoresCobranca (a receber/atrasado/recebido),
@@ -37,11 +37,8 @@ import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
 // externo, confirmação além do que os motores já provam, ou causalidade
 // além do que gerarLinhaEconomica já comprova via trilha.
 
-type PedidoRow = {
-  id: string; nome_cliente: string; telefone: string | null; valor_centavos: number;
-  status: 'criado' | 'confirmado' | 'aguardando_confirmacao_pagamento' | 'pago' | 'cancelado';
-  criado_em: string; pagamento_confirmado_em: string | null;
-};
+type PedidoRow = PedidoVenda;
+type CobrancaRow = Cobranca & { pedido_origem_id?: string | null };
 type OportunidadeRow = {
   id: string; nome_informado: string | null; telefone: string; status: OportunidadeStatus;
   orcamento_vinculado_id: string | null; canal: CanalOportunidade;
@@ -101,18 +98,18 @@ export default function FinanceiroPage() {
       // app/previsor-faturamento/page.tsx e app/linha-economica/page.tsx —
       // busca tudo sem filtro de status na URL (cada motor filtra o que
       // precisa) para nunca duplicar a mesma chamada 3x nesta tela.
-      const [orcamentosRes, cobrancasRes, tratamentosRes, pedidosRes, oportunidadesRes] = await Promise.all([
+      const [orcamentosRes, cobrancasRes, pedidosRes, oportunidadesRes] = await Promise.all([
         fetch(`/api/orcamentos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'orcamentos')),
         fetch(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'cobrancas')),
-        fetch(`/api/tratamentos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'tratamentos')),
         fetch(`/api/pedidos?clinica_id=${cid}`, { headers: auth }).then(r => lerRespostaFinanceira(r, 'pedidos')),
         fetch('/api/oportunidades', { headers: auth }).then(r => lerRespostaFinanceira(r, 'data')),
       ]);
 
       const orcamentosTodos: Orcamento[] = orcamentosRes.orcamentos ?? [];
-      const cobrancasTodas: Cobranca[] = cobrancasRes.cobrancas ?? [];
-      const tratamentosTodos: Tratamento[] = tratamentosRes.tratamentos ?? [];
+      const cobrancasTodas: CobrancaRow[] = cobrancasRes.cobrancas ?? [];
       const pedidosTodos: PedidoRow[] = pedidosRes.pedidos ?? [];
+      // Cada venda entra uma única vez no dinheiro (lib/venda-execucao.ts).
+      const vendas = particionarVendas(pedidosTodos, cobrancasTodas);
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
 
       const hoje = hojeStr();
@@ -125,10 +122,10 @@ export default function FinanceiroPage() {
       // nenhum filtro novo, nenhuma regra de negócio inventada aqui.
       const orcamentosApresentados = orcamentosTodos.filter((o) => o.status === 'apresentado');
       const cobrancasAbertas = cobrancasTodas.filter((c) => c.status === 'pendente' || c.status === 'em_cobranca');
-      const tratamentosPrevisor = tratamentosTodos.filter((t) => t.status === 'em_andamento' || t.status === 'retorno_agendado' || t.status === 'interrompido');
-      const tratamentosRisco = tratamentosTodos.filter((t) => t.status === 'em_andamento' || t.status === 'interrompido');
-      const pedidosPrevisor = pedidosTodos.filter((p) => p.status === 'criado' || p.status === 'confirmado' || p.status === 'aguardando_confirmacao_pagamento');
-      const pedidosRisco = pedidosTodos.filter((p) => p.status === 'criado' || p.status === 'confirmado');
+      const tratamentosPrevisor = vendas.acompanhamentosAReceber.filter((t) => t.status === 'em_andamento' || t.status === 'retorno_agendado' || t.status === 'interrompido');
+      const tratamentosRisco = vendas.acompanhamentosAReceber.filter((t) => t.status === 'em_andamento' || t.status === 'interrompido');
+      const pedidosPrevisor = vendas.pedidosAReceber.filter((p) => p.status === 'criado' || p.status === 'confirmado' || p.status === 'aguardando_confirmacao_pagamento');
+      const pedidosRisco = vendas.pedidosAReceber.filter((p) => p.status === 'criado' || p.status === 'confirmado');
 
       const oportunidadesParaRisco = oportunidades.map((op) => ({ id: op.id, pacienteNome: op.nome_informado || op.telefone, status: op.status, orcamentoVinculadoId: op.orcamento_vinculado_id }));
 
@@ -171,16 +168,17 @@ export default function FinanceiroPage() {
       const linhaEconomica = gerarLinhaEconomica({
         oportunidades: oportunidades.map((op) => ({ id: op.id, canal: op.canal, status: op.status, orcamentoVinculadoId: op.orcamento_vinculado_id })),
         orcamentos: orcamentosTodos.map((o) => ({ id: o.id, status: o.status as StatusOrcamento, valor: o.valor, apresentadoEm: o.apresentado_em, decididoEm: o.decidido_em })),
-        tratamentos: tratamentosTodos.map((t) => ({ id: t.id, orcamentoOrigemId: t.orcamento_origem_id, status: t.status as StatusTratamento })),
+        // Cadeia pela venda: cobrança -> pedido -> orçamento (serviços legados já migrados para pedidos).
+        tratamentos: [],
         cobrancas: cobrancasTodas.map((c) => ({
-          id: c.id, pacienteNome: c.paciente_nome, tratamentoOrigemId: c.tratamento_origem_id, status: c.status as StatusCobranca,
+          id: c.id, pacienteNome: c.paciente_nome, tratamentoOrigemId: c.tratamento_origem_id, pedidoOrigemId: c.pedido_origem_id ?? null, status: c.status as StatusCobranca,
           valor: c.valor, valorPago: c.valor_pago, vencimento: c.vencimento, pagoEm: c.pago_em, emCobrancaEm: c.em_cobranca_em,
         })),
-        pedidos: pedidosTodos.map((p) => ({ id: p.id, pacienteNome: p.nome_cliente, status: p.status, valor: p.valor_centavos / 100, pagamentoConfirmadoEm: p.pagamento_confirmado_em })),
+        pedidos: pedidosTodos.map((p) => ({ id: p.id, pacienteNome: p.nome_cliente, status: p.status, valor: p.valor_centavos / 100, pagamentoConfirmadoEm: p.pagamento_confirmado_em ?? null, orcamentoOrigemId: p.orcamento_origem_id ?? null })),
       });
 
       const semDadosNenhuma = orcamentosTodos.length === 0 && cobrancasTodas.length === 0
-        && tratamentosTodos.length === 0 && pedidosTodos.length === 0 && oportunidades.length === 0;
+        && pedidosTodos.length === 0 && oportunidades.length === 0;
 
       setResumo({ indicadores, previsor, linhaEconomica, receitaPerdida, semDadosNenhuma });
     } catch (err: unknown) {

@@ -46,52 +46,59 @@ test("Bloco 4 — Gerar orçamento continua no MESMO contrato da API (descriçã
   assert.deepEqual(posts(oportunidades), ["`/api/oportunidades/${op.id}/transicao`", "`/api/oportunidades/${modalOrcamento.id}/gerar-orcamento`"]);
 });
 
-test("Bloco 3 — orçamento APROVADO leva ao formulário EXISTENTE de Serviços contratados, sem registrar nada", () => {
+// ── Convergência Definitiva: Pedidos = Venda/Execução única ─────────────
+// Os Blocos 1/3 da Fase 1 levavam a Serviços contratados; agora levam ao
+// formulário EXISTENTE de Pedidos. As mesmas garantias continuam: nada é
+// registrado sem confirmação, o dado conhecido não é redigitado.
+
+const pedidosPagina = ler("app/pedidos/page.tsx");
+
+test("Bloco 3 — orçamento APROVADO leva ao formulário EXISTENTE de Pedidos (venda), sem registrar nada; uma venda por orçamento", () => {
   const c = semComentarios(orcamentos);
-  assert.match(c, /\{o\.status === 'aprovado' && \(\s*<button[\s\S]*?onClick=\{\(\) => router\.push\(`\/tratamentos\?orcamento=\$\{encodeURIComponent\(o\.id\)\}`\)\}[\s\S]*?Registrar serviço contratado/);
+  assert.match(c, /onClick=\{\(\) => router\.push\(`\/pedidos\?orcamento=\$\{encodeURIComponent\(o\.id\)\}`\)\}[\s\S]*?Registrar venda/);
+  assert.match(c, /orcamentosComVenda\.has\(o\.id\)[\s\S]*?Venda registrada/, "orçamento com venda não oferece segunda venda");
+  assert.doesNotMatch(c, /\/tratamentos\?orcamento=/);
   assert.deepEqual(posts(orcamentos), ["'/api/orcamentos'", "`/api/orcamentos/${o.id}/transicao`"], "nenhum POST novo em Orçamentos");
 });
 
-test("Bloco 1/3 — Serviços contratados: orçamento de origem preenche nome, TELEFONE, serviço e valor; abre pela URL só para revisão", () => {
-  const c = semComentarios(tratamentos);
-  assert.match(c, /type OrcamentoPicker = \{ id: string; paciente_nome: string; telefone: string \| null; procedimento: string; valor: number \}/);
-  assert.match(c, /function dadosDoOrcamento\(o: OrcamentoPicker\)[\s\S]*?orcamentoId: o\.id,\s*paciente_nome: o\.paciente_nome,\s*telefone: o\.telefone \? normalizar\(o\.telefone\) : '',\s*tipo_tratamento: o\.procedimento,\s*valor_estimado: String\(o\.valor\),/);
-  assert.match(c, /function selecionarOrcamento[\s\S]*?dadosDoOrcamento\(o\)[\s\S]*?telefone: dados\.telefone \|\| prev\.telefone/);
-  // ?orcamento= lido uma vez e só ABRE o formulário preenchido
+test("Bloco 1/3 — Pedidos: orçamento de origem preenche nome, TELEFONE, descrição e valor; abre pela URL só para revisão", () => {
+  const c = semComentarios(pedidosPagina);
   assert.match(c, /new URLSearchParams\(window\.location\.search\)\.get\('orcamento'\)/);
-  assert.match(c, /setForm\(\{ \.\.\.formInicial, \.\.\.dadosDoOrcamento\(origem\) \}\);\s*idempotencyKeyRef\.current = crypto\.randomUUID\(\);\s*setModalNovo\(true\);/);
-  assert.deepEqual(posts(tratamentos), ["'/api/tratamentos'", "`/api/tratamentos/${t.id}/transicao`"], "o único registro continua sendo o 'Registrar serviço' do usuário");
-  // avulso continua possível
-  assert.match(tratamentos, /— Serviço avulso \(sem orçamento\) —/);
-  // contrato da API inalterado: o vínculo já existia
-  assert.match(c, /orcamento_origem_id: form\.orcamentoId \|\| undefined,/);
-  assert.match(c, /paciente_telefone: form\.telefone \? normalizar\(form\.telefone\) : undefined,/);
+  assert.match(c, /setNomeCliente\(origem\.paciente_nome\); setTelefone\(origem\.telefone \? normalizar\(origem\.telefone\) : ''\);/);
+  assert.match(c, /setLinhas\(\[\{ servicoId: AVULSO, descricaoManual: origem\.procedimento, valorManualReais: Number\(origem\.valor\)\.toFixed\(2\), quantidade: '1' \}\]\);/);
+  assert.match(c, /setOrcamentoOrigem\(origem\); setAcompanharExecucao\(true\);\s*idempotencyKeyRef\.current = crypto\.randomUUID\(\);\s*setModalNovo\(true\);/);
+  assert.match(c, /pedidosLidos\.some\(p => p\.orcamento_origem_id === idOrcamento\)[\s\S]*?Já existe uma venda registrada a partir deste orçamento\./);
+  assert.match(c, /orcamento_origem_id: orcamentoOrigem\?\.id \|\| undefined,\s*acompanhar_execucao: acompanharExecucao \|\| undefined,/);
+  // Serviços contratados não cadastra mais; o link antigo segue para a venda.
+  assert.deepEqual(posts(tratamentos), [], "Serviços contratados é só histórico");
+  assert.match(semComentarios(tratamentos), /router\.replace\(`\/pedidos\?orcamento=\$\{encodeURIComponent\(orcamentoDaUrl\)\}`\)/);
 });
 
-test("Bloco 2 — Cobrança: serviço de origem preenche cliente cadastrado, nome, TELEFONE, descrição e valor", () => {
+test("Bloco 2 — Cobrança: venda de origem preenche cliente cadastrado, nome, TELEFONE, descrição e valor", () => {
   const c = semComentarios(cobrancas);
-  assert.match(c, /type TratamentoPicker = \{ id: string; paciente_id: string \| null; paciente_nome: string; paciente_telefone: string \| null; tipo_tratamento: string; valor_estimado: number \| null \}/);
-  assert.match(c, /function selecionarTratamento[\s\S]*?pacienteId: clienteDaOrigem \?\? prev\.pacienteId,[\s\S]*?telefone: t\?\.paciente_telefone \? normalizar\(t\.paciente_telefone\) : prev\.telefone,[\s\S]*?descricao: t \? t\.tipo_tratamento : prev\.descricao,/);
+  assert.match(c, /function dadosDaVenda\(v: VendaPicker, pacientes: ClientePicker\[\]\)[\s\S]*?pedidoId: v\.id,\s*pacienteId: v\.paciente_id && pacientes\.some\(p => p\.id === v\.paciente_id\) \? v\.paciente_id : '',\s*paciente_nome: v\.nome_cliente,\s*telefone: v\.telefone \? normalizar\(v\.telefone\) : '',\s*descricao: descricaoDaVenda\(v\),\s*valor: \(v\.valor_centavos \/ 100\)\.toFixed\(2\),/);
+  assert.match(c, /new URLSearchParams\(window\.location\.search\)\.get\('pedido'\)/);
   assert.deepEqual(posts(cobrancas).filter(x => x === "'/api/cobrancas'"), ["'/api/cobrancas'"]);
 });
 
-test("Bloco 2 — Cobrança envia telefone e cliente nos campos que a API REALMENTE lê (antes 'telefone' era descartado)", () => {
+test("Bloco 2 — Cobrança envia venda de origem, telefone e cliente nos campos que a API REALMENTE lê", () => {
   const c = semComentarios(cobrancas);
   const api = ler("app/api/cobrancas/route.ts");
-  assert.match(api, /clinica_id, paciente_id, paciente_nome, paciente_telefone,/);
-  assert.match(c, /paciente_id: form\.pacienteId \|\| undefined,\s*paciente_nome: form\.paciente_nome\.trim\(\),\s*paciente_telefone: form\.telefone \? normalizar\(form\.telefone\) : undefined,\s*tratamento_origem_id: form\.tratamentoId \|\| undefined,/);
+  assert.match(api, /tratamento_origem_id, pedido_origem_id, descricao, valor,/);
+  assert.match(c, /paciente_id: form\.pacienteId \|\| undefined,\s*paciente_nome: form\.paciente_nome\.trim\(\),\s*paciente_telefone: form\.telefone \? normalizar\(form\.telefone\) : undefined,\s*pedido_origem_id: form\.pedidoId \|\| undefined,/);
   assert.doesNotMatch(c, /^\s*telefone: form\.telefone/m, "chave que a API ignorava não existe mais");
 });
 
 test("Formulários do fluxo ficam contidos na área visível (mesma correção do Novo orçamento)", () => {
-  for (const [nome, p] of [["oportunidades", oportunidades], ["tratamentos", tratamentos], ["cobrancas", cobrancas], ["orcamentos", orcamentos]]) {
+  for (const [nome, p] of [["oportunidades", oportunidades], ["cobrancas", cobrancas], ["orcamentos", orcamentos]]) {
     assert.match(p, /maxWidth: 480, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain'/, nome);
-    assert.doesNotMatch(p, /maxWidth: 480, maxHeight: '90vh'/, nome);
+    assert.doesNotMatch(p, /maxHeight: '90vh'/, nome);
   }
+  assert.match(pedidosPagina, /maxWidth: 560, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain'/, "Nova venda/pedido");
 });
 
-test("Fase 1 não toca APIs, banco, Pedidos, Estoque, Receita Perdida, Follow-up nem Pesquisa de Preços", () => {
+test("Telas do fluxo não mexem direto em estoque nem chamam RPC — isso é da API de pedidos", () => {
   for (const p of [orcamentos, oportunidades, tratamentos, cobrancas, ler("app/components/ItensCatalogoOrcamento.tsx")]) {
-    assert.doesNotMatch(semComentarios(p), /\.rpc\(|pedido_itens|estoque|receita-perdida|follow-up-comercial|pesquisa-precos/);
+    assert.doesNotMatch(semComentarios(p), /\.rpc\(|estoque_|receita-perdida|follow-up-comercial|pesquisa-precos/);
   }
 });

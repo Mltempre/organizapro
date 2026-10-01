@@ -43,7 +43,6 @@ export const navGrupos: { titulo: string; itens: { l: string; h: string; i: stri
       { l: "Catálogo e Pedidos",   h: "/pedidos",         i: "🛒" },
       { l: "Estoque",              h: "/estoque",         i: "📦" },
       { l: "Pesquisa de Preços",   h: "/pesquisa-precos", i: "💲" },
-      { l: "Serviços contratados", h: "/tratamentos",     i: "🧰" },
       { l: "Receita Perdida",      h: "/receita-perdida", i: "📉" },
     ],
   },
@@ -99,6 +98,9 @@ export const ROTAS_COM_SHELL: readonly string[] = [
   ...navForaDoMenuPreVenda.map((i) => i.h),
   "/configuracoes",
   "/dashboard-demo",
+  // Serviços contratados: histórico somente leitura, fora do menu operacional
+  // (Pedidos = Venda/Execução única) — continua com o mesmo AdminShell/chrome.
+  "/tratamentos",
 ];
 
 const DEFAULT_HEADER: AdminShellHeader = { title: "" };

@@ -31,10 +31,12 @@ test('uma fonte indisponível rejeita o conjunto, mesmo com outras fontes válid
   ]));
 });
 
-test('quatro superfícies protegem as cinco fontes e descartam resumo anterior ao recarregar', () => {
+// Quatro fontes: execução de venda vem de /api/pedidos (Pedidos = Venda/Execução única), sem /api/tratamentos.
+test('quatro superfícies protegem as quatro fontes e descartam resumo anterior ao recarregar', () => {
   for (const tela of ['financeiro', 'receita-perdida', 'previsor-faturamento', 'linha-economica']) {
     const source = fs.readFileSync(new URL(`../app/${tela}/page.tsx`, import.meta.url), 'utf8');
-    assert.equal((source.match(/lerRespostaFinanceira\(r,/g) ?? []).length, 5);
+    assert.equal((source.match(/lerRespostaFinanceira\(r,/g) ?? []).length, 4);
+    assert.doesNotMatch(source, /\/api\/tratamentos/);
     assert.match(source, /setCarregando\(true\); setErro\(''\); setResumo\(null\)/);
     assert.doesNotMatch(source, /catch\(\(\) => \(\{/);
     assert.match(source, /if \(!cuRes.ok\) throw/);
