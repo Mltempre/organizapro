@@ -334,7 +334,13 @@ test('migration preparada: só aditiva, nada apagado, vínculos dentro do mesmo 
 
 test('migração de dados preparada: transacional, idempotente, valida antes/depois e nunca apaga histórico', () => {
   const sql = semComentarios(ler('sql/convergencia-vendas-migrar-servicos-contratados.sql'));
-  assert.match(sql, /^begin;[\s\S]*commit;\s*$/m);
+  // v2: UMA instrução (bloco DO) — atômica mesmo quando o cliente (SQL Editor
+  // do Supabase) executa cada instrução em transação própria. Sem tabela
+  // temporária e sem depender de begin/commit (causa do incidente da v1).
+  assert.equal(sql.match(/\bdo \$\$/g)?.length, 1, 'um único bloco DO');
+  assert.doesNotMatch(sql, /\bcreate\s+temp|\bbegin;|\bcommit;/i);
+  const posBloco = sql.slice(sql.lastIndexOf('end $$;') + 'end $$;'.length);
+  assert.doesNotMatch(posBloco, /\b(insert|update|delete)\b/i, 'depois do bloco, só leitura');
   // "on commit drop" é só a tabela temporária de controle; nada real é apagado.
   assert.doesNotMatch(sql, /\bdelete\s+from\b|\bdrop\s+(table|column|function|trigger|index|constraint)\b|\btruncate\b/i);
   assert.doesNotMatch(sql, /update\s+public\.(tratamentos|eventos_dominio|estoque_movimentos|pedido_itens)\b/i);
