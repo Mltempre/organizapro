@@ -10,9 +10,11 @@
 // URL da loja; se a imagem falhar (hotlink/expirada), mostra placeholder.
 //
 // Segurança da leitura (a URL veio da busca): só http(s) em domínio público,
-// sem IP literal, DNS conferido contra redes privadas a cada redirecionamento,
-// só HTML, até 1,5 MB, tempo curto. Qualquer falha → null (nunca quebra a busca).
+// sem IP literal; o DNS é validado contra redes privadas DENTRO da própria
+// conexão (sem segunda resolução — imune a DNS rebinding), em cada
+// redirecionamento; só HTML, até 1,5 MB, tempo curto. Qualquer falha → null.
 
+import type { LookupFunction } from "node:net";
 import type { ReferenciaPreco } from "./pesquisa-precos-web";
 
 export const LIMITE_HTML_BYTES = 1_500_000;
@@ -110,40 +112,95 @@ export function extrairImagemDoProduto(html: string, urlPagina: string): string 
 }
 
 // ── Leitura segura de UMA página ───────────────────────────────────────────
-async function lerHtmlLimitado(res: Response): Promise<string | null> {
-  const leitor = res.body?.getReader?.();
-  if (!leitor) { const t = await res.text(); return t.length > LIMITE_HTML_BYTES ? t.slice(0, LIMITE_HTML_BYTES) : t; }
-  const partes: Uint8Array[] = []; let total = 0;
-  while (total < LIMITE_HTML_BYTES) {
-    const { done, value } = await leitor.read();
-    if (done || !value) break;
-    partes.push(value); total += value.byteLength;
-  }
-  try { await leitor.cancel(); } catch { /* já terminou */ }
-  const junto = new Uint8Array(Math.min(total, LIMITE_HTML_BYTES)); let pos = 0;
-  for (const p of partes) { const pedaco = p.subarray(0, junto.length - pos); junto.set(pedaco, pos); pos += pedaco.length; if (pos >= junto.length) break; }
-  return new TextDecoder("utf-8").decode(junto);
+// Anti-SSRF sem janela de troca (TOCTOU / DNS rebinding): o DNS é resolvido
+// UMA vez, dentro da própria conexão (opção `lookup` de node:http/https), e o
+// socket conecta exatamente no IP que acabou de ser validado. Não existe uma
+// segunda resolução depois da validação. O TLS continua verificando o
+// certificado contra o nome do domínio.
+
+export type RespostaPagina = { status: number; location: string | null; contentType: string; ler: () => Promise<string>; descartar: () => void };
+export type Requisitar = (url: URL, signal: AbortSignal) => Promise<RespostaPagina>;
+
+/** `lookup` para a conexão: resolve, recusa se QUALQUER IP for interno, e entrega só os IPs validados. */
+export function lookupProtegido(resolverDns: ResolverDns, ipPermitido: (ip: string) => boolean = (ip) => !ipPrivado(ip)): LookupFunction {
+  return (host, opcoes, callback) => {
+    resolverDns(host).then((ips) => {
+      if (!ips.length || !ips.every(ipPermitido)) {
+        const erro: NodeJS.ErrnoException = new Error("Destino de rede não permitido");
+        erro.code = "EDESTINO_BLOQUEADO";
+        return callback(erro, "", 0);
+      }
+      const enderecos = ips.map((address) => ({ address, family: address.includes(":") ? 6 : 4 }));
+      if (opcoes?.all) return callback(null, enderecos);
+      return callback(null, enderecos[0].address, enderecos[0].family);
+    }, (erro: NodeJS.ErrnoException) => callback(erro, "", 0));
+  };
 }
 
-export async function imagemDaPagina(urlPagina: string, deps: { fetchImpl: typeof fetch; resolverDns: ResolverDns; timeoutMs?: number }): Promise<string | null> {
+/** Requisição real (node:http/https) com o lookup protegido; corpo limitado a LIMITE_HTML_BYTES. */
+// `ipPermitido` existe só para teste com servidor local; a produção nunca o
+// passa e usa sempre o padrão (bloqueia qualquer rede interna).
+export async function criarRequisitarProtegido(resolverDns: ResolverDns, ipPermitido?: (ip: string) => boolean): Promise<Requisitar> {
+  const http = await import("node:http");
+  const https = await import("node:https");
+  const zlib = await import("node:zlib");
+  const lookup = lookupProtegido(resolverDns, ipPermitido);
+  return (url, signal) => new Promise<RespostaPagina>((resolve, reject) => {
+    const modulo = url.protocol === "https:" ? https : http;
+    const req = modulo.request(url, {
+      method: "GET", lookup, signal, agent: false, // sem reaproveitar conexão: cada salto passa pelo lookup
+      headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml", "Accept-Encoding": "gzip, deflate, br" },
+    }, (res) => {
+      const location = res.headers.location;
+      resolve({
+        status: res.statusCode ?? 0,
+        location: typeof location === "string" ? location : null,
+        contentType: String(res.headers["content-type"] ?? ""),
+        descartar: () => res.destroy(),
+        // Lojas costumam mandar HTML compactado: descompacta e aplica o limite
+        // ao conteúdo JÁ descompactado (protege contra "bomba de compressão").
+        ler: () => new Promise<string>((ok, falha) => {
+          const codificacao = String(res.headers["content-encoding"] ?? "").toLowerCase().trim();
+          const descompactar = codificacao === "gzip" || codificacao === "x-gzip" ? zlib.createGunzip()
+            : codificacao === "deflate" ? zlib.createInflate()
+            : codificacao === "br" ? zlib.createBrotliDecompress()
+            : null;
+          if (!descompactar && codificacao && codificacao !== "identity") { res.destroy(); return ok(""); } // codificação desconhecida
+          const fluxo = descompactar ? res.pipe(descompactar) : res;
+          const partes: Buffer[] = []; let total = 0; let fim = false;
+          const concluir = () => { if (!fim) { fim = true; ok(Buffer.concat(partes).toString("utf8")); } };
+          fluxo.on("data", (pedaco: Buffer) => {
+            if (fim) return;
+            const resta = LIMITE_HTML_BYTES - total;
+            partes.push(pedaco.length > resta ? pedaco.subarray(0, resta) : pedaco);
+            total += Math.min(pedaco.length, resta);
+            if (total >= LIMITE_HTML_BYTES) { concluir(); res.destroy(); descompactar?.destroy(); }
+          });
+          fluxo.on("end", concluir);
+          fluxo.on("error", (e: Error) => (fim ? undefined : falha(e)));
+          res.on("error", (e: Error) => (fim ? undefined : falha(e)));
+        }),
+      });
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+export async function imagemDaPagina(urlPagina: string, deps: { requisitar: Requisitar; timeoutMs?: number }): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), deps.timeoutMs ?? TEMPO_PAGINA_MS);
   try {
     let atual = urlPublicaPermitida(urlPagina);
     for (let salto = 0; atual && salto <= MAX_REDIRECIONAMENTOS; salto++) {
-      const ips = await deps.resolverDns(atual.hostname);
-      if (!ips.length || ips.some(ipPrivado)) return null;
-      const res = await deps.fetchImpl(atual.href, {
-        redirect: "manual", signal: controller.signal,
-        headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" },
-      });
+      const res = await deps.requisitar(atual, controller.signal);
       if (res.status >= 300 && res.status < 400) {
-        const destino = res.headers?.get?.("location");
-        atual = destino ? urlPublicaPermitida(new URL(destino, atual).href) : null;
+        res.descartar();
+        atual = res.location ? urlPublicaPermitida(new URL(res.location, atual).href) : null;
         continue;
       }
-      if (!res.ok || !/text\/html|application\/xhtml/i.test(res.headers?.get?.("content-type") ?? "")) return null;
-      const html = await lerHtmlLimitado(res);
+      if (res.status < 200 || res.status >= 300 || !/text\/html|application\/xhtml/i.test(res.contentType)) { res.descartar(); return null; }
+      const html = await res.ler();
       return html ? extrairImagemDoProduto(html, atual.href) : null;
     }
     return null;
@@ -160,20 +217,23 @@ export function referenciaElegivelParaImagem(r: Pick<ReferenciaPreco, "tipo" | "
 /** Imagem por URL de referência (páginas em paralelo, cada uma com tempo curto). */
 export async function imagensDasReferencias(
   refs: Pick<ReferenciaPreco, "url" | "tipo" | "comparabilidade">[],
-  deps: { fetchImpl?: typeof fetch; resolverDns?: ResolverDns; timeoutMs?: number } = {},
+  deps: { requisitar?: Requisitar; resolverDns?: ResolverDns; timeoutMs?: number } = {},
 ): Promise<Map<string, string>> {
   const urls = [...new Set(refs.filter(referenciaElegivelParaImagem).map(r => r.url))].slice(0, 8);
   const resultado = new Map<string, string>();
   if (!urls.length) return resultado;
-  let resolverDns = deps.resolverDns;
-  if (!resolverDns) {
+  let requisitar = deps.requisitar;
+  if (!requisitar) {
     try {
-      const dns = await import("node:dns/promises");
-      resolverDns = async (host) => (await dns.lookup(host, { all: true })).map(a => a.address);
-    } catch { return resultado; } // sem DNS verificável, não lê nada
+      let resolverDns = deps.resolverDns;
+      if (!resolverDns) {
+        const dns = await import("node:dns/promises");
+        resolverDns = async (host) => (await dns.lookup(host, { all: true })).map(a => a.address);
+      }
+      requisitar = await criarRequisitarProtegido(resolverDns);
+    } catch { return resultado; } // sem rede/DNS verificável, não lê nada
   }
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  const imagens = await Promise.all(urls.map(u => imagemDaPagina(u, { fetchImpl, resolverDns: resolverDns!, timeoutMs: deps.timeoutMs })));
+  const imagens = await Promise.all(urls.map(u => imagemDaPagina(u, { requisitar: requisitar!, timeoutMs: deps.timeoutMs })));
   urls.forEach((u, i) => { if (imagens[i]) resultado.set(u, imagens[i]!); });
   return resultado;
 }
