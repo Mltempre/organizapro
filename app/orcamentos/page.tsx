@@ -502,10 +502,13 @@ export default function OrcamentosPage() {
       {/* ── MODAL: NOVO ORÇAMENTO ───────────────────────────────────────────── */}
       {modalNovo && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16, overscrollBehavior: 'contain' }}
           onClick={e => { if (e.target === e.currentTarget) setModalNovo(false); }}
         >
-          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3148' }}>
+          {/* Altura limitada à área do overlay (a parte realmente visível da tela) — 90vh
+              passava dela no celular com a barra do navegador visível. overscroll
+              contain: a rolagem fica no modal e não vaza para a página de fundo. */}
+          <div style={{ background: '#1e2130', borderRadius: 16, padding: 32, width: '100%', maxWidth: 480, maxHeight: '100%', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain', border: '1px solid #2d3148' }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 24, marginTop: 0 }}>Novo orçamento</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
