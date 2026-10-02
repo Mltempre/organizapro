@@ -35,12 +35,21 @@ test("DashboardView só renderiza a Central quando há dado real (temDados && ce
   assert.match(codigo, /temDados && central && \(central\.alta\.length \+ central\.media\.length \+ central\.baixa\.length > 0\)/);
 });
 
-test("Casa mantém todas as prioridades canônicas acessíveis e demo preserva a Central", () => {
-  const pagina=ler("app/dashboard/page.tsx");
-  assert.match(pagina,/missaoDoDia=\{missaoDoDia\}/);
-  assert.match(pagina,/outrasPrioridades=\{estadoComercial.sinais.slice\(missaoDoDia.length\)\}/);
-  assert.match(ler("app/components/CasaDashboard.tsx"),/<details/);
-  assert.match(ler("app/dashboard-demo/page.tsx"),/central=\{/);
+// Arquitetura: Visão Geral = resumo (conta); Gerente Comercial = lista completa.
+// Toda prioridade canônica contada pela Visão Geral deve estar acessível no
+// Gerente — as duas montam as prioridades pela MESMA fonte compartilhada.
+test("Toda prioridade canônica contada pela Visão Geral está acessível no Gerente Comercial; demo preserva a Central", () => {
+  const pagina = ler("app/dashboard/page.tsx");
+  assert.match(pagina, /missaoDoDia=\{missaoDoDia\}/);
+  assert.match(pagina, /outrasPrioridades=\{estadoComercial.sinais.slice\(missaoDoDia.length\)\}/);
+  const casa = ler("app/components/CasaDashboard.tsx");
+  assert.match(casa, /const totalPrioridades = missaoDoDia\.length \+ props\.outrasPrioridades\.length;/, "a Casa conta TODAS");
+  assert.match(casa, /<Link href="\/copiloto">Abrir Gerente Comercial →<\/Link>/, "e leva à lista completa");
+  assert.doesNotMatch(casa, /<details/, "sem repetir a lista na Visão Geral");
+  const gerente = ler("app/copiloto/page.tsx");
+  for (const p of [pagina, gerente]) assert.match(p, /montarSinaisCanonicos\(\{/);
+  assert.match(gerente, /organizarSinaisCanonicos\(montarSinaisCanonicos\(\{/);
+  assert.match(ler("app/dashboard-demo/page.tsx"), /central=\{/);
 });
 // ── 2. Previsor de Faturamento 30 Dias — ganha consumidor cruzado real ───
 

@@ -2,8 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import { gerarCentralOportunidades } from "../../lib/recomendacoes";
 import { obterHorariosVagos } from "../../lib/horarios";
+import { consultarBaseDoNegocio, consultarTelefonesComReagendamento, contextoNegocioDaBase, montarSinaisCanonicos } from "../../lib/prioridades-canonicas";
+import type { ContextoNegocio } from "../../lib/recomendacoes";
 import { gerarOportunidadesClientes, type OportunidadeCliente } from "../../lib/oportunidades-clientes";
 import type { Orcamento } from "../../lib/motor-orcamentos";
 import type { Tratamento } from "../../lib/motor-tratamento";
@@ -14,10 +15,6 @@ import { particionarVendas, type PedidoVenda } from "../../lib/venda-execucao";
 // Pedidos = Venda/Execução única: a execução da venda substitui Serviços contratados.
 type PedidoRow = PedidoVenda;
 import {
-  adaptarOportunidadesClientes,
-  adaptarRecomendacoes,
-  adaptarOportunidadesDemanda,
-  removerAgregadosCobertosPorClientes,
   existemDadosComerciaisReais,
   gerarEstadoComercialCanonico,
   type SinalCanonico,
@@ -73,6 +70,7 @@ type DashData = {
   cobrancasAbertasRows: Cobranca[];
   todasCobrancasRows: Cobranca[];
   oportunidadesDemandaRows: OportunidadeDemandaSinal[];
+  contextoNegocio: ContextoNegocio;
 };
 
 export default function Dashboard() {
@@ -97,6 +95,11 @@ export default function Dashboard() {
     cobrancasAbertasRows: [],
     todasCobrancasRows: [],
     oportunidadesDemandaRows: [],
+    contextoNegocio: {
+      totalPacientes: 0, totalAgendamentos: 0, compromissosHoje: 0, pendentesHoje: 0, atrasados: 0, proximosSemana: 0,
+      clientesParaReativar: 0, cancelamentosHoje: 0, horariosVagosHoje: 0, avaliacoesPendentes: 0,
+      temEmail: false, temTelefone: false, temEndereco: false, temWhatsapp: false,
+    },
   });
 
   const carregarDados = useCallback(async () => {
@@ -208,57 +211,9 @@ export default function Dashboard() {
       if (!configRes.ok) throw new Error("Configuração indisponível");
       const configSegura = await configRes.json();
       if (typeof configSegura.zapi_configurado !== "boolean") throw new Error("Configuração inválida");
-      const consultas = await Promise.all([
-        supabase.from("agendamentos")
-          .select("id, hora, paciente_nome, telefone, tipo_consulta, status, data")
-          .eq("clinica_id", cid).eq("data", hoje)
-          .order("hora"),
-        supabase.from("agendamentos")
-          .select("id, hora, paciente_nome, tipo_consulta, status, data")
-          .eq("clinica_id", cid)
-          .gte("data", amanha).lte("data", fimSete)
-          .not("status", "in", '("cancelado","faltou")')
-          .order("data").order("hora"),
-        supabase.from("agendamentos")
-          .select("id, hora, paciente_nome, tipo_consulta, status, data")
-          .eq("clinica_id", cid)
-          .lt("data", hoje).eq("status", "agendado")
-          .order("data", { ascending: false }).order("hora")
-          .limit(20),
-        supabase.from("pacientes")
-          .select("*", { count: "exact", head: true })
-          .eq("clinica_id", cid),
-        // Insights do Dia · Oportunidades: clientes sem próxima consulta agendada (candidatos a reativação)
-        supabase.from("pacientes")
-          .select("id", { count: "exact", head: true })
-          .eq("clinica_id", cid)
-          .or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`),
-        // Onboarding: já existe algum compromisso cadastrado (qualquer status/data)?
-        supabase.from("agendamentos")
-          .select("id", { count: "exact", head: true })
-          .eq("clinica_id", cid),
-        // Central de Oportunidades: avaliações do Google já solicitadas e ainda sem resposta do cliente
-        supabase.from("avaliacoes")
-          .select("id", { count: "exact", head: true })
-          .eq("clinica_id", cid)
-          .eq("respondeu", false),
-        supabase.from("clinica_config")
-          .select("logo_url, email, telefone, endereco, nome_clinica, horario_funcionamento")
-          .eq("clinica_id", cid)
-          .maybeSingle(),
-        // Agenda Autônoma de Receita · sinal "sem próximo compromisso"
-        supabase.from("pacientes")
-          .select("id, nome, telefone, whatsapp, proxima_consulta")
-          .eq("clinica_id", cid).eq("status", "ativo")
-          .or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`)
-          .order("nome").limit(20),
-        // Agenda Autônoma de Receita · candidatos ao sinal "cancelamento sem reagendamento"
-        supabase.from("agendamentos")
-          .select("id, paciente_nome, telefone, data")
-          .eq("clinica_id", cid).eq("status", "cancelado")
-          .gte("data", trintaDiasAtras)
-          .order("data", { ascending: false }).limit(50),
-      ]);
+      // Base do negócio: mesmas consultas e mesma ordem usadas pelo Gerente
+      // Comercial (lib/prioridades-canonicas.ts) — fonte única das prioridades.
+      const consultas = await consultarBaseDoNegocio(supabase, cid, { hoje, amanha, fimSete, trintaDiasAtras });
 
       if (consultas.some(resultado => resultado.error)) throw new Error("Não foi possível carregar os dados do negócio. Tente novamente.");
       const [
@@ -298,18 +253,7 @@ export default function Dashboard() {
       const canceladosComTelefone = (canceladosRecentes || []).filter(a => a.telefone) as
         { id: string; paciente_nome: string; telefone: string; data: string }[];
       const telefonesCancelados = Array.from(new Set(canceladosComTelefone.map(a => a.telefone)));
-      let telefonesComReagendamento = new Set<string>();
-      if (telefonesCancelados.length > 0) {
-        const { data: futuros, error: erroFuturos } = await supabase
-          .from("agendamentos")
-          .select("telefone")
-          .eq("clinica_id", cid)
-          .in("telefone", telefonesCancelados)
-          .gte("data", hoje)
-          .not("status", "in", '("cancelado","faltou")');
-        if (erroFuturos) throw new Error("Não foi possível conferir os reagendamentos. Tente novamente.");
-        telefonesComReagendamento = new Set((futuros || []).map(f => f.telefone));
-      }
+      const telefonesComReagendamento = await consultarTelefonesComReagendamento(supabase, cid, telefonesCancelados, hoje);
       // Um cliente pode ter cancelado mais de uma vez em 30 dias — mantém só o cancelamento mais recente.
       const cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[] = [];
       const telefonesJaIncluidos = new Set<string>();
@@ -357,6 +301,11 @@ export default function Dashboard() {
         cobrancasAbertasRows,
         todasCobrancasRows,
         oportunidadesDemandaRows,
+        contextoNegocio: contextoNegocioDaBase({
+          agendaHoje: lista, proximosSemana: (prox || []).length, atrasados: atrasadosList.length,
+          totalPacientes: pacCount ?? 0, clientesParaReativar: reativarCount ?? 0, totalAgendamentos: agTotalCount ?? 0,
+          avaliacoesPendentes: avaliacoesPendentesCount ?? 0, config: cfg ?? null, temWhatsapp: configSegura.zapi_configurado,
+        }),
       });
     } catch (err) {
       console.error(err);
@@ -385,31 +334,9 @@ export default function Dashboard() {
     pedidos: dash.todosPedidosRows.length,
   });
 
-  // Intelligence 2.0 — o Diretor Digital não só percebe, decide: escolhe UMA
-  // prioridade principal para o dia (docs/organizapro-intelligence-engine-
-  // v1.html). Regras determinísticas, sem IA generativa; usa só dados já
-  // carregados acima. O mesmo contexto alimenta a Central de Oportunidades
-  // (Intelligence 2.2) logo abaixo — uma única fonte de verdade.
-  const ctxNegocio = {
-    totalPacientes:       dash.totalPacientes,
-    totalAgendamentos:    dash.totalAgendamentos,
-    compromissosHoje:     dash.compromissosHoje,
-    pendentesHoje:        dash.pendentes,
-    atrasados:            dash.atrasados,
-    proximosSemana:       dash.proximos.length,
-    clientesParaReativar: dash.clientesParaReativar,
-    cancelamentosHoje:    dash.cancelamentosHoje,
-    horariosVagosHoje:    dash.horariosVagosHoje,
-    avaliacoesPendentes:  dash.avaliacoesPendentes,
-    temEmail:             dash.temEmail,
-    temTelefone:          dash.temTelefone,
-    temEndereco:          dash.temEndereco,
-    temWhatsapp:          dash.temWhatsapp,
-  };
-
-  const centralOportunidadesBase = temDadosComerciais
-    ? gerarCentralOportunidades(ctxNegocio)
-    : { alta: [], media: [], baixa: [] };
+  // Contexto da Central de Oportunidades — calculado na carga por
+  // contextoNegocioDaBase (lib/prioridades-canonicas.ts), o MESMO usado pelo
+  // Gerente Comercial. Nenhuma regra de negócio nova.
 
   // Agenda Autônoma de Receita — diferente da Central de Oportunidades (que
   // conta), aqui cada card é UM cliente nomeado, com o motivo real que o
@@ -491,27 +418,17 @@ export default function Dashboard() {
 
   const saudacaoCard = { linha1: dash.nomeNegocio ? `Olá, ${dash.nomeNegocio}.` : "Olá!", subtitulo: "Acompanhe seu negócio." };
 
-  // Central de Oportunidades continua alimentando Missão do Dia/Diretor
-  // Digital abaixo — nenhuma regra de negócio nova.
-  const todasRecomendacoesAcionaveis = [
-    ...centralOportunidadesBase.alta, ...centralOportunidadesBase.media, ...centralOportunidadesBase.baixa,
-  ];
-
-  // ── 🎯 Missão do Dia (Núcleo Inteligente V1.1, Fase 1) ───────────────────
-  // Mesmos sinais canônicos que alimentam a Próxima Melhor Ação — nenhuma
-  // regra de priorização própria, nenhuma consulta nova. Ver
-  // docs/nucleo-inteligente-v1-arquitetura.md, seção 4.5.
-  // Smart Commerce Canônico · primeiro elo ("interesse sem compra") entra
-  // aqui também — mesma lista de sinais, mesma ordenação/desempate, nenhuma
-  // regra nova (docs P1: Reintegração da Inteligência).
-  const sinaisCanonicos = temDadosComerciais
-    ? [
-        ...adaptarOportunidadesClientes(oportunidadesClientes),
-        // Agregado cujo fato já aparece inteiro nos cards de cliente sai da lista.
-        ...adaptarRecomendacoes(removerAgregadosCobertosPorClientes(todasRecomendacoesAcionaveis, oportunidadesClientes)),
-        ...adaptarOportunidadesDemanda(dash.oportunidadesDemandaRows),
-      ]
-    : [];
+  // ── 🎯 Prioridades canônicas (Núcleo Inteligente) ─────────────────────
+  // Mesma montagem do Gerente Comercial (lib/prioridades-canonicas.ts):
+  // sinais de clientes + recomendações do negócio (sem os agregados já
+  // cobertos pelos cards de cliente) + demanda. A Visão Geral só RESUME; o
+  // Gerente lista todas — nunca uma prioridade contada aqui sem acesso lá.
+  const sinaisCanonicos = montarSinaisCanonicos({
+    temDadosComerciais,
+    oportunidadesClientes,
+    contexto: dash.contextoNegocio,
+    oportunidadesDemanda: dash.oportunidadesDemandaRows,
+  });
   const estadoComercial = gerarEstadoComercialCanonico(sinaisCanonicos);
   const missaoDoDia: SinalCanonico[] = estadoComercial.missaoDoDia;
   if (loading || (!clinicaId && !erroCarga)) return (

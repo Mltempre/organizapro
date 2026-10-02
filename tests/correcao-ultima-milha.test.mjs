@@ -116,7 +116,8 @@ test("Copiloto: usa fetchJsonSeguro nas 4 APIs e expõe falhaParcial (nunca fing
   assert.match(codigo, /import \{ fetchJsonSeguro \} from '\.\.\/\.\.\/lib\/fetch-seguro'/);
   assert.match(codigo, /falhaParcial: boolean/);
   // Execução de venda vem de /api/pedidos (Pedidos = Venda/Execução única) — sem /api/tratamentos.
-  assert.match(codigo, /const falhaParcial = \[oportunidadesR, orcamentosR, pedidosR, cobrancasR\]\.some\(r => r\.falhou\)/);
+  // + configuração e a base do negócio compartilhada com a Visão Geral (lib/prioridades-canonicas.ts).
+  assert.match(codigo, /const falhaParcial = \[oportunidadesR, orcamentosR, pedidosR, cobrancasR, configR\]\.some\(r => r\.falhou\) \|\| !zapiConhecido\s*\|\| base\.some\(r => !!r\.error\);/);
   assert.doesNotMatch(codigo, /\/api\/tratamentos/);
   assert.match(codigo, /estado\.falhaParcial && \(/);
 });

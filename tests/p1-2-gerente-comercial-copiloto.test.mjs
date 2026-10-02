@@ -47,7 +47,8 @@ test("Copiloto: reaproveita literalmente os motores reais (gerarOportunidadesCli
   assert.match(codigo, /organizarSinaisCanonicos/);
   assert.match(codigo, /gerarFollowUpsComerciais/);
   assert.match(codigo, /agregarReceitaPerdida/);
-  assert.match(codigo, /adaptarOportunidadesDemanda/);
+  // As 3 fontes canônicas (clientes, recomendações do negócio, demanda) pela montagem compartilhada.
+  assert.match(codigo, /montarSinaisCanonicos\(\{/);
 });
 
 test("Copiloto: mesmo padrão de tenant já estabelecido (/api/minha-clinica, erro 'Negócio não vinculado ao usuário')", () => {

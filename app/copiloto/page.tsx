@@ -15,7 +15,8 @@ import { agregarClientesElegiveisRecompra } from '../../lib/motor-pedidos';
 import { particionarVendas, type PedidoVenda } from '../../lib/venda-execucao';
 import { gerarFollowUpsComerciais, type CasoFollowUp } from '../../lib/follow-up-comercial';
 import { agregarReceitaPerdida } from '../../lib/receita-perdida';
-import { adaptarOportunidadesClientes, adaptarOportunidadesDemanda, organizarSinaisCanonicos, type SinalCanonico } from '../../lib/nucleo-inteligente';
+import { consultarBaseDoNegocio, consultarTelefonesComReagendamento, contextoNegocioDaBase, montarSinaisCanonicos } from '../../lib/prioridades-canonicas';
+import { existemDadosComerciaisReais, organizarSinaisCanonicos, type SinalCanonico } from '../../lib/nucleo-inteligente';
 import type { OportunidadeStatus } from '../../lib/oportunidades-demanda';
 import { coordenarGerenteComercial, type AtencaoComercial } from '../../lib/gerente-comercial';
 import { cancelamentosSemReagendamento, gerarCasosAgendaAutonoma } from '../../lib/agenda-autonoma';
@@ -82,7 +83,11 @@ export default function CopilotoPage() {
 
       const hoje = hojeStr();
       const agora = new Date().toISOString();
-      const trintaDiasAtras = new Date(Date.now() - 30 * 86400000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      // Mesmas datas da Visão Geral (app/dashboard/page.tsx) para a base do negócio.
+      const [ano, mes, dia] = hoje.split('-').map(Number);
+      const amanha = new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().split('T')[0];
+      const fimSete = new Date(Date.UTC(ano, mes - 1, dia + 6)).toISOString().split('T')[0];
+      const trintaDiasAtras = new Date(Date.UTC(ano, mes - 1, dia - 30)).toISOString().split('T')[0];
 
       // Mesmas 5 APIs já usadas por app/follow-up e app/receita-perdida —
       // nenhuma consulta nova além das duas queries diretas ao Supabase
@@ -91,21 +96,25 @@ export default function CopilotoPage() {
       // app/dashboard/page.tsx. fetchJsonSeguro distingue falha real de
       // vazio real — uma API fora do ar nunca deve virar silenciosamente
       // "nada pendente" (achado sistêmico da auditoria de última milha).
-      const [oportunidadesR, orcamentosR, pedidosR, cobrancasR, agHojeRes, semProximoRes, canceladosRes, atrasadosRes] = await Promise.all([
+      // Base do negócio = as MESMAS consultas da Visão Geral
+      // (lib/prioridades-canonicas.ts): agenda de hoje, atrasados, clientes
+      // sem próximo compromisso, cancelamentos e os totais que alimentam as
+      // recomendações gerais do negócio.
+      const [oportunidadesR, orcamentosR, pedidosR, cobrancasR, configR, base] = await Promise.all([
         fetchJsonSeguro<{ data: OportunidadeRow[] }>('/api/oportunidades', { headers: auth }, { data: [] }),
         fetchJsonSeguro<{ orcamentos: OrcamentoRow[] }>(`/api/orcamentos?clinica_id=${cid}&status=apresentado`, { headers: auth }, { orcamentos: [] }),
         fetchJsonSeguro<{ pedidos: PedidoRow[] }>(`/api/pedidos?clinica_id=${cid}`, { headers: auth }, { pedidos: [] }),
         fetchJsonSeguro<{ cobrancas: CobrancaRow[] }>(`/api/cobrancas?clinica_id=${cid}`, { headers: auth }, { cobrancas: [] }),
-        supabase.from('agendamentos').select('id, hora, paciente_nome, telefone, status, data').eq('clinica_id', cid).eq('data', hoje).order('hora'),
-        supabase.from('pacientes').select('id, nome, telefone, whatsapp, proxima_consulta').eq('clinica_id', cid).eq('status', 'ativo').or(`proxima_consulta.is.null,proxima_consulta.lt.${hoje}`).order('nome').limit(20),
-        supabase.from('agendamentos').select('id, paciente_nome, telefone, data').eq('clinica_id', cid).eq('status', 'cancelado').gte('data', trintaDiasAtras).order('data', { ascending: false }).limit(50),
-        // Atrasados = mesma definição da Casa (app/dashboard/page.tsx): dias
-        // anteriores ainda "agendado". A consulta de hoje acima nunca os contém.
-        supabase.from('agendamentos').select('id, hora, paciente_nome, telefone, status, data').eq('clinica_id', cid).lt('data', hoje).eq('status', 'agendado').order('data', { ascending: false }).order('hora').limit(20),
+        fetchJsonSeguro<{ zapi_configurado?: boolean }>(`/api/configuracoes?clinica_id=${encodeURIComponent(cid)}`, { headers: auth }, {}),
+        consultarBaseDoNegocio(supabase, cid, { hoje, amanha, fimSete, trintaDiasAtras }),
       ]);
+      const [agHojeRes, proxRes, atrasadosRes, pacientesRes, reativarRes, agTotalRes, avaliacoesRes, configBaseRes, semProximoRes, canceladosRes] = base;
       const oportunidadesRes = oportunidadesR.dado, orcamentosRes = orcamentosR.dado, pedidosRes = pedidosR.dado, cobrancasRes = cobrancasR.dado;
-      const falhaParcial = [oportunidadesR, orcamentosR, pedidosR, cobrancasR].some(r => r.falhou)
-        || !!agHojeRes.error || !!semProximoRes.error || !!canceladosRes.error || !!atrasadosRes.error;
+      // Configuração indisponível: não fabrica "WhatsApp não configurado" (assume
+      // configurado) e sinaliza visão parcial.
+      const zapiConhecido = typeof configR.dado.zapi_configurado === 'boolean';
+      const falhaParcial = [oportunidadesR, orcamentosR, pedidosR, cobrancasR, configR].some(r => r.falhou) || !zapiConhecido
+        || base.some(r => !!r.error);
 
       const oportunidades: OportunidadeRow[] = oportunidadesRes.data ?? [];
       const orcamentos: OrcamentoRow[] = orcamentosRes.orcamentos ?? [];
@@ -125,13 +134,9 @@ export default function CopilotoPage() {
       // compromisso futuro já remarcado — mesma regra real já usada em
       // app/dashboard/page.tsx, nunca reimplementada diferente aqui.
       const canceladosComTelefone = ((canceladosRes.data ?? []) as CanceladoRow[]).filter((a) => a.telefone);
-      const telefonesCancelados = Array.from(new Set(canceladosComTelefone.map(a => a.telefone)));
-      let telefonesComReagendamento = new Set<string>();
-      if (telefonesCancelados.length > 0) {
-        const { data: futuros, error: erroFuturos } = await supabase.from('agendamentos').select('telefone').eq('clinica_id', cid).in('telefone', telefonesCancelados).gte('data', hoje).not('status', 'in', '("cancelado","faltou")');
-        if (erroFuturos) throw erroFuturos; // não recomendar reagendamento sem verificar o futuro
-        telefonesComReagendamento = new Set((futuros || []).map(f => f.telefone));
-      }
+      const telefonesCancelados = Array.from(new Set(canceladosComTelefone.map(a => a.telefone).filter((t): t is string => !!t)));
+      // Não recomenda reagendamento sem verificar o futuro (erro interrompe a carga).
+      const telefonesComReagendamento = await consultarTelefonesComReagendamento(supabase, cid, telefonesCancelados, hoje);
       const cancelamentosRecentes = canceladosComTelefone.map(a => ({ id: a.id, nome: a.paciente_nome, telefone: a.telefone!, data: a.data }));
       const cancelamentosSemReagendamentoRows: CancelamentoSemReagendamentoRow[] = cancelamentosSemReagendamento(cancelamentosRecentes, telefonesComReagendamento);
       const casosAgenda = gerarCasosAgendaAutonoma({
@@ -159,10 +164,29 @@ export default function CopilotoPage() {
         recomprasPossiveis,
       });
 
-      const sinais = organizarSinaisCanonicos([
-        ...adaptarOportunidadesClientes(oportunidadesClientes),
-        ...adaptarOportunidadesDemanda(oportunidades.map(op => ({ id: op.id, canal: op.canal, telefone: op.telefone, nome_informado: op.nome_informado, status: op.status, confianca_classificacao: op.confianca_classificacao, orcamento_vinculado_id: op.orcamento_vinculado_id }))),
-      ]);
+      // Mesmas 3 fontes e mesma deduplicação da Visão Geral
+      // (lib/prioridades-canonicas.ts): toda prioridade contada lá está aqui.
+      const temDadosComerciais = existemDadosComerciaisReais({
+        totalPacientes: pacientesRes.count ?? 0,
+        totalAgendamentos: agTotalRes.count ?? 0,
+        oportunidades: oportunidades.length,
+        orcamentos: orcamentos.length,
+        tratamentos: tratamentos.length,
+        cobrancas: todasCobrancas.length,
+        pedidos: todosPedidos.length,
+      });
+      const contexto = contextoNegocioDaBase({
+        agendaHoje, proximosSemana: (proxRes.data ?? []).length, atrasados: (atrasadosRes.data ?? []).length,
+        totalPacientes: pacientesRes.count ?? 0, clientesParaReativar: reativarRes.count ?? 0, totalAgendamentos: agTotalRes.count ?? 0,
+        avaliacoesPendentes: avaliacoesRes.count ?? 0, config: configBaseRes.data ?? null,
+        temWhatsapp: zapiConhecido ? configR.dado.zapi_configurado === true : true,
+      });
+      const sinais = organizarSinaisCanonicos(montarSinaisCanonicos({
+        temDadosComerciais,
+        oportunidadesClientes,
+        contexto,
+        oportunidadesDemanda: oportunidades.map(op => ({ id: op.id, canal: op.canal, telefone: op.telefone, nome_informado: op.nome_informado, status: op.status, confianca_classificacao: op.confianca_classificacao, orcamento_vinculado_id: op.orcamento_vinculado_id })),
+      }));
 
       // ── Follow-ups pendentes (mesmo motor real de app/follow-up) ─────
       const followUps = gerarFollowUpsComerciais({

@@ -86,11 +86,14 @@ test('não inventa destino nem pendência quando não há dados', () => {
 
 test('integração da tela preserva proveniência e não oculta falha como vazio', () => {
   const codigo = fs.readFileSync(new URL('../app/copiloto/page.tsx', import.meta.url), 'utf8');
-  assert.match(codigo, /adaptarOportunidadesDemanda\(oportunidades\.map/);
+  // Demanda entra pela montagem compartilhada com a Visão Geral (lib/prioridades-canonicas.ts).
+  assert.match(codigo, /oportunidadesDemanda: oportunidades\.map/);
   assert.match(codigo, /canal:\s*op\.canal/);
   assert.match(codigo, /confianca_classificacao:\s*op\.confianca_classificacao/);
   assert.match(codigo, /!estado.falhaParcial && totalItens === 0/);
-  assert.match(codigo, /if \(erroFuturos\) throw erroFuturos/);
+  // Sem conferir reagendamento futuro, não recomenda: a consulta compartilhada lança erro.
+  assert.match(codigo, /await consultarTelefonesComReagendamento\(supabase, cid, telefonesCancelados, hoje\)/);
+  assert.match(fs.readFileSync(new URL('../lib/prioridades-canonicas.ts', import.meta.url), 'utf8'), /if \(error\) throw new Error\("Não foi possível conferir os reagendamentos/);
   assert.match(codigo, /setEstado\(null\)/);
   assert.match(codigo, /coordenarGerenteComercial\(sinais, receitaPerdida, casosAgenda\)/);
   assert.match(codigo, /router.push\(destinoAcao\)/);

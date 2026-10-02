@@ -5,7 +5,11 @@ require.extensions['.css'] = () => {};
 const { harness } = require('./helpers/site-harness.cjs');
 const page = 'app/copiloto/page.tsx';
 const uuid = '11111111-2222-4333-8444-555555555555';
-const resposta = (pedidos = []) => async url => ({ ok: true, json: async () => url === '/api/minha-clinica' ? { clinica_id: 'tenant-a' } : { data: [], orcamentos: [], tratamentos: [], pedidos, cobrancas: [] } });
+// /api/configuracoes responde como a API real (zapi_configurado booleano): o
+// Gerente lê a mesma configuração da Visão Geral para as recomendações do negócio.
+const resposta = (pedidos = []) => async url => ({ ok: true, json: async () => url === '/api/minha-clinica' ? { clinica_id: 'tenant-a' }
+  : String(url).startsWith('/api/configuracoes') ? { zapi_configurado: true }
+  : { data: [], orcamentos: [], tratamentos: [], pedidos, cobrancas: [] } });
 
 test('Copiloto: loading, vazio real e acesso canônico sem fabricar prioridade', async t => {
   const fetch = resposta(); t.mock.method(global, 'fetch', fetch);

@@ -13,11 +13,13 @@ const ler = p => fs.readFileSync(new URL("../" + p, import.meta.url), "utf8").re
 test("Copiloto: 'atrasados' vêm de consulta própria (data < hoje, agendado) — igual à Casa; nunca filtrados da agenda de hoje", () => {
   const copiloto = ler("app/copiloto/page.tsx");
   const casa = ler("app/dashboard/page.tsx");
-  assert.match(copiloto, /\.lt\('data', hoje\)\.eq\('status', 'agendado'\)\.order\('data', \{ ascending: false \}\)\.order\('hora'\)\.limit\(20\)/);
-  assert.match(casa, /\.lt\("data", hoje\)\.eq\("status", "agendado"\)/);
+  // A consulta é UMA só, compartilhada pela Casa e pelo Gerente (lib/prioridades-canonicas.ts).
+  const base = ler("lib/prioridades-canonicas.ts");
+  assert.match(base, /\.lt\("data", d\.hoje\)\.eq\("status", "agendado"\)\s*\.order\("data", \{ ascending: false \}\)\.order\("hora"\)\s*\.limit\(20\)/);
+  for (const p of [copiloto, casa]) assert.match(p, /consultarBaseDoNegocio\(supabase, cid, \{ hoje, amanha, fimSete, trintaDiasAtras \}\)/);
   assert.match(copiloto, /atrasados: \(atrasadosRes\.data \?\? \[\]\) as AgItem\[\]/);
   assert.doesNotMatch(copiloto, /agendaHoje\.filter\(a => a\.data < hoje/, "filtro impossível removido");
-  assert.match(copiloto, /\|\| !!atrasadosRes\.error;/, "falha da consulta entra na visão parcial");
+  assert.match(copiloto, /\|\| base\.some\(r => !!r\.error\);/, "falha da consulta entra na visão parcial");
   assert.doesNotMatch(copiloto, /compromisso em atraso \(\{a\.data\}\)/, "data ISO crua não é exibida");
 });
 
