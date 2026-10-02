@@ -124,7 +124,7 @@ test("toda página que já usava <AdminShell> antes desta missão continua usand
     "app/tratamentos/page.tsx", "app/pedidos/page.tsx", "app/follow-up/page.tsx",
     "app/agenda-autonoma/page.tsx", "app/chatbot/page.tsx", "app/automacao/page.tsx",
     "app/reputacao/page.tsx", "app/site/page.tsx", "app/conteudo/page.tsx",
-    "app/metricas/page.tsx", "app/raio-x/page.tsx", "app/previsor-faturamento/page.tsx",
+    "app/raio-x/page.tsx", "app/previsor-faturamento/page.tsx",
     "app/linha-economica/page.tsx", "app/receita-perdida/page.tsx", "app/configuracoes/page.tsx",
   ];
   for (const p of paginasEsperadas) {

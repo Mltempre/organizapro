@@ -14,6 +14,11 @@ type Gestao = {
   tendencia_confirmacao: number | null;
   reducao_faltas: number | null;
   total_historico: number;
+  // Absorvidos da antiga tela Métricas (/metricas → redirect para cá)
+  concluidos_historico: number;
+  pendentes_historico: number;
+  cancelados_faltas_historico: number;
+  sem_desfecho_historico: number;
 };
 
 type RaioXData = {
@@ -179,6 +184,28 @@ export default function RaioX() {
         : "dos compromissos",
       value: metricas.gestao.taxa_confirmacao !== null ? `${metricas.gestao.taxa_confirmacao}%` : "—",
       trend: metricas.gestao.tendencia_confirmacao, color: "#22c55e",
+    },
+    // Histórico por status — mesmos contadores da antiga tela Métricas,
+    // absorvidos neste bloco de Gestão (sem seção nova).
+    {
+      icon: "🏁", label: "Concluídos", sub: "histórico",
+      value: metricas.gestao.concluidos_historico.toString(),
+      trend: null as number | null, color: "#7c3aed",
+    },
+    {
+      icon: "⏳", label: "Pendentes", sub: "histórico",
+      value: metricas.gestao.pendentes_historico.toString(),
+      trend: null as number | null, color: "#f59e0b",
+    },
+    {
+      icon: "🚫", label: "Cancelados e faltas", sub: "histórico",
+      value: metricas.gestao.cancelados_faltas_historico.toString(),
+      trend: null as number | null, color: "#ef4444",
+    },
+    {
+      icon: "⚠️", label: "Sem desfecho", sub: "data passada · histórico",
+      value: metricas.gestao.sem_desfecho_historico.toString(),
+      trend: null as number | null, color: "#f87171",
     },
     {
       icon: "👤", label: "Total de Clientes", sub: "cadastrados",

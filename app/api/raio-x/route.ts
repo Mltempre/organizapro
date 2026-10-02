@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
       pacRes, pacSemTelRes, pacSemEmailRes,
       clinicaRes, configRes,
     ] = await Promise.all([
-      supabase.from("agendamentos").select("id,status").eq("clinica_id", cid),
+      supabase.from("agendamentos").select("id,status,data").eq("clinica_id", cid),
       supabase.from("agendamentos").select("id,status").eq("clinica_id", cid).gte("data", inicioSemana).lte("data", hoje),
       supabase.from("agendamentos").select("id,status").eq("clinica_id", cid).gte("data", inicioSemanaAnt).lte("data", fimSemanaAnt),
       supabase.from("agendamentos").select("id", { count: "exact", head: true }).eq("clinica_id", cid).gt("data", hoje).lte("data", proximaSemFim).not("status", "in", '("cancelado")'),
@@ -123,6 +123,14 @@ export async function GET(req: NextRequest) {
     const reducaoFaltas  = faltasAnterior > 0
       ? Math.round(((faltasAnterior - faltasSemana) / faltasAnterior) * 100)
       : null;
+
+    // ── Histórico por status — absorvido da antiga tela Métricas ─────────
+    // (/metricas virou redirect para /raio-x). Mesmas definições de lá:
+    // agendado com data passada é SEM DESFECHO, nunca contado como cancelado.
+    const concluidosHist       = agsAll.filter(a => a.status === "concluido").length;
+    const canceladosFaltasHist = agsAll.filter(a => a.status === "cancelado" || a.status === "faltou").length;
+    const semDesfechoHist      = agsAll.filter(a => a.status === "agendado" && a.data < hoje).length;
+    const pendentesHist        = agsAll.filter(a => (a.status === "agendado" && a.data >= hoje) || a.status === "reagendar").length;
 
     // ── Índice OrganizaPro (fonte única: lib/raio-x.ts) ──────────────────────
     const inp: IndiceInput = {
@@ -280,6 +288,10 @@ Exemplo de formato: {"diagnostico":"Sua empresa apresenta...","pontos_fortes":"O
           tendencia_confirmacao: tendenciaConfirmacao,
           reducao_faltas:        reducaoFaltas,
           total_historico:       agsAll.length,
+          concluidos_historico:        concluidosHist,
+          pendentes_historico:         pendentesHist,
+          cancelados_faltas_historico: canceladosFaltasHist,
+          sem_desfecho_historico:      semDesfechoHist,
         },
         pacientes:  { total: totalPacientes },
         reputacao:  { nota_google: notaGoogle, num_avaliacoes: numAvaliacoes },

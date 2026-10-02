@@ -23,13 +23,17 @@ test("Copiloto: 'atrasados' vêm de consulta própria (data < hoje, agendado) �
   assert.doesNotMatch(copiloto, /compromisso em atraso \(\{a\.data\}\)/, "data ISO crua não é exibida");
 });
 
-test("Métricas: agendado com data passada é 'Sem desfecho', nunca somado a cancelados", () => {
-  const m = ler("app/metricas/page.tsx");
-  assert.match(m, /const semDesfecho = ags\.filter\(a => a\.status === 'agendado' && a\.data < hoje\)\.length/);
-  const cancelados = m.slice(m.indexOf("const cancelados"), m.indexOf("const semDesfecho"));
+test("Métricas → Raio-X: agendado com data passada é 'Sem desfecho', nunca somado a cancelados (regra preservada na consolidação)", () => {
+  const api = ler("app/api/raio-x/route.ts");
+  assert.match(api, /const semDesfechoHist\s+= agsAll\.filter\(a => a\.status === "agendado" && a\.data < hoje\)\.length/);
+  const cancelados = api.slice(api.indexOf("const canceladosFaltasHist"), api.indexOf("const semDesfechoHist"));
   assert.doesNotMatch(cancelados, /agendado/, "cancelados não inclui agendado vencido");
-  assert.match(m, /label: 'Sem desfecho \(data passada\)'/);
-  assert.match(m, /label: 'Cancelados e faltas'/);
+  const pagina = ler("app/raio-x/page.tsx");
+  assert.match(pagina, /label: "Sem desfecho"/);
+  assert.match(pagina, /label: "Cancelados e faltas"/);
+  const antiga = ler("app/metricas/page.tsx");
+  assert.match(antiga, /redirect\("\/raio-x"\)/, "rota antiga virou redirect seguro");
+  assert.doesNotMatch(antiga, /use client/, "redirect no servidor, sem shell nem tela duplicada");
 });
 
 test("Cliente 360: falha de fonte vira aviso de visão parcial — nunca histórico vazio silencioso", () => {

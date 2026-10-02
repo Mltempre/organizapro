@@ -26,7 +26,7 @@ test("menu: ordem e rótulos finais da demonstração", () => {
     "Clientes", "Orçamentos", "Follow-up Comercial", "Cobranças", "Catálogo e Pedidos", "Estoque", "Pesquisa de Preços", "Receita Perdida",
     "Agenda", "Agenda Autônoma", "Chatbot IA", "WhatsApp",
     "Google Presença", "Reputação", "Meu Site", "Conteúdo IA",
-    "Gerente Comercial", "Métricas", "Raio-X da Empresa", "Previsor de Faturamento", "Linha Econômica", "Ads e Atribuição",
+    "Gerente Comercial", "Raio-X da Empresa", "Previsor de Faturamento", "Linha Econômica", "Ads e Atribuição",
   ]);
   assert.equal(new Set(menu.map(x => x.h)).size, menu.length);
 });
