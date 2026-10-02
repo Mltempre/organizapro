@@ -1,4 +1,4 @@
-// ── Pesquisa de Preços — busca REAL na web (OpenAI Responses + web_search) ──
+﻿// ── Pesquisa de Preços — busca REAL na web (OpenAI Responses + web_search) ──
 //
 // Complementa (não substitui) o registro manual rastreável de
 // lib/pesquisa-precos.ts. Fluxo: o modelo pesquisa a web de verdade
@@ -20,6 +20,10 @@
 export type TipoConsultaPreco = "produto" | "servico";
 export type Comparabilidade = "alta" | "media" | "baixa";
 export type Confirmacao = "pagina_consultada" | "site_consultado";
+// Serviço/mão de obra: o que o preço anunciado inclui. Só "mao_de_obra" entra
+// na faixa — anúncio com aparelho/material/peça junto nunca vira preço puro
+// de mão de obra (fica listado, identificado, fora da conta).
+export type ComposicaoServico = "mao_de_obra" | "mao_de_obra_e_material" | "produto" | "indefinida";
 
 export type ReferenciaPreco = {
   titulo: string;
@@ -33,6 +37,7 @@ export type ReferenciaPreco = {
   confirmacao: Confirmacao;
   mesmaLocalidade: boolean | null; // só para serviço com cidade informada
   imagemUrl?: string | null; // produto: imagem declarada pela página da loja (lib/pesquisa-precos-imagem.ts)
+  composicao?: ComposicaoServico; // só serviço
 };
 
 export type MotivoDescarte = "url_invalida" | "site_nao_consultado" | "preco_invalido" | "titulo_ausente" | "duplicada";
@@ -42,6 +47,7 @@ export type ResultadoExtracao = {
   descartadas: { motivo: MotivoDescarte; quantidade: number }[];
   fontesConsultadas: number;
   respostaInterpretavel: boolean;
+  fatores: string[]; // serviço: o que pode alterar o preço — só texto, nunca valor
 };
 
 export type ResumoReferencias = {
@@ -77,19 +83,70 @@ function dominio(url: string): string | null {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return null; }
 }
 
-export function montarConsultaBuscaWeb(input: { termo: string; tipo: TipoConsultaPreco; localidade?: string | null }): string {
+export const LIMITE_ESPECIFICACAO = 300;
+
+// O que o profissional quer comparar: só o serviço, serviço com material, ou
+// sem definição (qualquer serviço, nunca venda de produto).
+export type EscopoServico = "mao_de_obra" | "mao_de_obra_e_material" | "indefinido";
+export const ESCOPOS_SERVICO: EscopoServico[] = ["mao_de_obra", "mao_de_obra_e_material", "indefinido"];
+export function composicaoEntraNaConta(composicao: ComposicaoServico | undefined, escopo: EscopoServico): boolean {
+  if (escopo === "mao_de_obra") return composicao === "mao_de_obra";
+  if (escopo === "mao_de_obra_e_material") return composicao === "mao_de_obra_e_material";
+  return composicao === "mao_de_obra" || composicao === "mao_de_obra_e_material";
+}
+
+export function montarConsultaBuscaWeb(input: { termo: string; tipo: TipoConsultaPreco; localidade?: string | null; especificacao?: string | null; escopo?: EscopoServico }): string {
   const termo = input.termo.trim().slice(0, 160);
   const local = input.localidade?.trim().slice(0, 80) || null;
-  const alvo = input.tipo === "produto"
-    ? `preços atuais no Brasil do PRODUTO: "${termo}". Priorize lojas e anúncios com o mesmo modelo/especificação.`
-    : `preços cobrados pelo SERVIÇO / MÃO DE OBRA: "${termo}"${local ? ` em ${local} e região` : " no Brasil"}. Indique a cidade/região de cada preço quando a página informar.`;
+  if (input.tipo === "produto") {
+    return [
+      `Pesquise na web preços atuais no Brasil do PRODUTO: "${termo}". Priorize lojas e anúncios com o mesmo modelo/especificação.`,
+      'Responda SOMENTE com JSON válido (sem texto antes ou depois) no formato {"referencias":[{"titulo":"...","preco_reais":123.45,"url":"https://...","tipo":"' + input.tipo + '","localidade":null,"comparabilidade":"alta","diferenca":null}]}.',
+      "Regras: inclua apenas ofertas cujo preço você viu na página; use o preço exatamente como exibido (à vista, em reais); \"url\" é a página onde o preço aparece;",
+      "\"comparabilidade\": alta = mesmo item/serviço; media = parecido com diferença relevante (descreva em \"diferenca\"); baixa = só relacionado;",
+      "\"localidade\": cidade/UF da oferta quando a página informar, senão null. Nunca invente preço, loja ou link; se não encontrar, devolva {\"referencias\":[]}; no máximo 8.",
+    ].join("\n");
+  }
+  // Serviço / mão de obra: o preço depende do que está incluso e da região.
+  const especificacao = input.especificacao?.trim().slice(0, LIMITE_ESPECIFICACAO) || null;
   return [
-    `Pesquise na web ${alvo}`,
-    'Responda SOMENTE com JSON válido (sem texto antes ou depois) no formato {"referencias":[{"titulo":"...","preco_reais":123.45,"url":"https://...","tipo":"' + input.tipo + '","localidade":null,"comparabilidade":"alta","diferenca":null}]}.',
+    `Pesquise na web preços cobrados pelo SERVIÇO / MÃO DE OBRA: "${termo}"${local ? ` em ${local} e região` : " no Brasil"}. Indique a cidade/região de cada preço quando a página informar.`,
+    ...(input.escopo === "mao_de_obra_e_material" ? ["O profissional quer comparar preços que INCLUEM material/peças/aparelho junto com o serviço."] : input.escopo === "indefinido" ? [] : ["O profissional quer comparar SOMENTE a mão de obra, sem material, peça ou aparelho."]),
+    ...(especificacao ? [`Especificação informada pelo profissional: "${especificacao}". Compare cada oferta com ela.`] : []),
+    'Responda SOMENTE com JSON válido (sem texto antes ou depois) no formato {"referencias":[{"titulo":"...","preco_reais":123.45,"url":"https://...","tipo":"servico","localidade":null,"comparabilidade":"alta","diferenca":null,"composicao":"mao_de_obra"}],"fatores":["..."]}.',
     "Regras: inclua apenas ofertas cujo preço você viu na página; use o preço exatamente como exibido (à vista, em reais); \"url\" é a página onde o preço aparece;",
-    "\"comparabilidade\": alta = mesmo item/serviço; media = parecido com diferença relevante (descreva em \"diferenca\"); baixa = só relacionado;",
-    "\"localidade\": cidade/UF da oferta quando a página informar, senão null. Nunca invente preço, loja ou link; se não encontrar, devolva {\"referencias\":[]}; no máximo 8.",
+    "\"composicao\": mao_de_obra = o preço é SÓ do serviço; mao_de_obra_e_material = inclui aparelho, peça, vidro, material ou produto junto; produto = é a venda de um produto; indefinida = a página não deixa claro;",
+    "\"comparabilidade\": alta = mesmo serviço e mesma especificação; media = parecido com diferença relevante (descreva em \"diferenca\"); baixa = só relacionado;",
+    "\"localidade\": cidade/UF da oferta quando a página informar, senão null;",
+    "\"fatores\": até 5 fatores que podem alterar o preço deste serviço (ex.: metragem, material, dificuldade de acesso, deslocamento), SEM valores nem números;",
+    "Nunca invente preço, loja ou link; se não encontrar, devolva {\"referencias\":[],\"fatores\":[]}; no máximo 8.",
   ].join("\n");
+}
+
+// Anúncio que deixa explícito que vem com aparelho/material/produto nunca é
+// tratado como preço puro de mão de obra, mesmo que o modelo o classifique assim.
+const SINAL_MISTURA = /(\+|\bcom\b)\s*(a\s+)?instala[çc][ãa]o|instala[çc][ãa]o\s+(inclusa|incluída|incluida|gr[áa]tis)|\b(kit|aparelho|equipamento|produto|material|pe[çc]as?)\s+(inclus[oa]s?|incluíd[oa]s?|incluid[oa]s?)\b|\b(com|\+)\s*(material|pe[çc]as?|aparelho|equipamento|vidro)\b/i;
+
+// Título que não fala de nenhum serviço (ex.: "Box para Banheiro | Melhor
+// Preço") é anúncio de produto: nunca aceito como preço de mão de obra.
+const SINAL_SERVICO = /instala|m[ãa]o\s+de\s+obra|servi[çc]o|montag|monta\b|troca|manuten|consert|repar|limpez|pintur|reform|visita|di[áa]ria|\bhora\b|aplica[çc]|regulag|revis[ãa]o|higieniz|desentup|fia[çc][ãa]o|el[ée]tric|hidr[áa]ulic|assist[êe]ncia|t[ée]cnic/i;
+
+export function classificarComposicao(bruta: unknown, titulo: string, diferenca: string | null): ComposicaoServico {
+  const declarada: ComposicaoServico = bruta === "mao_de_obra" || bruta === "mao_de_obra_e_material" || bruta === "produto" ? bruta : "indefinida";
+  const texto = `${titulo} ${diferenca ?? ""}`;
+  if (declarada === "mao_de_obra" && SINAL_MISTURA.test(texto)) return "mao_de_obra_e_material";
+  if (declarada === "mao_de_obra" && !SINAL_SERVICO.test(texto)) return "indefinida";
+  return declarada;
+}
+
+/** Fatores qualitativos (sem valores): até 5, curtos, sem R$ nem números. */
+export function sanitizarFatores(brutos: unknown): string[] {
+  if (!Array.isArray(brutos)) return [];
+  return brutos
+    .filter((f): f is string => typeof f === "string")
+    .map(f => f.trim().replace(/\s+/g, " "))
+    .filter(f => f.length >= 3 && f.length <= 120 && !/r\$|\d/i.test(f))
+    .slice(0, 5);
 }
 
 function lerJson(texto: string): unknown {
@@ -122,7 +179,7 @@ export function extrairReferencias(resposta: unknown, ctx: { tipo: TipoConsultaP
 
   const paginas = new Set(consultadas.map(chavePagina).filter((x): x is string => !!x));
   const dominios = new Set(consultadas.map(dominio).filter((x): x is string => !!x));
-  const json = lerJson(texto) as { referencias?: unknown } | null;
+  const json = lerJson(texto) as { referencias?: unknown; fatores?: unknown } | null;
   const brutas = Array.isArray(json?.referencias) ? json!.referencias as Record<string, unknown>[] : [];
 
   const contagem = new Map<MotivoDescarte, number>();
@@ -146,11 +203,12 @@ export function extrairReferencias(resposta: unknown, ctx: { tipo: TipoConsultaP
     vistas.add(chave);
     const comparabilidade: Comparabilidade = b.comparabilidade === "alta" || b.comparabilidade === "media" ? b.comparabilidade : "baixa";
     const localidade = typeof b.localidade === "string" && b.localidade.trim() ? b.localidade.trim().slice(0, 80) : null;
+    const diferenca = typeof b.diferenca === "string" && b.diferenca.trim() ? b.diferenca.trim().slice(0, 200) : null;
     referencias.push({
-      titulo, precoCentavos, url, fonte: host, tipo: ctx.tipo, localidade, comparabilidade,
-      diferenca: typeof b.diferenca === "string" && b.diferenca.trim() ? b.diferenca.trim().slice(0, 200) : null,
+      titulo, precoCentavos, url, fonte: host, tipo: ctx.tipo, localidade, comparabilidade, diferenca,
       confirmacao: paginas.has(pagina) ? "pagina_consultada" : "site_consultado",
       mesmaLocalidade: ctx.tipo === "servico" ? mesmaLocalidade(localidade, localidadeInformada) : null,
+      ...(ctx.tipo === "servico" ? { composicao: classificarComposicao(b.composicao, titulo, diferenca) } : {}),
     });
   }
   return {
@@ -158,6 +216,7 @@ export function extrairReferencias(resposta: unknown, ctx: { tipo: TipoConsultaP
     descartadas: [...contagem.entries()].map(([motivo, quantidade]) => ({ motivo, quantidade })),
     fontesConsultadas: paginas.size,
     respostaInterpretavel: json !== null,
+    fatores: ctx.tipo === "servico" ? sanitizarFatores(json?.fatores) : [],
   };
 }
 
@@ -168,8 +227,12 @@ function mediana(valores: number[]): number {
 }
 
 // Números só a partir de referências comparáveis (não "baixa") e, para
-// serviço, da mesma cidade informada. Sem cidade, serviço não conclui.
-export function resumirReferencias(refs: ReferenciaPreco[], ctx: { tipo: TipoConsultaPreco; localidade?: string | null; seuPrecoCentavos?: number | null }): ResumoReferencias {
+// serviço, da mesma cidade informada e SÓ de preço de mão de obra (sem
+// aparelho/material/produto junto). Sem cidade, serviço não conclui; com
+// evidência fraca, serviço não forma faixa (só lista as referências).
+export const MSG_SERVICO_EVIDENCIA_FRACA = "Não encontrei referências suficientes e comparáveis para formar uma faixa confiável deste serviço.";
+export function resumirReferencias(refs: ReferenciaPreco[], ctx: { tipo: TipoConsultaPreco; localidade?: string | null; seuPrecoCentavos?: number | null; escopo?: EscopoServico }): ResumoReferencias {
+  const escopo: EscopoServico = ctx.escopo ?? "mao_de_obra";
   const seu = typeof ctx.seuPrecoCentavos === "number" && ctx.seuPrecoCentavos > 0 ? ctx.seuPrecoCentavos : null;
   const vazio = (motivo: string, consideradas = 0, fontes = 0): ResumoReferencias => ({
     consideradas, fontesDistintas: fontes, minimoCentavos: null, maximoCentavos: null, medianaCentavos: null,
@@ -178,14 +241,18 @@ export function resumirReferencias(refs: ReferenciaPreco[], ctx: { tipo: TipoCon
   if (ctx.tipo === "servico" && !ctx.localidade?.trim()) {
     return vazio("Para serviço/mão de obra informe a cidade: preços de outras regiões não representam o seu mercado.");
   }
-  const consideradas = refs.filter(r => r.comparabilidade !== "baixa" && (ctx.tipo === "produto" || r.mesmaLocalidade === true));
+  const consideradas = refs.filter(r => r.comparabilidade !== "baixa"
+    && (ctx.tipo === "produto" || (r.mesmaLocalidade === true && composicaoEntraNaConta(r.composicao, escopo))));
   const fontes = new Set(consideradas.map(r => r.fonte)).size;
   if (consideradas.length === 0) {
-    return vazio(ctx.tipo === "servico" ? "Nenhuma referência comparável encontrada para essa cidade." : "Nenhuma referência comparável encontrada.");
+    return vazio(ctx.tipo === "servico" ? `${MSG_SERVICO_EVIDENCIA_FRACA} Nenhuma referência ${escopo === "mao_de_obra" ? "de mão de obra" : escopo === "mao_de_obra_e_material" ? "de mão de obra com material" : "de serviço"} comparável nessa cidade.` : "Nenhuma referência comparável encontrada.");
   }
   const precos = consideradas.map(r => r.precoCentavos);
   const minimo = Math.min(...precos), maximo = Math.max(...precos), med = mediana(precos);
   const confiavel = consideradas.length >= MIN_REFERENCIAS_CONFIAVEL && fontes >= MIN_FONTES_CONFIAVEL;
+  if (ctx.tipo === "servico" && !confiavel) {
+    return vazio(`${MSG_SERVICO_EVIDENCIA_FRACA} Encontrei ${consideradas.length} referência${consideradas.length === 1 ? "" : "s"} de ${fontes} fonte${fontes === 1 ? "" : "s"} — veja-as individualmente abaixo.`, consideradas.length, fontes);
+  }
   return {
     consideradas: consideradas.length, fontesDistintas: fontes,
     minimoCentavos: minimo, maximoCentavos: maximo, medianaCentavos: med,
@@ -204,7 +271,7 @@ export type SucessoBusca = { ok: true; extracao: ResultadoExtracao; modelo: stri
 // Única chamada ao provedor. `fetchImpl` é injetável para teste; nunca loga
 // chave, prompt nem resposta.
 export async function executarBuscaWeb(args: {
-  apiKey: string | undefined; termo: string; tipo: TipoConsultaPreco; localidade?: string | null;
+  apiKey: string | undefined; termo: string; tipo: TipoConsultaPreco; localidade?: string | null; especificacao?: string | null; escopo?: EscopoServico;
   fetchImpl?: typeof fetch; timeoutMs?: number;
 }): Promise<SucessoBusca | FalhaBusca> {
   if (!args.apiKey) return { ok: false, status: 503, erro: "Busca na web indisponível: provedor não configurado." };
@@ -219,7 +286,7 @@ export async function executarBuscaWeb(args: {
         model: MODELO_BUSCA_WEB,
         tools: [{ type: "web_search", user_location: { type: "approximate", country: "BR", ...(local ? { city: local.slice(0, 80) } : {}) } }],
         include: ["web_search_call.action.sources"],
-        input: montarConsultaBuscaWeb({ termo: args.termo, tipo: args.tipo, localidade: local }),
+        input: montarConsultaBuscaWeb({ termo: args.termo, tipo: args.tipo, localidade: local, especificacao: args.especificacao, escopo: args.escopo }),
         max_output_tokens: 1800,
       }),
       signal: controller.signal,

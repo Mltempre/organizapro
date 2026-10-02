@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,12 +8,14 @@ import PageLoader from "../components/PageLoader";
 import EmptyState from "../components/EmptyState";
 import Feedback, { MSG_ERRO_PADRAO } from "../components/Feedback";
 import { TIPOS_FONTE_PRECO, UNIDADES_PESQUISA, type EstadoComparacao } from "../../lib/pesquisa-precos";
-import type { ReferenciaPreco, ResumoReferencias, TipoConsultaPreco } from "../../lib/pesquisa-precos-web";
+import { composicaoEntraNaConta, type EscopoServico, type ReferenciaPreco, type ResumoReferencias, type TipoConsultaPreco } from "../../lib/pesquisa-precos-web";
 
 // Resultado de /api/pesquisa-precos/busca-web (referências reais, validadas no servidor).
 type ResultadoBusca = {
-  consulta: { termo: string; tipo: TipoConsultaPreco; localidade: string | null; pesquisadoEm: string };
+  consulta: { termo: string; tipo: TipoConsultaPreco; localidade: string | null; pesquisadoEm: string; especificacao?: string | null; escopo?: EscopoServico | null };
   itemCatalogo: { id: string; nome: string } | null;
+  seuPrecoOrigem?: "informado" | "catalogo" | null;
+  fatores?: string[];
   referencias: ReferenciaPreco[];
   descartadas: { motivo: string; quantidade: number }[];
   fontesConsultadas: number;
@@ -65,6 +67,15 @@ function reaisParaCentavos(valor: string): number | null {
   return Math.round(numero * 100);
 }
 
+// "450" · "450,00" · "1.234,56" · "R$ 1.234,56" → número em reais (null se inválido).
+function precoParaNumero(texto: string): number | null {
+  const limpo = texto.replace(/R\$|\s/g, "");
+  if (!limpo) return null;
+  const normalizado = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
+  const n = Number(normalizado);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function moeda(centavos: number, codigo = "BRL"): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: codigo });
 }
@@ -103,7 +114,7 @@ export default function PesquisaPrecosPage() {
   const [observacao, setObservacao] = useState({ fonteId: "", preco: "", quantidade: "1", unidade: "un", observadoEm: agoraLocal(), evidencia: "", corrigeId: "" });
 
   // Busca real na web (produto ou serviço/mão de obra)
-  const [busca, setBusca] = useState<{ termo: string; tipo: TipoConsultaPreco; localidade: string; servicoId: string }>({ termo: "", tipo: "produto", localidade: "", servicoId: "" });
+  const [busca, setBusca] = useState<{ termo: string; tipo: TipoConsultaPreco; localidade: string; servicoId: string; especificacao: string; seuPreco: string; escopo: EscopoServico }>({ termo: "", tipo: "produto", localidade: "", servicoId: "", especificacao: "", seuPreco: "", escopo: "mao_de_obra" });
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoBusca | null>(null);
   const [erroBusca, setErroBusca] = useState("");
@@ -248,7 +259,8 @@ export default function PesquisaPrecosPage() {
     try {
       const resposta = await fetch("/api/pesquisa-precos/busca-web", {
         method: "POST", headers,
-        body: JSON.stringify({ termo: busca.termo, tipo: busca.tipo, localidade: busca.localidade || undefined, servico_id: busca.servicoId || undefined }),
+        body: JSON.stringify({ termo: busca.termo, tipo: busca.tipo, localidade: busca.localidade || undefined, servico_id: busca.servicoId || undefined,
+          ...(busca.tipo === "servico" ? { escopo: busca.escopo, especificacao: busca.especificacao.trim() || undefined, seu_preco_reais: precoParaNumero(busca.seuPreco) ?? undefined } : {}) }),
       });
       const json = await resposta.json().catch(() => ({}));
       if (!resposta.ok || !json.sucesso) throw new Error(json.error || MSG_ERRO_PADRAO);
@@ -342,6 +354,12 @@ export default function PesquisaPrecosPage() {
             <label style={label}>Tipo<select style={input} value={busca.tipo} onChange={(e) => setBusca({ ...busca, tipo: e.target.value === "servico" ? "servico" : "produto" })}>
               <option value="produto">Produto</option><option value="servico">Serviço / mão de obra</option></select></label>
             <label style={label}>{busca.tipo === "servico" ? "Cidade (necessária para serviço)" : "Cidade (opcional)"}<input style={input} maxLength={80} placeholder="Ex.: Londrina, PR" value={busca.localidade} onChange={(e) => setBusca({ ...busca, localidade: e.target.value })} /></label>
+            {busca.tipo === "servico" && <>
+              <label style={label} className="pp-span">O que o preço deve incluir<select style={input} value={busca.escopo} onChange={(e) => setBusca({ ...busca, escopo: e.target.value === "mao_de_obra_e_material" ? "mao_de_obra_e_material" : e.target.value === "indefinido" ? "indefinido" : "mao_de_obra" })}>
+                <option value="mao_de_obra">Somente mão de obra (sem material)</option><option value="mao_de_obra_e_material">Mão de obra + material</option><option value="indefinido">Ainda não sei / qualquer serviço</option></select></label>
+              <label style={label} className="pp-span">Especificação do serviço (opcional)<input style={input} maxLength={300} placeholder="Ex.: somente mão de obra · box frontal, vidro 8 mm, 1,40 x 1,90 m" value={busca.especificacao} onChange={(e) => setBusca({ ...busca, especificacao: e.target.value })} /></label>
+              <label style={label}>Seu preço para este serviço (opcional, R$)<input style={input} inputMode="decimal" maxLength={14} placeholder="Ex.: 450,00 — só para comparar" value={busca.seuPreco} onChange={(e) => setBusca({ ...busca, seuPreco: e.target.value })} /></label>
+            </>}
             <label style={label} className="pp-span">Comparar com item do Catálogo<select style={input} value={busca.servicoId} onChange={(e) => setBusca({ ...busca, servicoId: e.target.value })}><option value="">Sem comparação</option>{catalogo.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>
             <div className="pp-span"><button className="pp-btn" disabled={buscando || !token}>{buscando ? "Buscando na web..." : "Buscar referências"}</button></div>
           </form>
@@ -349,15 +367,23 @@ export default function PesquisaPrecosPage() {
 
           {resultado && resumo && <div data-testid="resultado-busca" style={{ marginTop: 16 }}>
             <div className="pp-resumo">
-              <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Seu preço</span><b>{resumo.seuPrecoCentavos !== null ? R(resumo.seuPrecoCentavos) : resultado.itemCatalogo ? "Sem preço no catálogo" : "—"}</b></div>
+              <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Seu preço{resultado.seuPrecoOrigem === "informado" ? " (informado)" : resultado.seuPrecoOrigem === "catalogo" ? " (Catálogo)" : ""}</span><b>{resumo.seuPrecoCentavos !== null ? R(resumo.seuPrecoCentavos) : resultado.itemCatalogo ? "Sem preço no catálogo" : "—"}</b></div>
               <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Referências consideradas</span><b>{resumo.consideradas} <small style={{ fontSize: 11, color: "#64748b" }}>de {resultado.referencias.length} · {resumo.fontesDistintas} fonte(s)</small></b></div>
               <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Faixa observada</span><b>{resumo.minimoCentavos !== null ? `${R(resumo.minimoCentavos)} – ${R(resumo.maximoCentavos)}` : "—"}</b></div>
               <div className="pp-kpi"><span style={{ fontSize: 11, color: "#94a3b8" }}>Mediana observada</span><b>{R(resumo.medianaCentavos)}</b></div>
             </div>
             <p data-testid="motivo-resumo" style={{ fontSize: 12, color: resumo.confiavel ? "#4ade80" : "#fbbf24", margin: "0 0 6px" }}>{resumo.motivo}</p>
+            {resultado.consulta.tipo === "servico" && resumo.medianaCentavos !== null && <div data-testid="resposta-simples" style={{ fontSize: 13, color: "#e2e8f0", background: "#0f1117", border: "1px solid #252b3a", borderRadius: 10, padding: "10px 12px", margin: "0 0 10px", lineHeight: 1.6 }}>
+              <div><b>Quanto estão cobrando:</b> de {R(resumo.minimoCentavos)} a {R(resumo.maximoCentavos)} (valor do meio: {R(resumo.medianaCentavos)}).</div>
+              <div><b>O que está incluído:</b> {(resultado.consulta.escopo ?? "mao_de_obra") === "mao_de_obra" ? "somente a mão de obra, sem material" : (resultado.consulta.escopo ?? "mao_de_obra") === "mao_de_obra_e_material" ? "mão de obra com material" : "serviço, com ou sem material (os preços podem não ser totalmente comparáveis)"}.</div>
+              <div><b>Seu preço:</b> {resumo.seuPrecoCentavos === null ? "não informado — digite o seu preço para comparar" : resumo.posicaoSeuPreco === null ? `${R(resumo.seuPrecoCentavos)} — sem comparação confiável` : `${R(resumo.seuPrecoCentavos)}, ${resumo.posicaoSeuPreco === "abaixo" ? "abaixo" : resumo.posicaoSeuPreco === "acima" ? "acima" : "dentro"} do que estão cobrando`}.</div>
+            </div>}
             {resumo.posicaoSeuPreco && <p style={{ fontSize: 12, color: "#cbd5e1", margin: "0 0 10px" }}>
               Seu preço está {resumo.posicaoSeuPreco === "abaixo" ? "abaixo da faixa encontrada" : resumo.posicaoSeuPreco === "acima" ? "acima da faixa encontrada" : "dentro da faixa encontrada"} — uma referência para sua decisão, não uma recomendação automática.
             </p>}
+            {resultado.consulta.tipo === "servico" && !!resultado.fatores?.length && <div data-testid="fatores-servico" style={{ fontSize: 12, color: "#cbd5e1", margin: "0 0 10px" }}>
+              O preço deste serviço pode variar conforme: {resultado.fatores.join(" · ")}.
+            </div>}
             <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 10px" }}>
               Pesquisado em {dataHora(resultado.consulta.pesquisadoEm)} · {resultado.fontesConsultadas} páginas consultadas por {resultado.provedor.nome}
               {resultado.descartadas.length > 0 && ` · ${resultado.descartadas.reduce((s, d) => s + d.quantidade, 0)} resposta(s) descartada(s) sem preço ou fonte válida`}
@@ -365,7 +391,11 @@ export default function PesquisaPrecosPage() {
             {resultado.referencias.length === 0 ? <EmptyState icon="🔎" title="Nenhuma referência com preço e fonte verificáveis" description="Tente um nome mais específico (modelo, medida, marca) ou registre cotações manualmente abaixo." compact /> :
             <div style={{ overflowX: "auto" }}><table className="pp-table"><thead><tr><th>Referência</th><th>Preço</th><th>Fonte</th><th>Comparabilidade</th><th></th></tr></thead><tbody>
               {resultado.referencias.map((r) => {
-                const foraDaConta = r.comparabilidade === "baixa" || (resultado.consulta.tipo === "servico" && r.mesmaLocalidade !== true);
+                const servico = resultado.consulta.tipo === "servico";
+                const foraDaConta = r.comparabilidade === "baixa" || (servico && (r.mesmaLocalidade !== true || !composicaoEntraNaConta(r.composicao, resultado.consulta.escopo ?? "mao_de_obra")));
+                const motivoFora = r.comparabilidade === "baixa" ? "Fora da conta"
+                  : servico && !composicaoEntraNaConta(r.composicao, resultado.consulta.escopo ?? "mao_de_obra") && r.mesmaLocalidade === true ? (r.composicao === "indefinida" ? "Não informa se inclui material — fora da conta" : r.composicao === "produto" ? "Venda de produto — fora da conta" : (resultado.consulta.escopo ?? "mao_de_obra") === "mao_de_obra_e_material" ? "Só mão de obra — fora da conta" : "Inclui produto/material — fora da conta")
+                  : "Outra região — fora da conta";
                 const chave = r.url + r.precoCentavos;
                 return <tr key={chave} style={{ opacity: foraDaConta ? 0.6 : 1 }}>
                   <td style={{ maxWidth: 380 }}>
@@ -380,12 +410,12 @@ export default function PesquisaPrecosPage() {
                             style={{ width: 56, height: 56, objectFit: "contain", borderRadius: 8, background: "#fff", flexShrink: 0 }} />
                         : <div aria-hidden="true" data-testid="sem-imagem-referencia" title="Sem imagem confiável desta fonte"
                             style={{ width: 56, height: 56, borderRadius: 8, border: "1px dashed #2d3148", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, opacity: 0.45, flexShrink: 0 }}>📦</div>)}
-                      <div style={{ minWidth: 0 }}>{r.titulo}{r.localidade && <><br /><span style={{ color: "#64748b" }}>📍 {r.localidade}</span></>}{r.diferenca && <><br /><span style={{ color: "#fbbf24" }}>Diferença: {r.diferenca}</span></>}</div>
+                      <div style={{ minWidth: 0 }}>{r.titulo}{r.localidade && <><br /><span style={{ color: "#64748b" }}>📍 {r.localidade}</span></>}{r.diferenca && <><br /><span style={{ color: "#fbbf24" }}>Diferença: {r.diferenca}</span></>}{servico && r.composicao && <><br /><span data-testid="composicao-referencia" style={{ color: r.composicao === "mao_de_obra" ? "#4ade80" : "#fbbf24" }}>{r.composicao === "mao_de_obra" ? "Somente mão de obra" : r.composicao === "indefinida" ? "Não informa se inclui material" : r.composicao === "produto" ? "Venda de produto" : "Inclui produto/material"}</span></>}</div>
                     </div>
                   </td>
                   <td style={{ fontWeight: 700, color: "#f1f5f9" }}>{R(r.precoCentavos)}</td>
                   <td><a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: "#4a9bb0" }}>{r.fonte}</a><br /><span style={{ color: "#64748b" }}>{r.confirmacao === "pagina_consultada" ? "página consultada" : "site consultado — confira a página"}</span></td>
-                  <td>{r.comparabilidade === "alta" ? "Alta" : r.comparabilidade === "media" ? "Média" : "Baixa"}{foraDaConta && <><br /><span style={{ color: "#fbbf24" }}>{r.comparabilidade === "baixa" ? "Fora da conta" : "Outra região — fora da conta"}</span></>}</td>
+                  <td>{r.comparabilidade === "alta" ? "Alta" : r.comparabilidade === "media" ? "Média" : "Baixa"}{foraDaConta && <><br /><span style={{ color: "#fbbf24" }}>{motivoFora}</span></>}</td>
                   <td><button type="button" className="pp-btn pp-secondary" disabled={salvando || registradas.has(chave)} onClick={() => void registrarReferencia(r)}>{registradas.has(chave) ? "Registrada" : "Registrar no histórico"}</button></td>
                 </tr>;
               })}

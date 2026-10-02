@@ -81,8 +81,9 @@ test("serviço/mão de obra: sem cidade não conclui; com cidade só conta preç
   assert.equal(mesmaLocalidade("Londrina/PR", "Londrina, PR"), true);
   assert.equal(mesmaLocalidade("Curitiba/PR", "Londrina, PR"), false);
   assert.equal(mesmaLocalidade(null, "Londrina, PR"), false);
-  const refs = [R("a.com", 2500, { tipo: "servico", mesmaLocalidade: true }), R("b.com", 2000, { tipo: "servico", mesmaLocalidade: true }),
-    R("c.com", 3000, { tipo: "servico", mesmaLocalidade: true }), R("d.com", 20000, { tipo: "servico", mesmaLocalidade: false })];
+  const mo = { tipo: "servico", composicao: "mao_de_obra" }; // só preço de mão de obra entra na faixa
+  const refs = [R("a.com", 2500, { ...mo, mesmaLocalidade: true }), R("b.com", 2000, { ...mo, mesmaLocalidade: true }),
+    R("c.com", 3000, { ...mo, mesmaLocalidade: true }), R("d.com", 20000, { ...mo, mesmaLocalidade: false })];
   const s = plain(resumirReferencias(refs, { tipo: "servico", localidade: "Londrina, PR" }));
   assert.deepEqual([s.consideradas, s.minimoCentavos, s.maximoCentavos, s.medianaCentavos, s.confiavel], [3, 2000, 3000, 2500, true]);
 });
