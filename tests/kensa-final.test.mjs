@@ -115,7 +115,8 @@ test("Automação: cards não mostram 0 durante carregamento nem após falha (ze
 
 test("Agenda Autônoma: rótulo condiz com o destino (sem compromisso → agendar novo horário)", () => {
   const p = ler("app/agenda-autonoma/page.tsx");
-  assert.match(p, /caso\.tipo === 'sem_proximo_compromisso' \? 'Agendar novo horário →' : 'Ver na Agenda →'/);
+  assert.match(p, /caso\.tipo === 'sem_proximo_compromisso' \? 'Agendar novo horário →'/);
+  assert.match(p, /caso\.tipo === 'confirmacao_pendente' \? 'Abrir compromisso na Agenda →'/);
   const lib = ler("lib/agenda-autonoma.ts");
   assert.match(lib, /const DESTINO_AGENDA_HISTORICO = "\/agendamentos\?filtro=historico";/);
   assert.match(lib, /const DESTINO_NOVO_COMPROMISSO = "\/agendamentos\?novo=1";/);

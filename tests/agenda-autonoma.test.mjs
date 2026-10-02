@@ -144,7 +144,7 @@ test("cada caso tem tipo, motivo e destino corretos, nunca misturado entre categ
   const porTipo = Object.fromEntries(r.map(c => [c.tipo, c]));
   // KENSA: cada destino abre onde o item está (cancelado → Histórico; sem compromisso → novo compromisso)
   assert.equal(porTipo.cancelamento_sem_reagendamento.destino, "/agendamentos?filtro=historico");
-  assert.equal(porTipo.confirmacao_pendente.destino, "/agendamentos");
+  assert.equal(porTipo.confirmacao_pendente.destino, "/agendamentos?agendamento=a1");
   assert.equal(porTipo.sem_proximo_compromisso.destino, "/agendamentos?novo=1");
   assert.match(porTipo.cancelamento_sem_reagendamento.motivo, /cancelou/i);
   assert.match(porTipo.confirmacao_pendente.motivo, /confirmad[oa]/i);
@@ -161,15 +161,27 @@ test("agenda-autonoma: toda consulta a agendamentos/pacientes é escopada por cl
   assert.ok(consultas.length >= 3, `esperado >=3 consultas escopadas por clinica_id, achou ${consultas.length}`);
 });
 
-test("agenda-autonoma: a única mutação (confirmar) nunca confia em clinica_id de fora do vínculo autenticado, e guarda contra reprocessamento", () => {
-  assert.match(pagina, /\.update\(\{ status: 'confirmado', confirmado: true \}\)/);
-  assert.match(pagina, /\.eq\('id', caso\.id\)/);
-  assert.match(pagina, /\.eq\('clinica_id', clinicaId\)/);
-  assert.match(pagina, /\.eq\('status', 'agendado'\)/);
-  assert.doesNotMatch(pagina, /clinicaId\s*=\s*(req|body|searchParams)/);
+test("agenda-autonoma: confirmação pendente encaminha ao compromisso na Agenda, sem mutação própria", () => {
+  assert.match(pagina, /router\.push\(caso\.destino\)/);
+  assert.match(pagina, /Abrir compromisso na Agenda →/);
+  assert.doesNotMatch(pagina, /\.update\(/);
+  assert.doesNotMatch(pagina, /function confirmar\(/);
+  assert.doesNotMatch(pagina, /Confirmando\.\.\./);
 });
 
-test("agenda-autonoma: nenhuma ação de reagendamento é fabricada — cancelamento e sem-próximo-compromisso só navegam para /agendamentos (ação assistida real)", () => {
+test("agenda: destino da Agenda Autônoma abre a edição do compromisso correspondente e mantém alteração de status", () => {
+  const agenda = fs.readFileSync(new URL("../app/agendamentos/page.tsx", import.meta.url), "utf8");
+  assert.match(agenda, /get\('agendamento'\)/);
+  assert.match(agenda, /agendamentos\.find\(item => item\.id === id\)/);
+  assert.match(agenda, /abrirEdicao\(agendamento\)/);
+  assert.match(agenda, /<option value="confirmado">Confirmado<\/option>/);
+  assert.match(agenda, /\.update\(payloadEdicao\)/);
+});
+
+test("agenda-autonoma: preserva triagem completa e navegação assistida sem fabricar reagendamento", () => {
+  assert.match(pagina, /cancelamento_sem_reagendamento/);
+  assert.match(pagina, /confirmacao_pendente/);
+  assert.match(pagina, /sem_proximo_compromisso/);
   assert.match(pagina, /router\.push\(caso\.destino\)/);
   assert.doesNotMatch(pagina, /status:\s*['"]reagendar['"]/);
 });

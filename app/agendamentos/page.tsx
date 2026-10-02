@@ -232,6 +232,7 @@ export default function AgendamentosPage() {
   const [form, setForm]                 = useState<FormData>(formInicial);
   const [salvando, setSalvando]         = useState(false);
   const salvandoRef = useRef(false); // trava síncrona de submissão — ver salvar()
+  const agendamentoAbertoRef = useRef<string | null>(null);
   const [excluindo, setExcluindo]       = useState<string | null>(null);
   const [carregando, setCarregando]     = useState(true);
   const [erro, setErro]                 = useState('');
@@ -282,6 +283,15 @@ export default function AgendamentosPage() {
   }, [router]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('agendamento');
+    if (!id || carregando || agendamentoAbertoRef.current === id) return;
+    const agendamento = agendamentos.find(item => item.id === id);
+    if (!agendamento) return;
+    agendamentoAbertoRef.current = id;
+    abrirEdicao(agendamento);
+  }, [agendamentos, carregando]);
 
   // Botão Rápido "Novo Agendamento" do Dashboard (?novo=1) — abre o mesmo
   // modal real de criação que o botão "+" desta tela já usa. Nenhum

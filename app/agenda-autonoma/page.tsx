@@ -38,12 +38,9 @@ function trintaDiasAtrasStr() {
 export default function AgendaAutonomaPage() {
   const router = useRouter();
   const [casos, setCasos] = useState<CasoAgendaAutonoma[]>([]);
-  const [clinicaId, setClinicaId] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const [sucesso, setSucesso] = useState('');
   const [filtro, setFiltro] = useState<'todos' | TipoCasoAgenda>('todos');
-  const [confirmando, setConfirmando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -56,7 +53,6 @@ export default function AgendaAutonomaPage() {
 
       const cuRes = await fetch('/api/minha-clinica', { headers: { Authorization: `Bearer ${session.access_token}` } });
       const cid: string | undefined = cuRes.ok ? (await cuRes.json()).clinica_id : undefined;
-      setClinicaId(cid || '');
       if (!cid) { setCasos([]); setCarregando(false); return; }
 
       const hoje = hojeStr();
@@ -119,39 +115,6 @@ export default function AgendaAutonomaPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Ação real e segura: só muda o status de "agendado" para "confirmado",
-  // escopada por id + clinica_id + status atual (guarda otimista, mesmo
-  // padrão de defesa em profundidade já usado em tratamentos/cobrancas) —
-  // nunca toca em outros campos do agendamento nem em pacientes.
-  async function confirmar(caso: CasoAgendaAutonoma) {
-    if (!clinicaId) return;
-    setConfirmando(caso.id);
-    try {
-      const { error, data } = await supabase
-        .from('agendamentos')
-        .update({ status: 'confirmado', confirmado: true })
-        .eq('id', caso.id)
-        .eq('clinica_id', clinicaId)
-        .eq('status', 'agendado')
-        .select('id');
-      if (error) { setErro(MSG_ERRO_PADRAO); return; }
-      if (!data || data.length === 0) {
-        // Já não estava mais 'agendado' (confirmado por outra aba, ou o
-        // status mudou) — nunca duplica a ação, só recarrega para refletir o estado real.
-        carregar();
-        return;
-      }
-      carregar();
-      setSucesso('Compromisso confirmado.');
-      setTimeout(() => setSucesso(''), 3500);
-    } catch (e) {
-      console.error(e);
-      setErro(MSG_ERRO_PADRAO);
-    } finally {
-      setConfirmando(null);
-    }
-  }
-
   const filtrados = casos.filter(c => filtro === 'todos' || c.tipo === filtro);
   const contagemPorTipo = (['cancelamento_sem_reagendamento', 'confirmacao_pendente', 'sem_proximo_compromisso'] as TipoCasoAgenda[])
     .map(tipo => ({ tipo, total: casos.filter(c => c.tipo === tipo).length }));
@@ -160,7 +123,6 @@ export default function AgendaAutonomaPage() {
     <AdminShell title="Agenda Autônoma" subtitle={`${filtrados.length} caso${filtrados.length !== 1 ? 's' : ''} precisando de atenção`}>
       {carregando && <PageLoader title="Consolidando a agenda..." />}
       {!carregando && erro && <Feedback type="erro" message={erro} onClose={() => setErro('')} />}
-      {!carregando && sucesso && <Feedback type="sucesso" message={sucesso} onClose={() => setSucesso('')} />}
 
       {!carregando && casos.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -203,13 +165,9 @@ export default function AgendaAutonomaPage() {
                   <strong>{caso.nome}</strong> — {caso.motivo}
                   <div style={{ fontSize: 12, marginTop: 4, color: '#4a9bb0' }}>➜ Próxima ação: {caso.proximaAcao}</div>
                 </div>
-                {caso.tipo === 'confirmacao_pendente' ? (
-                  <button disabled={confirmando === caso.id} onClick={() => confirmar(caso)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                    {confirmando === caso.id ? 'Confirmando...' : 'Confirmar'}
-                  </button>
-                ) : (
-                  <button onClick={() => router.push(caso.destino)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>{caso.tipo === 'sem_proximo_compromisso' ? 'Agendar novo horário →' : 'Ver na Agenda →'}</button>
-                )}
+                <button onClick={() => router.push(caso.destino)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #2d3148', background: 'transparent', color: '#4a9bb0', fontSize: 11, cursor: 'pointer' }}>
+                  {caso.tipo === 'sem_proximo_compromisso' ? 'Agendar novo horário →' : caso.tipo === 'confirmacao_pendente' ? 'Abrir compromisso na Agenda →' : 'Ver na Agenda →'}
+                </button>
               </div>
             );
           })}

@@ -142,7 +142,7 @@ export function gerarCasosAgendaAutonoma(input: EntradaAgendaAutonoma): CasoAgen
       telefone: a.telefone,
       motivo: "Tem um compromisso hoje que ainda não foi confirmado.",
       proximaAcao: "Confirmar presença com o cliente",
-      destino: DESTINO_AGENDA,
+      destino: `${DESTINO_AGENDA}?agendamento=${encodeURIComponent(a.id)}`,
     });
   }
 
